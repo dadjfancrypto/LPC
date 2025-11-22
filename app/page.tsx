@@ -126,7 +126,7 @@ export default function Home() {
                 </svg>
               </div>
               <h2 className="text-2xl font-bold text-slate-100 mb-3 group-hover:text-rose-400 transition-colors">
-                必要保障額シミュレーター
+                必要保障額
               </h2>
               <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">
                 遺族の生活費と公的年金の差額（ギャップ）を可視化し、民間保険などで準備すべき必要保障額を算出します。

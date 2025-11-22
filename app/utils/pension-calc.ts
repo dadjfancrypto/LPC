@@ -16,21 +16,21 @@ export const POLICY_MODES: Record<PolicyMode, { name: string; description: strin
     revised2028: { name: '2028年改正案', description: '2028年以降の改正案（試算）' },
 };
 
-// 令和6年度 遺族基礎年金（年額）
-export const KISO_BASE_ANNUAL = 816000; // 68歳未満
-export const CHILD_ADDITION_1_2 = 234800; // 第1子・第2子
-export const CHILD_ADDITION_3_PLUS = 78300; // 第3子以降
+// 令和7年度 遺族基礎年金（年額）
+export const KISO_BASE_ANNUAL = 831700; // 68歳未満
+export const CHILD_ADDITION_1_2 = 239300; // 第1子・第2子
+export const CHILD_ADDITION_3_PLUS = 79800; // 第3子以降
 
 // 中高齢寡婦加算（年額）
-export const CHUKOREI_KASAN = 612000;
+export const CHUKOREI_KASAN = 623800;
 
 // 経過的寡婦加算（簡易的に固定値または計算式）
 // ※本来は生年月日によるが、ここでは簡易シミュレーションのため0または代表値とする
 export const KEIKATEKI_KASAN_BASE = 0;
 
 // 障害年金（1級は2級の1.25倍）
-export const DISABILITY_BASIC_1 = 1020000; // 1級
-export const DISABILITY_BASIC_2 = 816000;  // 2級
+export const DISABILITY_BASIC_1 = 1039625; // 1級（令和7年度）
+export const DISABILITY_BASIC_2 = 831700;  // 2級（令和7年度）
 
 export type DisabilityLevel = 1 | 2 | 3;
 
@@ -97,6 +97,27 @@ export function calculateSurvivorEmployeePension(
 
     // 遺族厚生年金は報酬比例部分の3/4
     return remunerationProportional * 0.75;
+}
+
+/**
+ * 老齢基礎年金の計算（簡易版）
+ * 基本的に満額を返す（加入期間40年と仮定）
+ */
+export function calculateOldAgeBasicPension(): number {
+    return KISO_BASE_ANNUAL;
+}
+
+/**
+ * 老齢厚生年金の計算（簡易版）
+ * 報酬比例部分
+ */
+export function calculateOldAgeEmployeePension(
+    avgStdMonthly: number,
+    months: number
+): number {
+    // 報酬比例部分の計算（平成15年4月以降の乗率を使用：5.481/1000）
+    const multiplier = 5.481 / 1000;
+    return avgStdMonthly * months * multiplier;
 }
 
 /**
@@ -172,9 +193,9 @@ export function calculateDisabilityEmployeePension(
         amount = amount * 1.25;
     }
 
-    // 3級の最低保証額（令和6年度：612,000円）
-    if (level === 3 && amount < 612000) {
-        amount = 612000;
+    // 3級の最低保証額（令和7年度：623,800円）
+    if (level === 3 && amount < 623800) {
+        amount = 623800;
     }
 
     // 配偶者加給年金（1級・2級のみ）
@@ -277,7 +298,6 @@ export function generateTimeline({
 
     return items;
 }
-
 // 必要保障額シミュレーター用ヘルパー
 export function kisoAnnualByCount(count: number): number {
     return calculateSurvivorBasicPension(count);

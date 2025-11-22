@@ -307,7 +307,7 @@ export default function NecessaryCoveragePage() {
                 <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
                     <h1 className="text-xl font-bold flex items-center gap-2">
                         <span className="w-2 h-8 bg-rose-500 rounded-full"></span>
-                        必要保障額シミュレーター
+                        必要保障額
                     </h1>
                     <Link href="/" className="text-sm text-slate-400 hover:text-white transition-colors">
                         TOPへ戻る
