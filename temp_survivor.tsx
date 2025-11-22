@@ -230,8 +230,8 @@ function PensionSegmentsBar({ segments, geometry }: { segments: Segment[]; geome
           const w = geometry.rawW[i];
           if (w <= 1) return null;
           const showText = w >= MIN_SEG_PX;
-          const amountText = s.amountYear !== undefined ? `${(s.amountYear / 10000).toFixed(0)}万円` : '';
-          const titleText = `${s.label} ${s.years}年`;
+          const amountText = s.amountYear !== undefined ? `${(s.amountYear / 10000).toFixed(0)}荳・・` : '';
+          const titleText = `${s.label} ${s.years}蟷ｴ`;
           return (
             <div
               key={i}
@@ -371,8 +371,8 @@ function PeriodCard({ title, amount, period, colorClass, icon }: { title: string
         <div className="text-sm font-bold text-slate-300">{title}</div>
       </div>
       <div className="text-2xl font-bold text-slate-100 mb-1">
-        {amount > 0 ? `${(amount / 10000).toFixed(0)}万円` : '---'}
-        <span className="text-xs font-normal text-slate-500 ml-1">/年</span>
+        {amount > 0 ? `${(amount / 10000).toFixed(0)}荳・・` : '---'}
+        <span className="text-xs font-normal text-slate-500 ml-1">/蟷ｴ</span>
       </div>
       <div className="text-xs text-slate-500">{period}</div>
     </div>
@@ -506,7 +506,7 @@ export default function SurvivorPensionPage() {
 
     if (caseHusbandDeath.yearsUntilChild18 > 0) {
       segs.push({
-        label: '基礎+厚生',
+        label: '蝓ｺ遉・蜴夂函',
         years: caseHusbandDeath.yearsUntilChild18,
         widthYears: widenYears(caseHusbandDeath.yearsUntilChild18),
         className: 'bg-emerald-500/80 ring-1 ring-white/20',
@@ -518,7 +518,7 @@ export default function SurvivorPensionPage() {
 
     if (yearsChukorei > 0) {
       segs.push({
-        label: caseHusbandDeath.ageAfterChild >= 40 ? '中高齢+厚生' : '厚生のみ',
+        label: caseHusbandDeath.ageAfterChild >= 40 ? '荳ｭ鬮倬ｽ｢+蜴夂函' : '蜴夂函縺ｮ縺ｿ',
         years: yearsChukorei,
         widthYears: widenYears(yearsChukorei),
         className: 'bg-emerald-400/80 ring-1 ring-white/20',
@@ -528,7 +528,7 @@ export default function SurvivorPensionPage() {
 
     const yearsOldAge = 100 - oldAgeStartWife;
     segs.push({
-      label: '老齢+厚生',
+      label: '閠・ｽ｢+蜴夂函',
       years: yearsOldAge,
       widthYears: widenYears(yearsOldAge),
       className: 'bg-emerald-300/80 ring-1 ring-white/20',
@@ -541,15 +541,15 @@ export default function SurvivorPensionPage() {
   const timelineTicksHusband = useMemo(() => {
     const ticks: Tick[] = [];
 
-    ticks.push({ posYears: 0, labelLines: [`${ageWife}歳`] });
+    ticks.push({ posYears: 0, labelLines: [`${ageWife}豁ｳ`] });
 
     if (caseHusbandDeath.yearsUntilChild18 > 0) {
-      ticks.push({ posYears: caseHusbandDeath.yearsUntilChild18, labelLines: [`${caseHusbandDeath.ageAfterChild}歳`, '末子18歳'] });
+      ticks.push({ posYears: caseHusbandDeath.yearsUntilChild18, labelLines: [`${caseHusbandDeath.ageAfterChild}豁ｳ`, '譛ｫ蟄・8豁ｳ'] });
     }
 
     const yearsUntilOldAge = oldAgeStartWife - ageWife;
     if (yearsUntilOldAge > 0 && yearsUntilOldAge > caseHusbandDeath.yearsUntilChild18) {
-      ticks.push({ posYears: yearsUntilOldAge, labelLines: [`${oldAgeStartWife}歳`, '老齢開始'] });
+      ticks.push({ posYears: yearsUntilOldAge, labelLines: [`${oldAgeStartWife}豁ｳ`, '閠・ｽ｢髢句ｧ・] });
     }
 
     return ticks;
@@ -561,7 +561,7 @@ export default function SurvivorPensionPage() {
 
     if (caseWifeDeath.yearsUntilChild18 > 0) {
       segs.push({
-        label: '基礎+厚生',
+        label: '蝓ｺ遉・蜴夂函',
         years: caseWifeDeath.yearsUntilChild18,
         widthYears: widenYears(caseWifeDeath.yearsUntilChild18),
         className: 'bg-rose-500/80 ring-1 ring-white/20',
@@ -573,7 +573,7 @@ export default function SurvivorPensionPage() {
 
     if (yearsAfterChild > 0) {
       segs.push({
-        label: '厚生のみ',
+        label: '蜴夂函縺ｮ縺ｿ',
         years: yearsAfterChild,
         widthYears: widenYears(yearsAfterChild),
         className: 'bg-rose-400/80 ring-1 ring-white/20',
@@ -583,7 +583,7 @@ export default function SurvivorPensionPage() {
 
     const yearsOldAge = 100 - oldAgeStartHusband;
     segs.push({
-      label: '老齢+厚生',
+      label: '閠・ｽ｢+蜴夂函',
       years: yearsOldAge,
       widthYears: widenYears(yearsOldAge),
       className: 'bg-rose-300/80 ring-1 ring-white/20',
@@ -596,15 +596,15 @@ export default function SurvivorPensionPage() {
   const timelineTicksWife = useMemo(() => {
     const ticks: Tick[] = [];
 
-    ticks.push({ posYears: 0, labelLines: [`${ageHusband}歳`] });
+    ticks.push({ posYears: 0, labelLines: [`${ageHusband}豁ｳ`] });
 
     if (caseWifeDeath.yearsUntilChild18 > 0) {
-      ticks.push({ posYears: caseWifeDeath.yearsUntilChild18, labelLines: [`${caseWifeDeath.ageAfterChild}歳`, '末子18歳'] });
+      ticks.push({ posYears: caseWifeDeath.yearsUntilChild18, labelLines: [`${caseWifeDeath.ageAfterChild}豁ｳ`, '譛ｫ蟄・8豁ｳ'] });
     }
 
     const yearsUntilOldAge = oldAgeStartHusband - ageHusband;
     if (yearsUntilOldAge > 0 && yearsUntilOldAge > caseWifeDeath.yearsUntilChild18) {
-      ticks.push({ posYears: yearsUntilOldAge, labelLines: [`${oldAgeStartHusband}歳`, '老齢開始'] });
+      ticks.push({ posYears: yearsUntilOldAge, labelLines: [`${oldAgeStartHusband}豁ｳ`, '閠・ｽ｢髢句ｧ・] });
     }
 
     return ticks;
@@ -616,7 +616,7 @@ export default function SurvivorPensionPage() {
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <h1 className="text-xl font-bold flex items-center gap-2">
             <span className="w-2 h-8 bg-emerald-500 rounded-full"></span>
-            遺族年金シミュレーター
+            驕ｺ譌丞ｹｴ驥代す繝溘Η繝ｬ繝ｼ繧ｿ繝ｼ
           </h1>
           <div className="flex items-center gap-4">
             <div className="hidden md:flex items-center gap-2 bg-slate-800/50 rounded-lg p-1 border border-slate-700">
@@ -624,18 +624,16 @@ export default function SurvivorPensionPage() {
                 onClick={() => setMode('current')}
                 className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${mode === 'current' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
               >
-                現行制度
+                迴ｾ陦悟宛蠎ｦ
               </button>
               <button
                 onClick={() => setMode('revised2028')}
                 className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${mode === 'revised2028' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
               >
-                2028改正案
-              </button>
+                2028謾ｹ豁｣譯・              </button>
             </div>
             <Link href="/" className="text-sm text-slate-400 hover:text-white transition-colors">
-              TOPへ戻る
-            </Link>
+              TOP縺ｸ謌ｻ繧・            </Link>
           </div>
         </div>
       </div>
@@ -646,25 +644,25 @@ export default function SurvivorPensionPage() {
           <div className="lg:col-span-4 space-y-6">
             <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm">
               <h2 className="text-lg font-bold text-slate-200 mb-6 flex items-center gap-2">
-                <span className="text-emerald-400">⚙️</span> 前提条件
+                <span className="text-emerald-400">笞呻ｸ・/span> 蜑肴署譚｡莉ｶ
               </h2>
 
               <div className="space-y-4">
                 <Accordion
-                  title="基本情報（子）"
+                  title="蝓ｺ譛ｬ諠・ｱ・亥ｭ撰ｼ・
                   defaultOpen={true}
                   onClear={() => { setChildrenCount(null); setChildrenAges([]); }}
-                  headerContent={childrenCount !== null ? `${childrenCount}人` : undefined}
+                  headerContent={childrenCount !== null ? `${childrenCount}莠ｺ` : undefined}
                 >
                   <div className="space-y-4">
                     <div>
-                      <Label>子の人数</Label>
+                      <Label>蟄舌・莠ｺ謨ｰ</Label>
                       <Select
                         value={childrenCount ?? ''}
                         onChange={(e) => setChildrenCount(e.target.value ? Number(e.target.value) : null)}
                         options={[
                           { value: '', label: '--' },
-                          ...Array.from({ length: 6 }, (_, i) => ({ value: i, label: `${i}人` }))
+                          ...Array.from({ length: 6 }, (_, i) => ({ value: i, label: `${i}莠ｺ` }))
                         ]}
                       />
                     </div>
@@ -672,7 +670,7 @@ export default function SurvivorPensionPage() {
                       <div className="grid grid-cols-2 gap-2">
                         {Array.from({ length: childrenCount }).map((_, i) => (
                           <div key={i}>
-                            <Label>{i + 1}人目の年齢</Label>
+                            <Label>{i + 1}莠ｺ逶ｮ縺ｮ蟷ｴ鮨｢</Label>
                             <Select
                               value={childrenAges[i] ?? 0}
                               onChange={(e) => {
@@ -680,7 +678,7 @@ export default function SurvivorPensionPage() {
                                 newAges[i] = Number(e.target.value);
                                 setChildrenAges(newAges);
                               }}
-                              options={Array.from({ length: 23 }, (_, j) => ({ value: j, label: `${j}歳` }))}
+                              options={Array.from({ length: 23 }, (_, j) => ({ value: j, label: `${j}豁ｳ` }))}
                             />
                           </div>
                         ))}
@@ -690,58 +688,58 @@ export default function SurvivorPensionPage() {
                 </Accordion>
 
                 <Accordion
-                  title="妻の情報"
+                  title="螯ｻ縺ｮ諠・ｱ"
                   defaultOpen={false}
-                  headerContent={`${ageWife}歳 / 月収${(avgStdMonthlyWife / 10000).toFixed(0)}万`}
+                  headerContent={`${ageWife}豁ｳ / 譛亥庶${(avgStdMonthlyWife / 10000).toFixed(0)}荳㌔}
                 >
                   <div className="space-y-4">
                     <div>
-                      <Label>年齢</Label>
+                      <Label>蟷ｴ鮨｢</Label>
                       <Input value={ageWife} onChange={(e) => setAgeWife(Number(e.target.value))} />
                     </div>
                     <div>
-                      <Label>平均標準報酬月額</Label>
+                      <Label>蟷ｳ蝮・ｨ呎ｺ門ｱ驟ｬ譛磯｡・/Label>
                       <Input value={avgStdMonthlyWife} onChange={(e) => setAvgStdMonthlyWife(Number(e.target.value))} />
                     </div>
                     <div>
-                      <Label>厚生年金加入月数</Label>
+                      <Label>蜴夂函蟷ｴ驥大刈蜈･譛域焚</Label>
                       <Input value={monthsWife} onChange={(e) => setMonthsWife(Number(e.target.value))} />
                     </div>
                     <div>
-                      <Label>老齢年金開始年齢</Label>
+                      <Label>閠・ｽ｢蟷ｴ驥鷹幕蟋句ｹｴ鮨｢</Label>
                       <Select
                         value={oldAgeStartWife}
                         onChange={(e) => setOldAgeStartWife(Number(e.target.value))}
-                        options={Array.from({ length: 16 }, (_, i) => ({ value: 60 + i, label: `${60 + i}歳` }))}
+                        options={Array.from({ length: 16 }, (_, i) => ({ value: 60 + i, label: `${60 + i}豁ｳ` }))}
                       />
                     </div>
                   </div>
                 </Accordion>
 
                 <Accordion
-                  title="夫の情報"
+                  title="螟ｫ縺ｮ諠・ｱ"
                   defaultOpen={false}
-                  headerContent={`${ageHusband}歳 / 月収${(avgStdMonthlyHusband / 10000).toFixed(0)}万`}
+                  headerContent={`${ageHusband}豁ｳ / 譛亥庶${(avgStdMonthlyHusband / 10000).toFixed(0)}荳㌔}
                 >
                   <div className="space-y-4">
                     <div>
-                      <Label>年齢</Label>
+                      <Label>蟷ｴ鮨｢</Label>
                       <Input value={ageHusband} onChange={(e) => setAgeHusband(Number(e.target.value))} />
                     </div>
                     <div>
-                      <Label>平均標準報酬月額</Label>
+                      <Label>蟷ｳ蝮・ｨ呎ｺ門ｱ驟ｬ譛磯｡・/Label>
                       <Input value={avgStdMonthlyHusband} onChange={(e) => setAvgStdMonthlyHusband(Number(e.target.value))} />
                     </div>
                     <div>
-                      <Label>厚生年金加入月数</Label>
+                      <Label>蜴夂函蟷ｴ驥大刈蜈･譛域焚</Label>
                       <Input value={monthsHusband} onChange={(e) => setMonthsHusband(Number(e.target.value))} />
                     </div>
                     <div>
-                      <Label>老齢年金開始年齢</Label>
+                      <Label>閠・ｽ｢蟷ｴ驥鷹幕蟋句ｹｴ鮨｢</Label>
                       <Select
                         value={oldAgeStartHusband}
                         onChange={(e) => setOldAgeStartHusband(Number(e.target.value))}
-                        options={Array.from({ length: 16 }, (_, i) => ({ value: 60 + i, label: `${60 + i}歳` }))}
+                        options={Array.from({ length: 16 }, (_, i) => ({ value: 60 + i, label: `${60 + i}豁ｳ` }))}
                       />
                     </div>
                   </div>
@@ -753,7 +751,7 @@ export default function SurvivorPensionPage() {
                   href="/simulators/customer-profile"
                   className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors text-sm font-bold"
                 >
-                  <span>👤</span> プロフィール設定へ
+                  <span>側</span> 繝励Ο繝輔ぅ繝ｼ繝ｫ險ｭ螳壹∈
                 </Link>
               </div>
             </div>
@@ -764,170 +762,80 @@ export default function SurvivorPensionPage() {
             <section>
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 border border-emerald-500/20">
-                  <span className="text-xl">👨</span>
+                  <span className="text-xl">捉</span>
                 </div>
-                <h2 className="text-2xl font-bold text-slate-100">夫が死亡した場合</h2>
+                <h2 className="text-2xl font-bold text-slate-100">螟ｫ縺梧ｭｻ莠｡縺励◆蝣ｴ蜷・/h2>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                 <PeriodCard
-                  title="子がいる期間"
+                  title="蟄舌′縺・ｋ譛滄俣"
                   amount={caseHusbandDeath.withChildrenAmount}
-                  period={`${ageWife}歳 - ${caseHusbandDeath.ageAfterChild}歳`}
+                  period={`${ageWife}豁ｳ - ${caseHusbandDeath.ageAfterChild}豁ｳ`}
                   colorClass="border-emerald-500/30"
-                  icon="👶"
+                  icon="存"
                 />
                 <PeriodCard
-                  title="子がいなくなった後"
+                  title="蟄舌′縺・↑縺上↑縺｣縺溷ｾ・
                   amount={caseHusbandDeath.afterChildrenAmount}
-                  period={`${caseHusbandDeath.ageAfterChild}歳 - ${oldAgeStartWife}歳`}
+                  period={`${caseHusbandDeath.ageAfterChild}豁ｳ - ${oldAgeStartWife}豁ｳ`}
                   colorClass="border-emerald-500/30"
-                  icon="💼"
+                  icon="直"
                 />
                 <PeriodCard
-                  title="年金開始後"
+                  title="蟷ｴ驥鷹幕蟋句ｾ・
                   amount={caseHusbandDeath.oldAgeAmount}
-                  period={`${oldAgeStartWife}歳 - 100歳`}
+                  period={`${oldAgeStartWife}豁ｳ - 100豁ｳ`}
                   colorClass="border-emerald-500/30"
-                  icon="🎂"
+                  icon="獅"
                 />
               </div>
 
-              {caseHusbandDeath.yearsUntilChild18 > 0 && (
-                <TimelineBlock
-                  title="① 子がいる期間"
-                  color="emerald"
-                  segments={[{
-                    label: '基礎+厚生',
-                    years: caseHusbandDeath.yearsUntilChild18,
-                    widthYears: caseHusbandDeath.yearsUntilChild18,
-                    className: 'bg-emerald-500/80 ring-1 ring-white/20',
-                    amountYear: caseHusbandDeath.withChildrenAmount
-                  }]}
-                  ticks={[
-                    { posYears: 0, labelLines: [`${ageWife}歳`] },
-                    { posYears: caseHusbandDeath.yearsUntilChild18, labelLines: [`${caseHusbandDeath.ageAfterChild}歳`, '末子18歳'] }
-                  ]}
-                />
-              )}
-
-              {(oldAgeStartWife - caseHusbandDeath.ageAfterChild) > 0 && (
-                <TimelineBlock
-                  title="② 子がいなくなった後"
-                  color="emerald"
-                  segments={[{
-                    label: caseHusbandDeath.ageAfterChild >= 40 ? '中高齢+厚生' : '厚生のみ',
-                    years: oldAgeStartWife - caseHusbandDeath.ageAfterChild,
-                    widthYears: oldAgeStartWife - caseHusbandDeath.ageAfterChild,
-                    className: 'bg-emerald-400/80 ring-1 ring-white/20',
-                    amountYear: caseHusbandDeath.afterChildrenAmount
-                  }]}
-                  ticks={[
-                    { posYears: 0, labelLines: [`${caseHusbandDeath.ageAfterChild}歳`] },
-                    { posYears: oldAgeStartWife - caseHusbandDeath.ageAfterChild, labelLines: [`${oldAgeStartWife}歳`, '老齢開始'] }
-                  ]}
-                />
-              )}
-
               <TimelineBlock
-                title="③ 年金開始後"
+                title="蜿礼ｵｦ繧ｿ繧､繝繝ｩ繧､繝ｳ・亥ｦｻ縺ｮ蟷ｴ鮨｢・・
                 color="emerald"
-                segments={[{
-                  label: '老齢+厚生',
-                  years: 100 - oldAgeStartWife,
-                  widthYears: 100 - oldAgeStartWife,
-                  className: 'bg-emerald-300/80 ring-1 ring-white/20',
-                  amountYear: caseHusbandDeath.oldAgeAmount
-                }]}
-                ticks={[
-                  { posYears: 0, labelLines: [`${oldAgeStartWife}歳`] },
-                  { posYears: 100 - oldAgeStartWife, labelLines: ['100歳'] }
-                ]}
+                segments={timelineSegmentsHusband}
+                ticks={timelineTicksHusband}
               />
             </section>
 
             <section className="pt-12 border-t border-slate-800">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-400 border border-rose-500/20">
-                  <span className="text-xl">👩</span>
+                  <span className="text-xl">束</span>
                 </div>
-                <h2 className="text-2xl font-bold text-slate-100">妻が死亡した場合</h2>
+                <h2 className="text-2xl font-bold text-slate-100">螯ｻ縺梧ｭｻ莠｡縺励◆蝣ｴ蜷・/h2>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                 <PeriodCard
-                  title="子がいる期間"
+                  title="蟄舌′縺・ｋ譛滄俣"
                   amount={caseWifeDeath.withChildrenAmount}
-                  period={`${ageHusband}歳 - ${caseWifeDeath.ageAfterChild}歳`}
+                  period={`${ageHusband}豁ｳ - ${caseWifeDeath.ageAfterChild}豁ｳ`}
                   colorClass="border-rose-500/30"
-                  icon="👶"
+                  icon="存"
                 />
                 <PeriodCard
-                  title="子がいなくなった後"
+                  title="蟄舌′縺・↑縺上↑縺｣縺溷ｾ・
                   amount={caseWifeDeath.afterChildrenAmount}
-                  period={`${caseWifeDeath.ageAfterChild}歳 - ${oldAgeStartHusband}歳`}
+                  period={`${caseWifeDeath.ageAfterChild}豁ｳ - ${oldAgeStartHusband}豁ｳ`}
                   colorClass="border-rose-500/30"
-                  icon="💼"
+                  icon="直"
                 />
                 <PeriodCard
-                  title="年金開始後"
+                  title="蟷ｴ驥鷹幕蟋句ｾ・
                   amount={caseWifeDeath.oldAgeAmount}
-                  period={`${oldAgeStartHusband}歳 - 100歳`}
+                  period={`${oldAgeStartHusband}豁ｳ - 100豁ｳ`}
                   colorClass="border-rose-500/30"
-                  icon="🎂"
+                  icon="獅"
                 />
               </div>
 
-              {caseWifeDeath.yearsUntilChild18 > 0 && (
-                <TimelineBlock
-                  title="① 子がいる期間"
-                  color="rose"
-                  segments={[{
-                    label: '基礎+厚生',
-                    years: caseWifeDeath.yearsUntilChild18,
-                    widthYears: caseWifeDeath.yearsUntilChild18,
-                    className: 'bg-rose-500/80 ring-1 ring-white/20',
-                    amountYear: caseWifeDeath.withChildrenAmount
-                  }]}
-                  ticks={[
-                    { posYears: 0, labelLines: [`${ageHusband}歳`] },
-                    { posYears: caseWifeDeath.yearsUntilChild18, labelLines: [`${caseWifeDeath.ageAfterChild}歳`, '末子18歳'] }
-                  ]}
-                />
-              )}
-
-              {(oldAgeStartHusband - caseWifeDeath.ageAfterChild) > 0 && (
-                <TimelineBlock
-                  title="② 子がいなくなった後"
-                  color="rose"
-                  segments={[{
-                    label: '厚生のみ',
-                    years: oldAgeStartHusband - caseWifeDeath.ageAfterChild,
-                    widthYears: oldAgeStartHusband - caseWifeDeath.ageAfterChild,
-                    className: 'bg-rose-400/80 ring-1 ring-white/20',
-                    amountYear: caseWifeDeath.afterChildrenAmount
-                  }]}
-                  ticks={[
-                    { posYears: 0, labelLines: [`${caseWifeDeath.ageAfterChild}歳`] },
-                    { posYears: oldAgeStartHusband - caseWifeDeath.ageAfterChild, labelLines: [`${oldAgeStartHusband}歳`, '老齢開始'] }
-                  ]}
-                />
-              )}
-
               <TimelineBlock
-                title="③ 年金開始後"
+                title="蜿礼ｵｦ繧ｿ繧､繝繝ｩ繧､繝ｳ・亥､ｫ縺ｮ蟷ｴ鮨｢・・
                 color="rose"
-                segments={[{
-                  label: '老齢+厚生',
-                  years: 100 - oldAgeStartHusband,
-                  widthYears: 100 - oldAgeStartHusband,
-                  className: 'bg-rose-300/80 ring-1 ring-white/20',
-                  amountYear: caseWifeDeath.oldAgeAmount
-                }]}
-                ticks={[
-                  { posYears: 0, labelLines: [`${oldAgeStartHusband}歳`] },
-                  { posYears: 100 - oldAgeStartHusband, labelLines: ['100歳'] }
-                ]}
+                segments={timelineSegmentsWife}
+                ticks={timelineTicksWife}
               />
             </section>
 
