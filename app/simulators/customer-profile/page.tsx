@@ -271,6 +271,16 @@ function BasicInfoInput({
               />
               <span className="text-sm text-slate-300">みなし300月を使用</span>
             </label>
+
+            <InputGroup label="老齢年金開始年齢">
+              <Select
+                value={basicInfo.oldAgeStartWife || 65}
+                onChange={(e: any) => setBasicInfo({ ...basicInfo, oldAgeStartWife: parseInt(e.target.value, 10) || 65 })}
+                options={Array.from({ length: 16 }, (_, i) => (
+                  <option key={60 + i} value={60 + i}>{60 + i}歳</option>
+                ))}
+              />
+            </InputGroup>
           </div>
 
           {/* 夫の情報 */}
@@ -318,6 +328,16 @@ function BasicInfoInput({
               />
               <span className="text-sm text-slate-300">みなし300月を使用</span>
             </label>
+
+            <InputGroup label="老齢年金開始年齢">
+              <Select
+                value={basicInfo.oldAgeStartHusband || 65}
+                onChange={(e: any) => setBasicInfo({ ...basicInfo, oldAgeStartHusband: parseInt(e.target.value, 10) || 65 })}
+                options={Array.from({ length: 16 }, (_, i) => (
+                  <option key={60 + i} value={60 + i}>{60 + i}歳</option>
+                ))}
+              />
+            </InputGroup>
           </div>
         </div>
       )}
