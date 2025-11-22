@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import {
   calculateAge,
@@ -19,85 +19,7 @@ import {
   POLICY_MODES,
 } from '../../utils/pension-calc';
 
-type Segment = {
-  label: string;
-  years: number;
-  widthYears?: number;
-  className: string;
-  amountYear?: number;
-};
-
-type Tick = {
-  edgeIndex?: number;
-  posYears?: number;
-  posPx?: number;
-  labelLines: string[];
-};
-
-type Geometry = {
-  used: number;
-  edgesRaw: number[];
-  totalYears: number;
-  rawW: number[];
-};
-
-const BAR_HEIGHT = 64;
-const MIN_SEG_PX = 60;
-
-function AutoFitLine({
-  text,
-  className = '',
-  maxRem = 1.0,
-  minScale = 0.5,
-  align = 'center',
-}: {
-  text: string;
-  className?: string;
-  maxRem?: number;
-  minScale?: number;
-  align?: 'left' | 'center' | 'right';
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
-
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const parent = el.parentElement;
-    if (!parent) return;
-
-    el.style.transform = 'none';
-    el.style.width = 'auto';
-    el.style.whiteSpace = 'nowrap';
-
-    const pW = parent.clientWidth;
-    const cW = el.scrollWidth;
-
-    if (cW > pW && cW > 0) {
-      const s = Math.max(minScale, pW / cW);
-      setScale(s);
-    } else {
-      setScale(1);
-    }
-  }, [text, minScale]);
-
-  const origin = align === 'left' ? 'left center' : align === 'right' ? 'right center' : 'center center';
-
-  return (
-    <div
-      ref={ref}
-      className={`origin-left whitespace-nowrap leading-none ${className}`}
-      style={{
-        fontSize: `${maxRem}rem`,
-        transform: `scale(${scale})`,
-        transformOrigin: origin,
-        width: scale < 1 ? '100%' : 'auto',
-      }}
-    >
-      {text}
-    </div>
-  );
-}
+/* ===================== UI Components ===================== */
 
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
@@ -143,132 +65,7 @@ function Select({ value, onChange, options }: { value: number | string; onChange
   );
 }
 
-function useSharedGeometry(measureRef: React.RefObject<HTMLDivElement>, segments: Segment[]): Geometry {
-  const [innerW, setInnerW] = useState(0);
-  useLayoutEffect(() => {
-    const resize = () => setInnerW(measureRef.current?.clientWidth ?? 0);
-    resize();
-    const ro = new ResizeObserver(resize);
-    if (measureRef.current) ro.observe(measureRef.current);
-    return () => ro.disconnect();
-  }, [measureRef]);
-
-  return useMemo(() => {
-    const barW = innerW;
-    const widthYearsArr = segments.map((s) => Math.max(0, s.widthYears ?? s.years));
-    const totalYearsRaw = widthYearsArr.reduce((s, x) => s + x, 0);
-    const totalYears = Math.max(1e-6, totalYearsRaw);
-
-    const ideal = widthYearsArr.map((y) => (y / totalYears) * barW);
-    const smallFlags = ideal.map((w, i) => widthYearsArr[i] > 0 && w < MIN_SEG_PX);
-    const minTotal = smallFlags.reduce((sum, f) => sum + (f ? MIN_SEG_PX : 0), 0);
-    const largeIdeal = ideal.map((w, i) => (smallFlags[i] ? 0 : w));
-    const largeIdealSum = largeIdeal.reduce((a, b) => a + b, 0);
-    const remain = Math.max(0, barW - minTotal);
-
-    const floatW = segments.map((_, i) => {
-      if (widthYearsArr[i] <= 0) return 0;
-      return smallFlags[i] ? MIN_SEG_PX : largeIdealSum > 0 ? (largeIdeal[i] / largeIdealSum) * remain : 0;
-    });
-
-    const quantW = floatW.map((w) => Math.floor(w));
-    let usedFloor = quantW.reduce((a, b) => a + b, 0);
-    let delta = barW - usedFloor;
-    if (delta !== 0) {
-      const idx = quantW
-        .map((w, i) => ({ w, i }))
-        .filter((x) => x.w > 0)
-        .slice(-1)[0]?.i;
-      if (idx !== undefined) {
-        quantW[idx] += delta;
-        usedFloor += delta;
-      }
-    }
-    for (let i = 0; i < quantW.length; i++) {
-      if (quantW[i] > 0 && quantW[i] <= 1) {
-        const giveTo = i < quantW.length - 1 ? i + 1 : i - 1;
-        if (giveTo >= 0) {
-          quantW[giveTo] += quantW[i];
-          quantW[i] = 0;
-        }
-      }
-    }
-
-    const used = quantW.reduce((a, b) => a + b, 0);
-    const edgesRaw: number[] = [];
-    let acc = 0;
-    for (let i = 0; i < quantW.length; i++) {
-      acc += quantW[i];
-      edgesRaw.push(acc);
-    }
-    return { used, edgesRaw, totalYears, rawW: quantW };
-  }, [segments, innerW]);
-}
-
-function PensionSegmentsBar({ segments, geometry }: { segments: Segment[]; geometry: Geometry }) {
-  return (
-    <div className="relative" style={{ width: geometry.used, height: BAR_HEIGHT }}>
-      <div
-        className="relative flex overflow-visible rounded-2xl border border-white/15"
-        style={{ width: geometry.used, height: BAR_HEIGHT }}
-      >
-        {segments.map((s, i) => {
-          const w = geometry.rawW[i];
-          if (w <= 1) return null;
-          const showText = w >= MIN_SEG_PX;
-          const amountText = s.amountYear !== undefined ? `${(s.amountYear / 10000).toFixed(0)}万円` : '';
-          const titleText = `${s.label} ${s.years}年`;
-          return (
-            <div
-              key={i}
-              className={`${s.className} ring-1 ring-white/15 relative flex flex-col justify-center items-stretch px-2 overflow-hidden`}
-              style={{ width: w }}
-              title={titleText}
-            >
-              {showText && (
-                <>
-                  <AutoFitLine text={amountText} maxRem={0.95} minScale={0.35} className="text-white" align="left" />
-                  <AutoFitLine
-                    text={titleText}
-                    maxRem={0.78}
-                    minScale={0.35}
-                    className="text-white/90 mt-0.5"
-                    align="left"
-                  />
-                </>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function AgeTicksBar({ ticks, geometry }: { ticks: Tick[]; geometry: Geometry }) {
-  return (
-    <div className="relative h-20" style={{ width: geometry.used }}>
-      <div className="absolute left-0 right-0 top-5 h-[2px] bg-white/25 rounded" />
-      {ticks.map((t, i) => {
-        const leftPx =
-          t.posPx !== undefined ? t.posPx : Math.round(((t.posYears || 0) / geometry.totalYears) * geometry.used);
-        return (
-          <div key={i} className="absolute -translate-x-1/2" style={{ left: `${leftPx}px` }}>
-            <div className="h-6 w-px bg-white/70 mx-auto" />
-            <div className="mt-1 text-xs md:text-sm opacity-90 text-center leading-[1.2]">
-              {t.labelLines.map((ln, j) => (
-                <div key={j} className="whitespace-nowrap">
-                  {ln}
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
+/* ===================== アコーディオン ===================== */
 function Accordion({ title, children, defaultOpen = false, onClear, headerContent }: { title: string; children: React.ReactNode; defaultOpen?: boolean; onClear?: () => void; headerContent?: React.ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
@@ -295,7 +92,7 @@ function Accordion({ title, children, defaultOpen = false, onClear, headerConten
               onClear();
             }}
             className="p-3 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-rose-900/20 hover:border-rose-900/50 hover:text-rose-400 text-slate-400 transition-all"
-            title="Clear"
+            title="クリア"
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
               <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
@@ -312,43 +109,7 @@ function Accordion({ title, children, defaultOpen = false, onClear, headerConten
   );
 }
 
-function TimelineBlock({
-  title,
-  color,
-  segments,
-  ticks,
-}: {
-  title: string;
-  color: 'emerald' | 'sky';
-  segments: Segment[];
-  ticks: Tick[];
-}) {
-  const border = color === 'emerald' ? 'border-emerald-500/40' : 'border-sky-500/40';
-  const bg = color === 'emerald' ? 'bg-emerald-900/20' : 'bg-sky-900/20';
-  const measureRef = useRef<HTMLDivElement>(null);
-  const geometry = useSharedGeometry(measureRef, segments);
-
-  const ticksResolved: Tick[] = useMemo(() => {
-    const edgesPx = [0, ...geometry.edgesRaw];
-    return ticks.map((t) => {
-      if (t.edgeIndex !== undefined) {
-        const idx = Math.max(0, Math.min(edgesPx.length - 1, t.edgeIndex));
-        return { ...t, posPx: edgesPx[idx] };
-      }
-      return t;
-    });
-  }, [ticks, geometry.edgesRaw]);
-
-  return (
-    <div className={`rounded-2xl ${border} ${bg} p-8 md:p-10 mb-8`}>
-      <div className="text-base font-semibold mb-3">{title}</div>
-      <div ref={measureRef} className="w-full h-0 overflow-hidden" />
-      <PensionSegmentsBar segments={segments} geometry={geometry} />
-      <AgeTicksBar ticks={ticksResolved} geometry={geometry} />
-    </div>
-  );
-}
-
+/* ===================== 結果表示コンポーネント ===================== */
 function ResultCard({ title, amount, colorClass }: { title: string; amount: number; colorClass: string }) {
   return (
     <div className={`p-4 rounded-xl border ${colorClass} bg-slate-900/40 backdrop-blur-sm`}>
@@ -361,24 +122,80 @@ function ResultCard({ title, amount, colorClass }: { title: string; amount: numb
   );
 }
 
+/* ===================== タイムラインコンポーネント ===================== */
+function TimelineView({ items }: { items: TimelineItem[] }) {
+  return (
+    <div className="relative pl-8 border-l-2 border-slate-800 space-y-8 py-4">
+      {items.map((item, index) => (
+        <div key={index} className="relative">
+          {/* ドット */}
+          <div className={`absolute -left-[39px] top-1 w-5 h-5 rounded-full border-4 border-slate-950 ${item.type === 'event' ? 'bg-emerald-500' : 'bg-slate-600'
+            }`} />
+
+          {/* 年齢ラベル */}
+          <div className="text-xs font-bold text-slate-500 mb-1 font-mono">
+            {item.age}歳
+          </div>
+
+          {/* コンテンツ */}
+          <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-4 hover:bg-slate-900/60 transition-colors">
+            <div className="font-bold text-slate-200 mb-2">{item.label}</div>
+
+            {/* 金額の内訳 */}
+            {item.amount > 0 && (
+              <div className="space-y-2">
+                <div className="text-2xl font-bold text-emerald-400 font-mono">
+                  {formatCurrency(item.amount)}<span className="text-sm text-slate-500 ml-1">円/年</span>
+                </div>
+
+                {item.breakdown && item.breakdown.length > 0 && (
+                  <div className="space-y-1 pt-2 border-t border-slate-800/50">
+                    {item.breakdown.map((b, i) => (
+                      <div key={i} className="flex justify-between text-xs text-slate-400">
+                        <span>{b.name}</span>
+                        <span>{formatCurrency(b.amount)}円</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {item.amount === 0 && item.type !== 'event' && (
+              <div className="text-sm text-slate-500 italic">受給なし</div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ===================== メインコンポーネント ===================== */
 export default function SurvivorPensionPage() {
+  // --- State ---
   const [mode, setMode] = useState<PolicyMode>('current');
 
+  // 共通
   const [childrenCount, setChildrenCount] = useState<number | null>(null);
   const [childrenAges, setChildrenAges] = useState<number[]>([]);
 
+  // 妻の情報
   const [ageWife, setAgeWife] = useState<number>(35);
   const [avgStdMonthlyWife, setAvgStdMonthlyWife] = useState<number>(300000);
   const [monthsWife, setMonthsWife] = useState<number>(120);
   const [useMinashi300Wife, setUseMinashi300Wife] = useState<boolean>(true);
   const [oldAgeStartWife, setOldAgeStartWife] = useState<number>(65);
 
+  // 夫の情報
   const [ageHusband, setAgeHusband] = useState<number>(38);
   const [avgStdMonthlyHusband, setAvgStdMonthlyHusband] = useState<number>(450000);
   const [monthsHusband, setMonthsHusband] = useState<number>(180);
   const [useMinashi300Husband, setUseMinashi300Husband] = useState<boolean>(true);
   const [oldAgeStartHusband, setOldAgeStartHusband] = useState<number>(65);
 
+  // --- Effects ---
+  // localStorageから読み込み
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedBasic = localStorage.getItem('customer-profile-basic');
@@ -386,15 +203,18 @@ export default function SurvivorPensionPage() {
         try {
           const basicInfo = JSON.parse(savedBasic);
 
+          // 共通
           if (basicInfo.childrenCount !== undefined) setChildrenCount(basicInfo.childrenCount);
           if (basicInfo.childrenAges) setChildrenAges(basicInfo.childrenAges);
 
+          // 妻
           if (basicInfo.ageWife) setAgeWife(basicInfo.ageWife);
           if (basicInfo.avgStdMonthlyWife) setAvgStdMonthlyWife(basicInfo.avgStdMonthlyWife);
           if (basicInfo.monthsWife) setMonthsWife(basicInfo.monthsWife);
           if (basicInfo.useMinashi300Wife !== undefined) setUseMinashi300Wife(basicInfo.useMinashi300Wife);
           if (basicInfo.oldAgeStartWife) setOldAgeStartWife(basicInfo.oldAgeStartWife);
 
+          // 夫
           if (basicInfo.ageHusband) setAgeHusband(basicInfo.ageHusband);
           if (basicInfo.avgStdMonthlyHusband) setAvgStdMonthlyHusband(basicInfo.avgStdMonthlyHusband);
           if (basicInfo.monthsHusband) setMonthsHusband(basicInfo.monthsHusband);
@@ -408,6 +228,7 @@ export default function SurvivorPensionPage() {
     }
   }, []);
 
+  // 子の人数変更時の処理
   useEffect(() => {
     if (childrenCount === null) return;
     if (childrenAges.length !== childrenCount) {
@@ -421,28 +242,53 @@ export default function SurvivorPensionPage() {
     }
   }, [childrenCount]);
 
+
+  // --- Calculations (Memoized) ---
+
+  // ケース1: 夫が死亡（妻が受け取る）
   const caseHusbandDeath = useMemo(() => {
+    const currentPolicy = POLICY_MODES[mode];
+
+    // 遺族基礎年金
     const eligibleChildren = calculateEligibleChildrenCount(childrenAges);
     const basicPension = calculateSurvivorBasicPension(eligibleChildren);
+
+    // 遺族厚生年金
     const employeePension = calculateSurvivorEmployeePension(
       avgStdMonthlyHusband,
       monthsHusband,
       useMinashi300Husband
     );
+
+    // 中高齢寡婦加算
+    // 要件: 夫死亡時に40歳以上65歳未満の妻で、生計を同じくする子がいない（または子が18歳到達年度末を過ぎた）
+    // ここでは簡易的に「現在40歳以上かつ子が0人」の場合に加算フラグを立てるシミュレーションとする
+    // ※厳密にはタイムライン上で判定するが、ここでは「現在の受給額」としての参考値
     const isChukorei = (ageWife >= 40 && ageWife < 65 && eligibleChildren === 0);
     const chukoreiKasan = isChukorei ? calculateChukoreiKasan() : 0;
+
+    // 経過的寡婦加算（今回は簡易化のため省略または0）
+    const keikatekiKasan = 0;
 
     return {
       basicPension,
       employeePension,
       chukoreiKasan,
-      total: basicPension + employeePension + chukoreiKasan
+      keikatekiKasan,
+      total: basicPension + employeePension + chukoreiKasan + keikatekiKasan
     };
   }, [mode, childrenAges, avgStdMonthlyHusband, monthsHusband, useMinashi300Husband, ageWife]);
 
+  // ケース2: 妻が死亡（夫が受け取る）
   const caseWifeDeath = useMemo(() => {
+    const currentPolicy = POLICY_MODES[mode];
+
+    // 遺族基礎年金
     const eligibleChildren = calculateEligibleChildrenCount(childrenAges);
     const basicPension = calculateSurvivorBasicPension(eligibleChildren);
+
+    // 遺族厚生年金
+    // ※夫が受け取る場合、55歳以上である必要があるなどの要件があるが、受給額ベースの計算は同様
     const employeePension = calculateSurvivorEmployeePension(
       avgStdMonthlyWife,
       monthsWife,
@@ -456,71 +302,26 @@ export default function SurvivorPensionPage() {
     };
   }, [mode, childrenAges, avgStdMonthlyWife, monthsWife, useMinashi300Wife]);
 
-  const timelineSegments = useMemo(() => {
-    const segs: Segment[] = [];
-    const widenYears = (y: number) => (y > 0 && y <= 3 ? 4 : y);
-
-    const youngestChildAge = childrenAges.length > 0 ? Math.min(...childrenAges) : null;
-    const yearsUntilChild18 = youngestChildAge !== null ? Math.max(0, 18 - youngestChildAge) : 0;
-
-    if (yearsUntilChild18 > 0) {
-      segs.push({
-        label: '基礎+厚生',
-        years: yearsUntilChild18,
-        widthYears: widenYears(yearsUntilChild18),
-        className: 'bg-emerald-500/80 ring-1 ring-white/20',
-        amountYear: caseHusbandDeath.basicPension + caseHusbandDeath.employeePension
-      });
-    }
-
-    const ageAfterChild = ageWife + yearsUntilChild18;
-    const yearsChukorei = Math.max(0, 65 - ageAfterChild);
-
-    if (yearsChukorei > 0) {
-      const amount = caseHusbandDeath.employeePension + (ageAfterChild >= 40 ? calculateChukoreiKasan() : 0);
-      segs.push({
-        label: ageAfterChild >= 40 ? '中高齢+厚生' : '厚生のみ',
-        years: yearsChukorei,
-        widthYears: widenYears(yearsChukorei),
-        className: 'bg-emerald-400/80 ring-1 ring-white/20',
-        amountYear: amount
-      });
-    }
-
-    const yearsOldAge = 100 - 65;
-    segs.push({
-      label: '老齢+厚生',
-      years: yearsOldAge,
-      widthYears: widenYears(yearsOldAge),
-      className: 'bg-emerald-300/80 ring-1 ring-white/20',
-      amountYear: caseHusbandDeath.employeePension
+  // タイムライン生成（夫死亡ケース）
+  const timelineHusbandDeath = useMemo(() => {
+    return generateTimeline({
+      currentAge: ageWife,
+      targetAge: 100, // 100歳まで
+      spouseDeathAge: ageHusband, // 現在時点で死亡と仮定
+      childrenAges: childrenAges,
+      pensionAmounts: {
+        basic: caseHusbandDeath.basicPension,
+        employee: caseHusbandDeath.employeePension,
+        chukorei: calculateChukoreiKasan(),
+      },
+      isWife: true, // 受給者は妻
+      oldAgeStart: oldAgeStartWife,
     });
-
-    return segs;
-  }, [ageWife, childrenAges, caseHusbandDeath]);
-
-  const timelineTicks = useMemo(() => {
-    const ticks: Tick[] = [];
-    let currentAge = ageWife;
-
-    ticks.push({ posYears: 0, labelLines: [`${currentAge}歳`] });
-
-    const youngestChildAge = childrenAges.length > 0 ? Math.min(...childrenAges) : null;
-    const yearsUntilChild18 = youngestChildAge !== null ? Math.max(0, 18 - youngestChildAge) : 0;
-    if (yearsUntilChild18 > 0) {
-      ticks.push({ posYears: yearsUntilChild18, labelLines: [`${currentAge + yearsUntilChild18}歳`, '末子18歳'] });
-    }
-
-    const yearsUntil65 = 65 - currentAge;
-    if (yearsUntil65 > 0 && yearsUntil65 > yearsUntilChild18) {
-      ticks.push({ posYears: yearsUntil65, labelLines: ['65歳', '老齢開始'] });
-    }
-
-    return ticks;
-  }, [ageWife, childrenAges]);
+  }, [ageWife, ageHusband, childrenAges, caseHusbandDeath, oldAgeStartWife]);
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-emerald-500/30 pb-20">
+      {/* ヘッダー */}
       <div className="bg-slate-900/50 border-b border-slate-800 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <h1 className="text-xl font-bold flex items-center gap-2">
@@ -552,6 +353,7 @@ export default function SurvivorPensionPage() {
       <div className="max-w-6xl mx-auto px-6 py-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
+          {/* 左カラム：入力エリア */}
           <div className="lg:col-span-4 space-y-6">
             <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm">
               <h2 className="text-lg font-bold text-slate-200 mb-6 flex items-center gap-2">
@@ -652,8 +454,10 @@ export default function SurvivorPensionPage() {
             </div>
           </div>
 
+          {/* 右カラム：結果エリア */}
           <div className="lg:col-span-8 space-y-8">
 
+            {/* ケース1: 夫死亡 */}
             <section>
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 border border-emerald-500/20">
@@ -674,14 +478,13 @@ export default function SurvivorPensionPage() {
                 </div>
               </div>
 
-              <TimelineBlock
-                title="受給タイムライン（妻の年齢）"
-                color="emerald"
-                segments={timelineSegments}
-                ticks={timelineTicks}
-              />
+              <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm">
+                <h3 className="text-sm font-bold text-slate-400 mb-6 uppercase tracking-wider">受給タイムライン（妻の年齢）</h3>
+                <TimelineView items={timelineHusbandDeath} />
+              </div>
             </section>
 
+            {/* ケース2: 妻死亡 */}
             <section className="pt-12 border-t border-slate-800">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-400 border border-rose-500/20">
@@ -699,6 +502,10 @@ export default function SurvivorPensionPage() {
                     {formatCurrency(caseWifeDeath.total)}<span className="text-sm font-normal ml-1">円</span>
                   </div>
                 </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700 text-sm text-slate-400">
+                <p>※ 夫が受け取る場合、年齢要件（55歳以上）や受給開始時期（60歳から）などの制限があります。詳細なタイムラインは現在開発中です。</p>
               </div>
             </section>
 
