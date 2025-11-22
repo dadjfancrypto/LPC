@@ -59,33 +59,6 @@ export default function Home() {
             </div>
           </Link>
 
-          {/* Necessary Coverage */}
-          <Link
-            href="/simulators/necessary-coverage"
-            className="group relative p-8 rounded-3xl bg-slate-900/40 border border-slate-800 hover:border-rose-500/50 hover:bg-slate-900/60 transition-all duration-500 backdrop-blur-sm overflow-hidden"
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-rose-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <div className="relative flex flex-col h-full">
-              <div className="w-14 h-14 mb-6 rounded-2xl bg-rose-500/10 flex items-center justify-center text-rose-400 group-hover:scale-110 transition-transform duration-500 border border-rose-500/20 group-hover:border-rose-500/40 group-hover:shadow-[0_0_20px_rgba(244,63,94,0.2)]">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-7 h-7">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v17.25m0 0c-1.472 0-2.882.265-4.185.75M12 20.25c1.472 0 2.882.265 4.185.75M18.75 4.97A48.416 48.416 0 0012 4.5c-2.291 0-4.545.16-6.75.47m13.5 0c1.01.143 2.01.317 3 .52m-3-.52l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.988 5.988 0 01-2.031.352 5.988 5.988 0 01-2.031-.352c-.483-.174-.711-.703-.59-1.202L18.75 4.971zm-16.5.52c.99-.203 1.99-.377 3-.52m0 0l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.988 5.988 0 01-2.031.352 5.988 5.988 0 01-2.031-.352c-.483-.174-.711-.703-.59-1.202L5.25 4.971z" />
-                </svg>
-              </div>
-              <h2 className="text-2xl font-bold text-slate-100 mb-3 group-hover:text-rose-400 transition-colors">
-                必要保障額シミュレーター
-              </h2>
-              <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">
-                遺族の生活費と公的年金の差額（ギャップ）を可視化し、民間保険などで準備すべき必要保障額を算出します。
-              </p>
-              <div className="flex items-center text-rose-400 text-sm font-bold group-hover:translate-x-2 transition-transform duration-300">
-                シミュレーションへ
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 ml-2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                </svg>
-              </div>
-            </div>
-          </Link>
-
           {/* Survivor Pension */}
           <Link
             href="/simulators/survivor-pension"
@@ -133,6 +106,33 @@ export default function Home() {
               </p>
               <div className="flex items-center text-amber-400 text-sm font-bold group-hover:translate-x-2 transition-transform duration-300">
                 詳細を確認する
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 ml-2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                </svg>
+              </div>
+            </div>
+          </Link>
+
+          {/* Necessary Coverage */}
+          <Link
+            href="/simulators/necessary-coverage"
+            className="group relative p-8 rounded-3xl bg-slate-900/40 border border-slate-800 hover:border-rose-500/50 hover:bg-slate-900/60 transition-all duration-500 backdrop-blur-sm overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-rose-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="relative flex flex-col h-full">
+              <div className="w-14 h-14 mb-6 rounded-2xl bg-rose-500/10 flex items-center justify-center text-rose-400 group-hover:scale-110 transition-transform duration-500 border border-rose-500/20 group-hover:border-rose-500/40 group-hover:shadow-[0_0_20px_rgba(244,63,94,0.2)]">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-7 h-7">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v17.25m0 0c-1.472 0-2.882.265-4.185.75M12 20.25c1.472 0 2.882.265 4.185.75M18.75 4.97A48.416 48.416 0 0012 4.5c-2.291 0-4.545.16-6.75.47m13.5 0c1.01.143 2.01.317 3 .52m-3-.52l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.988 5.988 0 01-2.031.352 5.988 5.988 0 01-2.031-.352c-.483-.174-.711-.703-.59-1.202L18.75 4.971zm-16.5.52c.99-.203 1.99-.377 3-.52m0 0l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.988 5.988 0 01-2.031.352 5.988 5.988 0 01-2.031-.352c-.483-.174-.711-.703-.59-1.202L5.25 4.971z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-slate-100 mb-3 group-hover:text-rose-400 transition-colors">
+                必要保障額シミュレーター
+              </h2>
+              <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">
+                遺族の生活費と公的年金の差額（ギャップ）を可視化し、民間保険などで準備すべき必要保障額を算出します。
+              </p>
+              <div className="flex items-center text-rose-400 text-sm font-bold group-hover:translate-x-2 transition-transform duration-300">
+                シミュレーションへ
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 ml-2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
                 </svg>

@@ -1,0 +1,4 @@
+.next/types/validator.ts(60,39): error TS2306: File 'C:/Users/takashi/survivor-pension-pwa/app/simulators/disability-pension/app/simulators/necessary-coverage/page.tsx' is not a module.
+app/simulators/necessary-coverage/page.tsx(188,13): error TS2345: Argument of type '(number | null)[]' is not assignable to parameter of type 'number[]'.
+  Type 'number | null' is not assignable to type 'number'.
+    Type 'null' is not assignable to type 'number'.

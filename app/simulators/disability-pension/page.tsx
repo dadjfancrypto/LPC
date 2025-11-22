@@ -269,14 +269,26 @@ export default function DisabilityPensionPage() {
     <main className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-amber-500/30 pb-20">
       {/* ヘッダー */}
       <div className="bg-slate-900/50 border-b border-slate-800 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            <span className="w-2 h-8 bg-amber-500 rounded-full"></span>
-            障害年金シミュレーター
-          </h1>
-          <Link href="/" className="text-sm text-slate-400 hover:text-white transition-colors">
-            TOPへ戻る
-          </Link>
+        <div className="max-w-6xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-xl font-bold flex items-center gap-2">
+              <span className="w-2 h-8 bg-amber-500 rounded-full"></span>
+              障害年金シミュレーター
+            </h1>
+            <Link href="/" className="text-sm text-slate-400 hover:text-white transition-colors">
+              TOPへ戻る
+            </Link>
+          </div>
+          <div className="flex items-center gap-4 flex-wrap text-sm">
+            <Link
+              href="/simulators/disability-pension/rules"
+              className="text-amber-300 hover:text-amber-200 underline"
+            >
+              📘 障害年金について（解説ページ）
+            </Link>
+            <span className="text-slate-500">|</span>
+            <span className="text-slate-400">このシミュレータの注意点</span>
+          </div>
         </div>
       </div>
 
@@ -286,10 +298,25 @@ export default function DisabilityPensionPage() {
           {/* 左カラム：入力エリア */}
           <div className="lg:col-span-4 space-y-6">
             <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm">
-              <h2 className="text-lg font-bold text-slate-200 mb-6 flex items-center gap-2">
-                <span className="text-amber-400">⚙️</span> 前提条件
-              </h2>
-
+              <Accordion
+                title="基本情報"
+                defaultOpen={false}
+                onClear={() => {
+                  setSpouseType('none');
+                  setChildrenCount(null);
+                  setChildrenAges([]);
+                  setLevelWife(2);
+                  setAvgStdMonthlyWife(300000);
+                  setMonthsWife(120);
+                  setLevelHusband(2);
+                  setAvgStdMonthlyHusband(450000);
+                  setMonthsHusband(180);
+                  setLevelSingle(2);
+                  setAvgStdMonthlySingle(400000);
+                  setMonthsSingle(150);
+                }}
+                headerContent="反映されている情報: Customer Profile"
+              >
               <div className="space-y-4">
                 <Accordion
                   title="基本情報（子）"
@@ -432,6 +459,7 @@ export default function DisabilityPensionPage() {
                   <span>👤</span> プロフィール設定へ
                 </Link>
               </div>
+              </Accordion>
             </div>
           </div>
 
