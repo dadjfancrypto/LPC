@@ -338,16 +338,27 @@ function TimelineBlock({
   segments,
   ticks,
   calculationDetails,
+  blockNumber,
 }: {
   title: string;
   color: 'emerald' | 'sky' | 'rose';
   segments: Segment[];
   ticks: Tick[];
   calculationDetails?: { label: string; value: string }[];
+  blockNumber?: 1 | 2;
 }) {
   const [showCalc, setShowCalc] = useState(false);
   const border = color === 'emerald' ? 'border-emerald-500/40' : color === 'rose' ? 'border-rose-500/40' : 'border-sky-500/40';
-  const bg = color === 'emerald' ? 'bg-emerald-900/20' : color === 'rose' ? 'bg-rose-900/20' : 'bg-sky-900/20';
+  
+  // ①と②で背景色を変える
+  let bg = '';
+  if (blockNumber === 1) {
+    bg = color === 'emerald' ? 'bg-emerald-900/20' : 'bg-rose-900/20';
+  } else if (blockNumber === 2) {
+    bg = color === 'emerald' ? 'bg-emerald-900/10' : 'bg-rose-900/10';
+  } else {
+    bg = color === 'emerald' ? 'bg-emerald-900/20' : color === 'rose' ? 'bg-rose-900/20' : 'bg-sky-900/20';
+  }
   const measureRef = useRef<HTMLDivElement>(null);
   const geometry = useSharedGeometry(measureRef, segments);
 
@@ -370,7 +381,7 @@ function TimelineBlock({
       <AgeTicksBar ticks={ticksResolved} geometry={geometry} />
       
       {calculationDetails && calculationDetails.length > 0 && (
-        <div className="mt-6">
+        <div className="mt-16">
           <button
             onClick={() => setShowCalc(!showCalc)}
             className="text-sm text-slate-400 hover:text-slate-200 transition-colors flex items-center gap-2"
@@ -380,16 +391,55 @@ function TimelineBlock({
           </button>
           {showCalc && (
             <div className="mt-3 p-4 bg-slate-900/60 rounded-lg border border-slate-700">
-              <div className="space-y-2 text-sm">
+              <div className="space-y-4 text-sm">
                 {calculationDetails.map((detail, idx) => {
-                  const indent = detail.label.startsWith('　　') ? 'pl-8' : detail.label.startsWith('　') ? 'pl-4' : '';
+                  const isFormula = detail.label.startsWith('　');
                   const labelText = detail.label.replace(/^　+/, '');
-                  return (
-                    <div key={idx} className={`grid grid-cols-2 gap-x-4 ${indent}`}>
-                      <div className="text-slate-400">{labelText}</div>
-                      <div className="text-slate-100 font-semibold text-right">{detail.value}</div>
-                    </div>
-                  );
+                  
+                  // バッジの色を決定
+                  let badgeClass = '';
+                  let badgeText = '';
+                  if (labelText.includes('基礎年金')) {
+                    badgeClass = 'bg-blue-900/50 text-blue-200 border border-blue-700/50';
+                    badgeText = '基礎年金';
+                  } else if (labelText.includes('厚生年金')) {
+                    badgeClass = 'bg-green-900/50 text-green-200 border border-green-700/50';
+                    badgeText = '厚生年金';
+                  } else if (labelText.includes('加算')) {
+                    badgeClass = 'bg-gray-700/50 text-gray-300 border border-gray-600/50';
+                    badgeText = '加算';
+                  }
+                  
+                  if (isFormula) {
+                    // 数式の表示
+                    return (
+                      <div key={idx} className="pl-6 py-2 bg-black/30 rounded border border-slate-700/50">
+                        <div className="font-mono text-xs text-slate-300">
+                          <span className="text-slate-500">計算式:</span> {labelText}
+                        </div>
+                        <div className="font-mono text-xs text-emerald-400 mt-1">
+                          = {detail.value}
+                        </div>
+                      </div>
+                    );
+                  } else {
+                    // 通常の項目表示
+                    return (
+                      <div key={idx} className="flex items-start justify-between gap-4">
+                        <div className="flex items-center gap-2 flex-1">
+                          {badgeText && (
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap ${badgeClass}`}>
+                              {badgeText}
+                            </span>
+                          )}
+                          <span className="text-slate-300 break-words">{labelText}</span>
+                        </div>
+                        <div className="text-slate-100 font-bold text-right whitespace-nowrap text-base">
+                          {detail.value}
+                        </div>
+                      </div>
+                    );
+                  }
                 })}
               </div>
             </div>
@@ -400,7 +450,14 @@ function TimelineBlock({
   );
 }
 
-function PeriodCard({ title, amount, period, colorClass, icon }: { title: string; amount: number; period: string; colorClass: string; icon: string }) {
+function PeriodCard({ title, amount, period, colorClass, icon, pensionTypes }: { 
+  title: string; 
+  amount: number; 
+  period: string; 
+  colorClass: string; 
+  icon: string;
+  pensionTypes?: string[];
+}) {
   return (
     <div className={`p-5 rounded-xl border ${colorClass} bg-slate-900/40 backdrop-blur-sm`}>
       <div className="flex items-center gap-2 mb-2">
@@ -411,6 +468,20 @@ function PeriodCard({ title, amount, period, colorClass, icon }: { title: string
         {amount > 0 ? `${(amount / 10000).toFixed(0)}万円` : '---'}
         <span className="text-xs font-normal text-slate-500 ml-1">/年</span>
       </div>
+      {amount > 0 && (
+        <div className="text-lg font-semibold text-emerald-400 mb-2">
+          月額 {(amount / 12 / 10000).toFixed(1)}万円
+        </div>
+      )}
+      {pensionTypes && pensionTypes.length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-2">
+          {pensionTypes.map((type, idx) => (
+            <span key={idx} className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-700/50 text-slate-300 border border-slate-600/50">
+              {type}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="text-xs text-slate-500">{period}</div>
     </div>
   );
@@ -428,14 +499,105 @@ export default function SurvivorPensionPage() {
   const [monthsWife, setMonthsWife] = useState<number>(120);
   const [useMinashi300Wife, setUseMinashi300Wife] = useState<boolean>(true);
   const [oldAgeStartWife, setOldAgeStartWife] = useState<number>(65);
+  const [isOptimizedWife, setIsOptimizedWife] = useState<boolean>(false);
 
   const [ageHusband, setAgeHusband] = useState<number>(38);
   const [avgStdMonthlyHusband, setAvgStdMonthlyHusband] = useState<number>(450000);
   const [monthsHusband, setMonthsHusband] = useState<number>(180);
   const [useMinashi300Husband, setUseMinashi300Husband] = useState<boolean>(true);
   const [oldAgeStartHusband, setOldAgeStartHusband] = useState<number>(65);
+  const [isOptimizedHusband, setIsOptimizedHusband] = useState<boolean>(false);
 
   const [showNotes, setShowNotes] = useState(false);
+
+  // 生涯受給総額を計算する関数（100歳まで）
+  const calculateLifetimeTotal = (
+    currentAge: number,
+    ageAfterChild: number,
+    survivorEmployeePension: number,
+    chukoreiKasan: number,
+    ownBasic: number,
+    ownEmployee: number,
+    oldAgeStart: number,
+    isMale: boolean
+  ): number => {
+    let total = 0;
+    const lifeExpectancy = 100;
+
+    // 子がいなくなった後〜老齢年金開始前
+    const yearsBeforeOldAge = Math.max(0, oldAgeStart - ageAfterChild);
+    if (isMale) {
+      // 男性は60歳から遺族厚生年金
+      const survivorStartAge = Math.max(60, ageAfterChild);
+      if (oldAgeStart > survivorStartAge) {
+        total += survivorEmployeePension * (oldAgeStart - survivorStartAge);
+      }
+    } else {
+      // 女性は子がいなくなった後すぐに遺族厚生年金 + 中高齢寡婦加算
+      total += (survivorEmployeePension + chukoreiKasan) * yearsBeforeOldAge;
+    }
+
+    // 老齢年金開始後〜100歳
+    const adjustedOwnBasic = calculateOldAgePensionAdjustment(ownBasic, oldAgeStart);
+    const adjustedOwnEmployee = calculateOldAgePensionAdjustment(ownEmployee, oldAgeStart);
+    
+    // 重要：遺族厚生年金との併給調整
+    // 自分の老齢厚生年金を繰り下げても、遺族厚生年金との差額しか増えない
+    // 実質的な受給額 = 老齢基礎（繰り下げ増額あり） + Max(遺族厚生, 自分の老齢厚生)
+    const maxEmployeePart = Math.max(survivorEmployeePension, adjustedOwnEmployee);
+    const oldAgeAmount = adjustedOwnBasic + maxEmployeePart;
+    
+    const yearsOldAge = Math.max(0, lifeExpectancy - oldAgeStart);
+    total += oldAgeAmount * yearsOldAge;
+
+    return total;
+  };
+
+  // 最適な老齢年金開始年齢を計算
+  const findOptimalOldAgeStart = (
+    currentAge: number,
+    ageAfterChild: number,
+    survivorEmployeePension: number,
+    chukoreiKasan: number,
+    ownBasic: number,
+    ownEmployee: number,
+    isMale: boolean
+  ): number => {
+    // 65歳時点での自分の老齢厚生年金と遺族厚生年金を比較
+    const ownEmployeeAt65 = calculateOldAgePensionAdjustment(ownEmployee, 65);
+    
+    // 自分の老齢厚生年金が遺族厚生年金以上の場合、繰り下げのメリットなし
+    // → 65歳開始が最適
+    if (ownEmployeeAt65 >= survivorEmployeePension) {
+      return 65;
+    }
+    
+    // 自分の老齢厚生年金 < 遺族厚生年金 の場合のみ最適化を検討
+    // 繰り下げることで自分の老齢厚生年金が遺族厚生年金を上回る可能性がある
+    
+    let maxTotal = 0;
+    let optimalAge = 65;
+
+    for (let age = 60; age <= 75; age++) {
+      const total = calculateLifetimeTotal(
+        currentAge,
+        ageAfterChild,
+        survivorEmployeePension,
+        chukoreiKasan,
+        ownBasic,
+        ownEmployee,
+        age,
+        isMale
+      );
+      
+      if (total > maxTotal) {
+        maxTotal = total;
+        optimalAge = age;
+      }
+    }
+
+    return optimalAge;
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -489,33 +651,69 @@ export default function SurvivorPensionPage() {
       monthsHusband,
       useMinashi300Husband
     );
-    const isChukorei = (ageWife >= 40 && ageWife < 65 && eligibleChildren === 0);
-    const chukoreiKasan = isChukorei ? calculateChukoreiKasan() : 0;
 
     const youngestChildAge = childrenAges.length > 0 ? Math.min(...childrenAges) : null;
     const yearsUntilChild18 = youngestChildAge !== null ? Math.max(0, 18 - youngestChildAge) : 0;
     const ageAfterChild = ageWife + yearsUntilChild18;
 
+    // 最適な老齢年金開始年齢を計算
+    const wifeOwnBasic = calculateOldAgeBasicPension();
+    const wifeOwnEmployee = calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife);
+    const chukoreiKasan = (ageAfterChild >= 40 && ageAfterChild < 65) ? calculateChukoreiKasan() : 0;
+    
+    const optimalAgeWife = findOptimalOldAgeStart(
+      ageWife,
+      ageAfterChild,
+      survivorEmployeePension,
+      chukoreiKasan,
+      wifeOwnBasic,
+      wifeOwnEmployee,
+      false
+    );
+
+    // 最適化された年齢を使用（65歳以外になった場合のみ最適化フラグを立てる）
+    const effectiveOldAgeStartWife = optimalAgeWife;
+    if (effectiveOldAgeStartWife !== oldAgeStartWife) {
+      // 65歳以外に変更された場合のみ「最適化した」と表示
+      if (effectiveOldAgeStartWife !== 65) {
+        setIsOptimizedWife(true);
+      }
+      setOldAgeStartWife(effectiveOldAgeStartWife);
+    } else if (effectiveOldAgeStartWife === 65 && oldAgeStartWife === 65) {
+      // 元々65歳で、最適化後も65歳の場合は最適化フラグをfalseに
+      setIsOptimizedWife(false);
+    }
+
     const withChildrenAmount = basicPension + survivorEmployeePension;
-    const afterChildrenAmount = survivorEmployeePension + (ageAfterChild >= 40 && ageAfterChild < 65 ? calculateChukoreiKasan() : 0);
+    
+    // 改正モード（2028年見直し）の場合
+    let afterChildrenAmount = 0;
+    let pensionTypesAfterChildren: string[] = [];
+    
+    if (mode === 'revised2028') {
+      // 中高齢寡婦加算は廃止（0円）
+      // 子がいなくなった後は原則5年間のみ遺族厚生年金
+      const yearsAfterChild = effectiveOldAgeStartWife - ageAfterChild;
+      if (yearsAfterChild > 0) {
+        // 5年間は遺族厚生年金を支給（簡易実装：所得要件は考慮しない）
+        afterChildrenAmount = survivorEmployeePension;
+        pensionTypesAfterChildren = ['遺族厚生年金（5年間）'];
+      } else {
+        afterChildrenAmount = 0;
+      }
+    } else {
+      // 現行制度
+      const chukoreiKasanAfter = (ageAfterChild >= 40 && ageAfterChild < 65) ? calculateChukoreiKasan() : 0;
+      afterChildrenAmount = survivorEmployeePension + chukoreiKasanAfter;
+      pensionTypesAfterChildren = ['遺族厚生年金'];
+      if (chukoreiKasanAfter > 0) {
+        pensionTypesAfterChildren.push('中高齢寡婦加算');
+      }
+    }
 
     // 妻自身の老齢年金（簡易計算）
-    // 基礎年金は満額ベース
-    const wifeOwnBasic = calculateOldAgeBasicPension();
-    // 厚生年金は入力ベース
-    const wifeOwnEmployee = calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife);
-    
-    // 調整後の自身の老齢年金
-    const adjustedOwnBasic = calculateOldAgePensionAdjustment(wifeOwnBasic, oldAgeStartWife);
-    const adjustedOwnEmployee = calculateOldAgePensionAdjustment(wifeOwnEmployee, oldAgeStartWife);
-    
-    // 老齢期の受給額 = 自身の基礎 + 自身の厚生 + Max(0, 遺族厚生 - 自身の厚生)
-    // ※併給調整: 遺族厚生年金受給権発生後、自身の老齢厚生年金を受け取る場合、自身の厚生年金相当額の遺族厚生年金が支給停止となる。
-    // 実質的に Max(遺族厚生, 自身の厚生) を受け取ることになる（基礎年金は別）。
-    // ここでは「自身の基礎 + Max(遺族厚生, 自身の厚生)」として計算
-    // ただし、自身の厚生年金には繰り上げ・繰り下げがかかっているが、比較対象の遺族厚生年金は定額（65歳時点）
-    // 正確には、遺族厚生年金からは「自身の老齢厚生年金（本来の額）」が引かれるはずだが、
-    // 簡易的に「調整後の自身の厚生年金」と「遺族厚生年金」を比較して高い方＋基礎年金とする。
+    const adjustedOwnBasic = calculateOldAgePensionAdjustment(wifeOwnBasic, effectiveOldAgeStartWife);
+    const adjustedOwnEmployee = calculateOldAgePensionAdjustment(wifeOwnEmployee, effectiveOldAgeStartWife);
     
     const maxEmployeePart = Math.max(survivorEmployeePension, adjustedOwnEmployee);
     const oldAgeAmount = adjustedOwnBasic + maxEmployeePart;
@@ -523,13 +721,15 @@ export default function SurvivorPensionPage() {
     return {
       basicPension,
       employeePension: survivorEmployeePension,
-      chukoreiKasan,
-      total: basicPension + survivorEmployeePension + chukoreiKasan,
+      total: basicPension + survivorEmployeePension,
       withChildrenAmount,
       afterChildrenAmount,
       oldAgeAmount,
       yearsUntilChild18,
       ageAfterChild,
+      pensionTypesWithChildren: ['遺族基礎年金', '遺族厚生年金'],
+      pensionTypesAfterChildren,
+      pensionTypesOldAge: ['老齢基礎年金', '老齢厚生年金', '遺族厚生年金（差額）'],
     };
   }, [mode, childrenAges, avgStdMonthlyHusband, monthsHusband, useMinashi300Husband, ageWife, oldAgeStartWife, avgStdMonthlyWife, monthsWife]);
 
@@ -546,15 +746,60 @@ export default function SurvivorPensionPage() {
     const yearsUntilChild18 = youngestChildAge !== null ? Math.max(0, 18 - youngestChildAge) : 0;
     const ageAfterChild = ageHusband + yearsUntilChild18;
 
+    // 最適な老齢年金開始年齢を計算
+    const husbandOwnBasicCalc = calculateOldAgeBasicPension();
+    const husbandOwnEmployeeCalc = calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband);
+    
+    const optimalAgeHusband = findOptimalOldAgeStart(
+      ageHusband,
+      ageAfterChild,
+      survivorEmployeePension,
+      0, // 夫には中高齢寡婦加算なし
+      husbandOwnBasicCalc,
+      husbandOwnEmployeeCalc,
+      true
+    );
+
+    // 最適化された年齢を使用（65歳以外になった場合のみ最適化フラグを立てる）
+    const effectiveOldAgeStartHusband = optimalAgeHusband;
+    if (effectiveOldAgeStartHusband !== oldAgeStartHusband) {
+      // 65歳以外に変更された場合のみ「最適化した」と表示
+      if (effectiveOldAgeStartHusband !== 65) {
+        setIsOptimizedHusband(true);
+      }
+      setOldAgeStartHusband(effectiveOldAgeStartHusband);
+    } else if (effectiveOldAgeStartHusband === 65 && oldAgeStartHusband === 65) {
+      // 元々65歳で、最適化後も65歳の場合は最適化フラグをfalseに
+      setIsOptimizedHusband(false);
+    }
+
     const withChildrenAmount = basicPension + survivorEmployeePension;
-    const afterChildrenAmount = survivorEmployeePension;
+    
+    // 改正モード（2028年見直し）の場合
+    let afterChildrenAmount = 0;
+    let pensionTypesAfterChildren: string[] = [];
+    
+    if (mode === 'revised2028') {
+      // 夫は中高齢寡婦加算なし（元々女性のみの制度）
+      // 子がいなくなった後は原則5年間のみ遺族厚生年金
+      const yearsAfterChild = effectiveOldAgeStartHusband - ageAfterChild;
+      if (yearsAfterChild > 0) {
+        // 5年間は遺族厚生年金を支給（簡易実装：所得要件は考慮しない）
+        afterChildrenAmount = survivorEmployeePension;
+        pensionTypesAfterChildren = ['遺族厚生年金（5年間）'];
+      } else {
+        afterChildrenAmount = 0;
+      }
+    } else {
+      // 現行制度：夫は60歳から遺族厚生年金（55〜59歳は停止）
+      // 簡易実装：子がいなくなった後は遺族厚生年金を支給
+      afterChildrenAmount = survivorEmployeePension;
+      pensionTypesAfterChildren = ['遺族厚生年金（60歳〜）'];
+    }
     
     // 夫自身の老齢年金（簡易計算）
-    const husbandOwnBasic = calculateOldAgeBasicPension();
-    const husbandOwnEmployee = calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband);
-    
-    const adjustedOwnBasic = calculateOldAgePensionAdjustment(husbandOwnBasic, oldAgeStartHusband);
-    const adjustedOwnEmployee = calculateOldAgePensionAdjustment(husbandOwnEmployee, oldAgeStartHusband);
+    const adjustedOwnBasic = calculateOldAgePensionAdjustment(husbandOwnBasicCalc, effectiveOldAgeStartHusband);
+    const adjustedOwnEmployee = calculateOldAgePensionAdjustment(husbandOwnEmployeeCalc, effectiveOldAgeStartHusband);
     
     const maxEmployeePart = Math.max(survivorEmployeePension, adjustedOwnEmployee);
     const oldAgeAmount = adjustedOwnBasic + maxEmployeePart;
@@ -568,6 +813,9 @@ export default function SurvivorPensionPage() {
       oldAgeAmount,
       yearsUntilChild18,
       ageAfterChild,
+      pensionTypesWithChildren: ['遺族基礎年金', '遺族厚生年金'],
+      pensionTypesAfterChildren,
+      pensionTypesOldAge: ['老齢基礎年金', '老齢厚生年金', '遺族厚生年金（差額）'],
     };
   }, [mode, childrenAges, avgStdMonthlyWife, monthsWife, useMinashi300Wife, ageHusband, oldAgeStartHusband, avgStdMonthlyHusband, monthsHusband]);
 
@@ -585,11 +833,17 @@ export default function SurvivorPensionPage() {
     const points = Array.from(new Set([0, ...yearsTo18List])).sort((a, b) => a - b);
     const maxYearsWithChild = points[points.length - 1] || 0;
 
-    if (maxYearsWithChild > 0) {
-      block1.ticks.push({
-        edgeIndex: 0,
-        labelLines: [`妻${ageWife}`]
-      });
+      if (maxYearsWithChild > 0) {
+        const initialLines = [`妻${ageWife}`];
+        childrenAges.forEach((age) => {
+          if (age <= 18) {
+            initialLines.push(`子${age}`);
+          }
+        });
+        block1.ticks.push({
+          edgeIndex: 0,
+          labelLines: initialLines
+        });
 
       for (let i = 0; i < points.length - 1; i++) {
         const startY = points[i];
@@ -693,11 +947,17 @@ export default function SurvivorPensionPage() {
     const points = Array.from(new Set([0, ...yearsTo18List])).sort((a, b) => a - b);
     const maxYearsWithChild = points[points.length - 1] || 0;
 
-    if (maxYearsWithChild > 0) {
-      block1.ticks.push({
-        edgeIndex: 0,
-        labelLines: [`夫${ageHusband}`]
-      });
+      if (maxYearsWithChild > 0) {
+        const initialLines = [`夫${ageHusband}`];
+        childrenAges.forEach((age) => {
+          if (age <= 18) {
+            initialLines.push(`子${age}`);
+          }
+        });
+        block1.ticks.push({
+          edgeIndex: 0,
+          labelLines: initialLines
+        });
 
       for (let i = 0; i < points.length - 1; i++) {
         const startY = points[i];
@@ -844,16 +1104,7 @@ export default function SurvivorPensionPage() {
 
           <Accordion
             title="⚙️ 基本情報"
-            headerContent={
-              <div className="flex flex-col gap-1">
-                <span className="text-slate-500">反映されている情報: Customer Profile</span>
-                {childrenCount !== null && childrenCount > 0 && childrenAges.length > 0 && (
-                  <span className="text-slate-400">
-                    子{childrenCount}人 ({childrenAges.map(a => `${a}歳`).join(', ')})
-                  </span>
-                )}
-              </div>
-            }
+            headerContent="反映されている情報: Customer Profile"
             defaultOpen={false}
             onClear={() => { setChildrenCount(null); setChildrenAges([]); }}
           >
@@ -916,7 +1167,7 @@ export default function SurvivorPensionPage() {
                               <Select
                                 value={oldAgeStartWife}
                                 onChange={(e) => setOldAgeStartWife(Number(e.target.value))}
-                                options={Array.from({ length: 11 }, (_, i) => ({ value: 60 + i, label: `${60 + i}歳` }))}
+                                options={Array.from({ length: 16 }, (_, i) => ({ value: 60 + i, label: `${60 + i}歳` }))}
                               />
                             </div>
                              <div className="flex items-start gap-2 mt-2">
@@ -961,7 +1212,7 @@ export default function SurvivorPensionPage() {
                               <Select
                                 value={oldAgeStartHusband}
                                 onChange={(e) => setOldAgeStartHusband(Number(e.target.value))}
-                                options={Array.from({ length: 11 }, (_, i) => ({ value: 60 + i, label: `${60 + i}歳` }))}
+                                options={Array.from({ length: 16 }, (_, i) => ({ value: 60 + i, label: `${60 + i}歳` }))}
                               />
                             </div>
                             <div className="flex items-start gap-2 mt-2">
@@ -992,6 +1243,15 @@ export default function SurvivorPensionPage() {
               <h2 className="text-2xl font-bold text-slate-100">夫が死亡した場合</h2>
             </div>
 
+            {isOptimizedWife && (
+              <div className="mb-4 p-3 bg-amber-900/20 border border-amber-500/40 rounded-lg flex items-start gap-2">
+                <span className="text-amber-400 text-lg">⚠</span>
+                <div className="text-sm text-amber-200">
+                  <strong>老齢年金開始年齢を最適化しました：</strong> 生涯受給総額が最大になるよう、妻の老齢年金開始年齢を{oldAgeStartWife}歳に自動調整しました。
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                 <PeriodCard
                   title="子がいる期間"
@@ -999,6 +1259,7 @@ export default function SurvivorPensionPage() {
                   period={`${ageWife}歳 - ${caseHusbandDeath.ageAfterChild}歳`}
                   colorClass="border-emerald-500/30"
                   icon="👶"
+                  pensionTypes={caseHusbandDeath.pensionTypesWithChildren}
                 />
                 <PeriodCard
                   title="子がいなくなった後"
@@ -1006,6 +1267,7 @@ export default function SurvivorPensionPage() {
                   period={`${caseHusbandDeath.ageAfterChild}歳 - ${oldAgeStartWife}歳`}
                   colorClass="border-emerald-500/30"
                   icon="💼"
+                  pensionTypes={caseHusbandDeath.pensionTypesAfterChildren}
                 />
                 <PeriodCard
                   title="年金開始後"
@@ -1013,6 +1275,7 @@ export default function SurvivorPensionPage() {
                   period={`${oldAgeStartWife}歳 - 100歳`}
                   colorClass="border-emerald-500/30"
                   icon="🎂"
+                  pensionTypes={caseHusbandDeath.pensionTypesOldAge}
                 />
             </div>
 
@@ -1022,12 +1285,13 @@ export default function SurvivorPensionPage() {
                 color="emerald"
                 segments={timelineDataHusband.block1.segments}
                 ticks={timelineDataHusband.block1.ticks}
+                blockNumber={1}
                 calculationDetails={[
                   { label: '遺族基礎年金（基本額）', value: '83.2万円' },
                   { label: '子の加算（第1子・第2子）', value: '各23.9万円' },
                   { label: '子の加算（第3子以降）', value: '各8.0万円' },
                   { label: '遺族厚生年金（年額）', value: `${(caseHusbandDeath.employeePension / 10000).toFixed(1)}万円` },
-                  { label: '　月額 × 月数 × 5.481/1000 × 3/4', value: `${(avgStdMonthlyHusband / 10000).toFixed(1)}万 × ${useMinashi300Husband ? Math.max(monthsHusband, 300) : monthsHusband}月` },
+                  { label: '　平均標準報酬月額 × 厚生年金加入月数 × 5.481/1000 × 3/4', value: `${(avgStdMonthlyHusband / 10000).toFixed(1)}万 × ${useMinashi300Husband ? Math.max(monthsHusband, 300) : monthsHusband}月 × 5.481/1000 × 3/4 = ${(caseHusbandDeath.employeePension / 10000).toFixed(1)}万円` },
                 ]}
               />
             )}
@@ -1037,14 +1301,30 @@ export default function SurvivorPensionPage() {
               color="emerald"
               segments={timelineDataHusband.block2.segments}
               ticks={timelineDataHusband.block2.ticks}
+              blockNumber={2}
               calculationDetails={[
                 { label: '遺族厚生年金（年額）', value: `${(caseHusbandDeath.employeePension / 10000).toFixed(1)}万円` },
-                { label: '　月額 × 月数 × 5.481/1000 × 3/4', value: `${(avgStdMonthlyHusband / 10000).toFixed(1)}万 × ${useMinashi300Husband ? Math.max(monthsHusband, 300) : monthsHusband}月` },
+                { label: '　平均標準報酬月額 × 厚生年金加入月数 × 5.481/1000 × 3/4', value: `${(avgStdMonthlyHusband / 10000).toFixed(1)}万 × ${useMinashi300Husband ? Math.max(monthsHusband, 300) : monthsHusband}月 × 5.481/1000 × 3/4 = ${(caseHusbandDeath.employeePension / 10000).toFixed(1)}万円` },
                 { label: '中高齢寡婦加算（該当時）', value: '62.4万円' },
-                { label: '妻の老齢基礎年金', value: `${(calculateOldAgePensionAdjustment(calculateOldAgeBasicPension(), oldAgeStartWife) / 10000).toFixed(1)}万円` },
-                { label: '妻の老齢厚生年金', value: `${(calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife), oldAgeStartWife) / 10000).toFixed(1)}万円` },
-                { label: '　月額 × 月数 × 5.481/1000', value: `${(avgStdMonthlyWife / 10000).toFixed(1)}万 × ${monthsWife}月` },
+                { label: `妻の老齢基礎年金（${oldAgeStartWife}歳〜）`, value: `${(calculateOldAgePensionAdjustment(calculateOldAgeBasicPension(), oldAgeStartWife) / 10000).toFixed(1)}万円` },
+                ...(oldAgeStartWife !== 65 ? [{ 
+                  label: '　繰り上げ・繰り下げ調整', 
+                  value: oldAgeStartWife < 65 
+                    ? `83.2万円 × (1 - ${((65 - oldAgeStartWife) * 12 * 0.4).toFixed(1)}%) = ${(calculateOldAgePensionAdjustment(calculateOldAgeBasicPension(), oldAgeStartWife) / 10000).toFixed(1)}万円`
+                    : `83.2万円 × (1 + ${((oldAgeStartWife - 65) * 12 * 0.7).toFixed(1)}%) = ${(calculateOldAgePensionAdjustment(calculateOldAgeBasicPension(), oldAgeStartWife) / 10000).toFixed(1)}万円`
+                }] : []),
+                { label: `妻の老齢厚生年金（${oldAgeStartWife}歳〜）`, value: `${(calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife), oldAgeStartWife) / 10000).toFixed(1)}万円` },
+                { label: '　平均標準報酬月額 × 厚生年金加入月数 × 5.481/1000', value: `${(avgStdMonthlyWife / 10000).toFixed(1)}万 × ${monthsWife}月 × 5.481/1000 = ${(calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife) / 10000).toFixed(1)}万円` },
+                ...(oldAgeStartWife !== 65 ? [{ 
+                  label: '　繰り上げ・繰り下げ調整', 
+                  value: oldAgeStartWife < 65 
+                    ? `${(calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife) / 10000).toFixed(1)}万円 × (1 - ${((65 - oldAgeStartWife) * 12 * 0.4).toFixed(1)}%) = ${(calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife), oldAgeStartWife) / 10000).toFixed(1)}万円`
+                    : `${(calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife) / 10000).toFixed(1)}万円 × (1 + ${((oldAgeStartWife - 65) * 12 * 0.7).toFixed(1)}%) = ${(calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife), oldAgeStartWife) / 10000).toFixed(1)}万円`
+                }] : []),
+                { label: '遺族厚生年金（差額調整後）', value: `${(Math.max(0, caseHusbandDeath.employeePension - calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife), oldAgeStartWife)) / 10000).toFixed(1)}万円` },
+                { label: '　Max(遺族厚生年金 - 妻の老齢厚生年金, 0)', value: `Max(${(caseHusbandDeath.employeePension / 10000).toFixed(1)}万 - ${(calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife), oldAgeStartWife) / 10000).toFixed(1)}万, 0) = ${(Math.max(0, caseHusbandDeath.employeePension - calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife), oldAgeStartWife)) / 10000).toFixed(1)}万円` },
                 { label: '65歳以降の合計（年額）', value: `${(caseHusbandDeath.oldAgeAmount / 10000).toFixed(1)}万円` },
+                { label: '　老齢基礎 + 老齢厚生 + 遺族厚生（差額）', value: `${(calculateOldAgePensionAdjustment(calculateOldAgeBasicPension(), oldAgeStartWife) / 10000).toFixed(1)}万 + ${(calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife), oldAgeStartWife) / 10000).toFixed(1)}万 + ${(Math.max(0, caseHusbandDeath.employeePension - calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife), oldAgeStartWife)) / 10000).toFixed(1)}万 = ${(caseHusbandDeath.oldAgeAmount / 10000).toFixed(1)}万円` },
               ]}
             />
           </section>
@@ -1057,6 +1337,15 @@ export default function SurvivorPensionPage() {
               <h2 className="text-2xl font-bold text-slate-100">妻が死亡した場合</h2>
             </div>
 
+            {isOptimizedHusband && (
+              <div className="mb-4 p-3 bg-amber-900/20 border border-amber-500/40 rounded-lg flex items-start gap-2">
+                <span className="text-amber-400 text-lg">⚠</span>
+                <div className="text-sm text-amber-200">
+                  <strong>老齢年金開始年齢を最適化しました：</strong> 生涯受給総額が最大になるよう、夫の老齢年金開始年齢を{oldAgeStartHusband}歳に自動調整しました。
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
               <PeriodCard
                 title="子がいる期間"
@@ -1064,6 +1353,7 @@ export default function SurvivorPensionPage() {
                 period={`${ageHusband}歳 - ${caseWifeDeath.ageAfterChild}歳`}
                 colorClass="border-rose-500/30"
                 icon="👶"
+                pensionTypes={caseWifeDeath.pensionTypesWithChildren}
               />
               <PeriodCard
                 title="子がいなくなった後"
@@ -1071,6 +1361,7 @@ export default function SurvivorPensionPage() {
                 period={`${caseWifeDeath.ageAfterChild}歳 - ${oldAgeStartHusband}歳`}
                 colorClass="border-rose-500/30"
                 icon="💼"
+                pensionTypes={caseWifeDeath.pensionTypesAfterChildren}
               />
               <PeriodCard
                 title="年金開始後"
@@ -1078,6 +1369,7 @@ export default function SurvivorPensionPage() {
                 period={`${oldAgeStartHusband}歳 - 100歳`}
                 colorClass="border-rose-500/30"
                 icon="🎂"
+                pensionTypes={caseWifeDeath.pensionTypesOldAge}
               />
             </div>
 
@@ -1087,12 +1379,13 @@ export default function SurvivorPensionPage() {
                 color="rose"
                 segments={timelineDataWife.block1.segments}
                 ticks={timelineDataWife.block1.ticks}
+                blockNumber={1}
                 calculationDetails={[
                   { label: '遺族基礎年金（基本額）', value: '83.2万円' },
                   { label: '子の加算（第1子・第2子）', value: '各23.9万円' },
                   { label: '子の加算（第3子以降）', value: '各8.0万円' },
                   { label: '遺族厚生年金（年額）', value: `${(caseWifeDeath.employeePension / 10000).toFixed(1)}万円` },
-                  { label: '　月額 × 月数 × 5.481/1000 × 3/4', value: `${(avgStdMonthlyWife / 10000).toFixed(1)}万 × ${useMinashi300Wife ? Math.max(monthsWife, 300) : monthsWife}月` },
+                  { label: '　平均標準報酬月額 × 厚生年金加入月数 × 5.481/1000 × 3/4', value: `${(avgStdMonthlyWife / 10000).toFixed(1)}万 × ${useMinashi300Wife ? Math.max(monthsWife, 300) : monthsWife}月 × 5.481/1000 × 3/4 = ${(caseWifeDeath.employeePension / 10000).toFixed(1)}万円` },
                 ]}
               />
             )}
@@ -1102,13 +1395,29 @@ export default function SurvivorPensionPage() {
               color="rose"
               segments={timelineDataWife.block2.segments}
               ticks={timelineDataWife.block2.ticks}
+              blockNumber={2}
               calculationDetails={[
                 { label: '遺族厚生年金（年額）', value: `${(caseWifeDeath.employeePension / 10000).toFixed(1)}万円` },
-                { label: '　月額 × 月数 × 5.481/1000 × 3/4', value: `${(avgStdMonthlyWife / 10000).toFixed(1)}万 × ${useMinashi300Wife ? Math.max(monthsWife, 300) : monthsWife}月` },
-                { label: '夫の老齢基礎年金', value: `${(calculateOldAgePensionAdjustment(calculateOldAgeBasicPension(), oldAgeStartHusband) / 10000).toFixed(1)}万円` },
-                { label: '夫の老齢厚生年金', value: `${(calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband) / 10000).toFixed(1)}万円` },
-                { label: '　月額 × 月数 × 5.481/1000', value: `${(avgStdMonthlyHusband / 10000).toFixed(1)}万 × ${monthsHusband}月` },
+                { label: '　平均標準報酬月額 × 厚生年金加入月数 × 5.481/1000 × 3/4', value: `${(avgStdMonthlyWife / 10000).toFixed(1)}万 × ${useMinashi300Wife ? Math.max(monthsWife, 300) : monthsWife}月 × 5.481/1000 × 3/4 = ${(caseWifeDeath.employeePension / 10000).toFixed(1)}万円` },
+                { label: `夫の老齢基礎年金（${oldAgeStartHusband}歳〜）`, value: `${(calculateOldAgePensionAdjustment(calculateOldAgeBasicPension(), oldAgeStartHusband) / 10000).toFixed(1)}万円` },
+                ...(oldAgeStartHusband !== 65 ? [{ 
+                  label: '　繰り上げ・繰り下げ調整', 
+                  value: oldAgeStartHusband < 65 
+                    ? `83.2万円 × (1 - ${((65 - oldAgeStartHusband) * 12 * 0.4).toFixed(1)}%) = ${(calculateOldAgePensionAdjustment(calculateOldAgeBasicPension(), oldAgeStartHusband) / 10000).toFixed(1)}万円`
+                    : `83.2万円 × (1 + ${((oldAgeStartHusband - 65) * 12 * 0.7).toFixed(1)}%) = ${(calculateOldAgePensionAdjustment(calculateOldAgeBasicPension(), oldAgeStartHusband) / 10000).toFixed(1)}万円`
+                }] : []),
+                { label: `夫の老齢厚生年金（${oldAgeStartHusband}歳〜）`, value: `${(calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband) / 10000).toFixed(1)}万円` },
+                { label: '　平均標準報酬月額 × 厚生年金加入月数 × 5.481/1000', value: `${(avgStdMonthlyHusband / 10000).toFixed(1)}万 × ${monthsHusband}月 × 5.481/1000 = ${(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband) / 10000).toFixed(1)}万円` },
+                ...(oldAgeStartHusband !== 65 ? [{ 
+                  label: '　繰り上げ・繰り下げ調整', 
+                  value: oldAgeStartHusband < 65 
+                    ? `${(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband) / 10000).toFixed(1)}万円 × (1 - ${((65 - oldAgeStartHusband) * 12 * 0.4).toFixed(1)}%) = ${(calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband) / 10000).toFixed(1)}万円`
+                    : `${(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband) / 10000).toFixed(1)}万円 × (1 + ${((oldAgeStartHusband - 65) * 12 * 0.7).toFixed(1)}%) = ${(calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband) / 10000).toFixed(1)}万円`
+                }] : []),
+                { label: '遺族厚生年金（差額調整後）', value: `${(Math.max(0, caseWifeDeath.employeePension - calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband)) / 10000).toFixed(1)}万円` },
+                { label: '　Max(遺族厚生年金 - 夫の老齢厚生年金, 0)', value: `Max(${(caseWifeDeath.employeePension / 10000).toFixed(1)}万 - ${(calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband) / 10000).toFixed(1)}万, 0) = ${(Math.max(0, caseWifeDeath.employeePension - calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband)) / 10000).toFixed(1)}万円` },
                 { label: '65歳以降の合計（年額）', value: `${(caseWifeDeath.oldAgeAmount / 10000).toFixed(1)}万円` },
+                { label: '　老齢基礎 + 老齢厚生 + 遺族厚生（差額）', value: `${(calculateOldAgePensionAdjustment(calculateOldAgeBasicPension(), oldAgeStartHusband) / 10000).toFixed(1)}万 + ${(calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband) / 10000).toFixed(1)}万 + ${(Math.max(0, caseWifeDeath.employeePension - calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband)) / 10000).toFixed(1)}万 = ${(caseWifeDeath.oldAgeAmount / 10000).toFixed(1)}万円` },
               ]}
             />
           </section>
