@@ -182,7 +182,7 @@ export default function NecessaryCoveragePage() {
 
         const childrenAges = basicInfo.childrenAges ?? [];
         const eligibleChildrenForDisability = calculateEligibleChildrenCount(
-            childrenAges.map((a) => (a == null ? null : a)),
+            childrenAges.filter((a): a is number => a != null),
             DISABILITY_LEVEL,
         );
 

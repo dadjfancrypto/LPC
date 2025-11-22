@@ -157,7 +157,7 @@ function Select({ value, onChange, options }: { value: number | string; onChange
   );
 }
 
-function useSharedGeometry(measureRef: React.RefObject<HTMLDivElement>, segments: Segment[]): Geometry {
+function useSharedGeometry(measureRef: React.RefObject<HTMLDivElement | null>, segments: Segment[]): Geometry {
   const [innerW, setInnerW] = useState(0);
   useLayoutEffect(() => {
     const resize = () => setInnerW(measureRef.current?.clientWidth ?? 0);
