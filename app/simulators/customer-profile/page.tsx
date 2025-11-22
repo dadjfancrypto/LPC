@@ -562,6 +562,50 @@ export default function CustomerProfilePage() {
             >
               例（夫婦）
             </button>
+            <button
+              onClick={() => {
+                setProfile({
+                  monthlyLivingExpense: 200_000,
+                  details: {
+                    food: 40_000,
+                    communication: 10_000,
+                    utilities: 15_000,
+                    education: 0,
+                    housingLoan: 0,
+                    rent: 70_000,
+                    dailyGoods: 15_000,
+                    entertainment: 20_000,
+                    lifeInsurance: 10_000,
+                    savings: 20_000,
+                  },
+                  basicInfo: {
+                    childrenCount: 0,
+                    childrenAges: [],
+                    spouseType: 'none',
+                    ageWife: 0,
+                    oldAgeStartWife: 0,
+                    avgStdMonthlyWife: 0,
+                    monthsWife: 300,
+                    useMinashi300Wife: false,
+                    ageHusband: 0,
+                    oldAgeStartHusband: 0,
+                    avgStdMonthlyHusband: 0,
+                    monthsHusband: 300,
+                    useMinashi300Husband: false,
+                    age: 30,
+                    oldAgeStart: 65,
+                    hasEmployeePension: true,
+                    employeePensionMonths: 100,
+                    avgStdMonthly: 350_000,
+                    useMinashi300: true,
+                  },
+                });
+                showNotification('テストデータ（独身）を読み込みました');
+              }}
+              className="text-xs px-3 py-1.5 rounded-full border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            >
+              例（独身）
+            </button>
           </div>
         </div>
       </div>
