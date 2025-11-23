@@ -44,7 +44,7 @@ type CustomerProfile = {
 /* ===================== UI Components ===================== */
 
 function CupVisualization({ expenseMonthly, pensionMonthly, gapMonthly, pensionLabel = '公的年金', colorTheme = 'sky' }: { expenseMonthly: number; pensionMonthly: number; gapMonthly: number; pensionLabel?: string; colorTheme?: 'sky' | 'emerald' | 'rose' | 'amber' | 'slate'; }) {
-    const totalHeight = 240;
+    const totalHeight = 320;
     const maxAmount = Math.max(expenseMonthly, pensionMonthly) * 1.2;
     const scale = maxAmount > 0 ? totalHeight / maxAmount : 0;
 
@@ -63,25 +63,33 @@ function CupVisualization({ expenseMonthly, pensionMonthly, gapMonthly, pensionL
     return (
         <div className="flex flex-col items-center justify-center py-4 relative">
             {/* メインのコップエリア */}
-            <div className="relative" style={{ width: 180, height: totalHeight }}>
+            <div className="relative" style={{ width: 340, height: totalHeight }}>
                 {/* 必要生活費ライン（左側） */}
                 <div
                     className="absolute left-0 top-0 bottom-0 w-full pointer-events-none"
                     style={{ height: expenseHeight, top: totalHeight - expenseHeight }}
                 >
-                    <div className="absolute -left-2 top-0 w-full border-t border-dashed border-slate-500/50 flex items-center">
-                        <div className="absolute right-full mr-2 flex flex-col items-end">
-                            <span className="text-[10px] text-slate-400 whitespace-nowrap">必要生活費</span>
-                            <span className="text-sm font-bold text-slate-200 whitespace-nowrap">
-                                {(expenseMonthly / 10000).toFixed(1)}<span className="text-[10px] font-normal">万円</span>
+                    {/* 天井のライン（点線） */}
+                    <div className="absolute left-12 right-12 top-0 border-t border-dashed border-slate-500/50" />
+
+                    {/* 左側の縦ラベル */}
+                    <div className="absolute left-4 top-0 bottom-0 flex flex-col justify-center items-center w-8">
+                        <div className="absolute transform -rotate-90 whitespace-nowrap flex items-center gap-2">
+                            <span className="text-xl font-bold text-slate-200 tracking-wider">
+                                {(expenseMonthly / 10000).toFixed(1)}<span className="text-sm font-normal ml-1">万円</span>
                             </span>
+                            <span className="text-xs text-slate-400 tracking-widest">必要生活費</span>
                         </div>
+                        {/* 高さを示す縦線 */}
+                        <div className="absolute right-[-8px] top-0 bottom-0 w-px bg-slate-700"></div>
+                        <div className="absolute right-[-8px] top-0 w-2 h-px bg-slate-700"></div>
+                        <div className="absolute right-[-8px] bottom-0 w-2 h-px bg-slate-700"></div>
                     </div>
                 </div>
 
                 {/* コップ本体 */}
                 <div
-                    className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-32 rounded-b-3xl border-b-4 border-l-2 border-r-2 ${colors.border} ${colors.bg} backdrop-blur-sm overflow-hidden transition-all duration-500`}
+                    className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-56 rounded-b-[3rem] border-b-4 border-l-2 border-r-2 ${colors.border} ${colors.bg} backdrop-blur-sm overflow-hidden transition-all duration-500`}
                     style={{ height: totalHeight }}
                 >
                     {/* 水（年金） */}
@@ -94,8 +102,8 @@ function CupVisualization({ expenseMonthly, pensionMonthly, gapMonthly, pensionL
 
                         {pensionMonthly > 0 && pensionHeight > 40 && (
                             <div className="text-white font-bold text-center drop-shadow-md z-10">
-                                <div className="text-[10px] opacity-90 mb-0.5">{pensionLabel}</div>
-                                <div className="text-lg leading-none">{(pensionMonthly / 10000).toFixed(1)}<span className="text-xs font-normal">万円</span></div>
+                                <div className="text-xs opacity-90 mb-0.5">{pensionLabel}</div>
+                                <div className="text-3xl leading-none">{(pensionMonthly / 10000).toFixed(1)}<span className="text-sm font-normal">万円</span></div>
                             </div>
                         )}
                     </div>
@@ -107,8 +115,8 @@ function CupVisualization({ expenseMonthly, pensionMonthly, gapMonthly, pensionL
                             style={{ bottom: pensionHeight, height: Math.max(0, expenseHeight - pensionHeight) }}
                         >
                             <div className="text-rose-400 font-bold text-center animate-pulse">
-                                <div className="text-[10px] opacity-80">不足</div>
-                                <div className="text-xl leading-none">{(gapMonthly / 10000).toFixed(1)}<span className="text-xs font-normal">万円</span></div>
+                                <div className="text-xs opacity-80">不足</div>
+                                <div className="text-3xl leading-none">{(gapMonthly / 10000).toFixed(1)}<span className="text-sm font-normal">万円</span></div>
                             </div>
                         </div>
                     )}
@@ -316,13 +324,21 @@ export default function NecessaryCoveragePage() {
             </div>
 
             <div className="max-w-5xl mx-auto px-6 py-10">
-                <p className="text-slate-400 mb-10 max-w-2xl">
+                <p className="text-slate-400 mb-10 max-w-4xl leading-relaxed">
                     万が一の際に必要な生活費と、公的年金（遺族年金・障害年金）の差額を可視化します。
                     不足分（ギャップ）が、民間保険などで準備すべき必要保障額となります。
                 </p>
 
                 {/* 設定パネル */}
                 <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 mb-12 backdrop-blur-sm">
+                    <div className="flex flex-col items-center justify-center mb-8 pb-8 border-b border-slate-800/50">
+                        <div className="text-sm text-slate-400 mb-2">現在の生活費（プロフィール設定）</div>
+                        <div className="text-4xl font-bold text-white tracking-tight">
+                            {(profile.monthlyLivingExpense / 10000).toFixed(0)}
+                            <span className="text-lg font-normal text-slate-500 ml-1">万円/月</span>
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div>
                             <div className="flex items-center justify-between mb-4">
@@ -341,6 +357,19 @@ export default function NecessaryCoveragePage() {
                                 className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
                             />
                             <p className="text-xs text-slate-500 mt-2">現在の生活費に対する割合（一般的に70%程度と言われています）</p>
+                            
+                            <div className="mt-6 p-4 rounded-xl bg-slate-950/50 border border-slate-800 flex items-center justify-between">
+                                <div>
+                                    <div className="text-xs text-slate-400">シミュレーション上の生活費</div>
+                                    <div className="text-[10px] text-slate-500 mt-0.5">現在より <span className="text-emerald-400 font-bold">{((profile.monthlyLivingExpense - Math.round(profile.monthlyLivingExpense * (expenseRatioSurvivor / 100))) / 10000).toFixed(1)}万円</span> 減少</div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-2xl font-bold text-emerald-400">
+                                        {(Math.round(profile.monthlyLivingExpense * (expenseRatioSurvivor / 100)) / 10000).toFixed(1)}
+                                        <span className="text-xs text-emerald-500/70 ml-1">万円</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div>
                             <div className="flex items-center justify-between mb-4">
@@ -359,6 +388,19 @@ export default function NecessaryCoveragePage() {
                                 className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
                             />
                             <p className="text-xs text-slate-500 mt-2">現在の生活費に対する割合（治療費や介護費用で増加する可能性があります）</p>
+
+                            <div className="mt-6 p-4 rounded-xl bg-slate-950/50 border border-slate-800 flex items-center justify-between">
+                                <div>
+                                    <div className="text-xs text-slate-400">シミュレーション上の生活費</div>
+                                    <div className="text-[10px] text-slate-500 mt-0.5">現在より <span className="text-amber-400 font-bold">{((Math.round(profile.monthlyLivingExpense * (expenseRatioDisability / 100)) - profile.monthlyLivingExpense) / 10000).toFixed(1)}万円</span> 増加</div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-2xl font-bold text-amber-400">
+                                        {(Math.round(profile.monthlyLivingExpense * (expenseRatioDisability / 100)) / 10000).toFixed(1)}
+                                        <span className="text-xs text-amber-500/70 ml-1">万円</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -368,7 +410,7 @@ export default function NecessaryCoveragePage() {
                     <div className="space-y-12">
                         {/* 夫婦の場合 */}
                         {profile.basicInfo.spouseType === 'couple' && (
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <div className="grid grid-cols-1 gap-12">
                                 {/* 妻の生活を守る */}
                                 <ScenarioCard title="妻の生活を守る" className="border-t-4 border-t-emerald-500">
                                     <div className="grid grid-cols-2 gap-4 divide-x divide-slate-800">

@@ -136,7 +136,7 @@ function BasicInfoInput({
     }
   }, [basicInfo.childrenCount, basicInfo.childrenAges, setBasicInfo, basicInfo]);
 
-  const InputGroup = ({ label, children }: { label: string, children: React.ReactNode }) => (
+  const InputGroup = ({ label, children }: { label: React.ReactNode, children: React.ReactNode }) => (
     <div className="space-y-2">
       <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">{label}</label>
       {children}
@@ -253,7 +253,12 @@ function BasicInfoInput({
               />
             </InputGroup>
 
-            <InputGroup label="加入月数">
+            <InputGroup label={
+              <div className="flex items-end gap-2">
+                <span>厚生年金加入月数</span>
+                <span className="text-[10px] font-normal text-slate-400 normal-case tracking-normal">※一度でも加入していた方は記入</span>
+              </div>
+            }>
               <input
                 type="number"
                 className="w-full rounded-lg px-3 py-2 bg-slate-800/50 border border-slate-700 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-all text-slate-100"
@@ -262,15 +267,20 @@ function BasicInfoInput({
               />
             </InputGroup>
 
-            <label className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/30 border border-slate-700/50 cursor-pointer hover:bg-slate-800/50 transition-colors">
-              <input
-                type="checkbox"
-                className="w-4 h-4 rounded border-slate-600 text-rose-500 focus:ring-rose-500 bg-slate-700"
-                checked={basicInfo.useMinashi300Wife}
-                onChange={(e) => setBasicInfo({ ...basicInfo, useMinashi300Wife: e.target.checked })}
-              />
-              <span className="text-sm text-slate-300">みなし300月を使用</span>
-            </label>
+            <InputGroup label={<span className="invisible">オプション</span>}>
+              <div className="space-y-1">
+                <label className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/30 border border-slate-700/50 cursor-pointer hover:bg-slate-800/50 transition-colors">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-slate-600 text-rose-500 focus:ring-rose-500 bg-slate-700"
+                    checked={basicInfo.useMinashi300Wife}
+                    onChange={(e) => setBasicInfo({ ...basicInfo, useMinashi300Wife: e.target.checked })}
+                  />
+                  <span className="text-sm text-slate-300">みなし300月を使用</span>
+                </label>
+                <p className="text-[10px] text-slate-500 ml-4">※現在厚生年金に加入している方はチェック</p>
+              </div>
+            </InputGroup>
 
             <InputGroup label="老齢年金開始年齢">
               <Select
@@ -310,7 +320,12 @@ function BasicInfoInput({
               />
             </InputGroup>
 
-            <InputGroup label="加入月数">
+            <InputGroup label={
+              <div className="flex items-end gap-2">
+                <span>厚生年金加入月数</span>
+                <span className="text-[10px] font-normal text-slate-400 normal-case tracking-normal">※一度でも加入していた方は記入</span>
+              </div>
+            }>
               <input
                 type="number"
                 className="w-full rounded-lg px-3 py-2 bg-slate-800/50 border border-slate-700 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all text-slate-100"
@@ -319,15 +334,20 @@ function BasicInfoInput({
               />
             </InputGroup>
 
-            <label className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/30 border border-slate-700/50 cursor-pointer hover:bg-slate-800/50 transition-colors">
-              <input
-                type="checkbox"
-                className="w-4 h-4 rounded border-slate-600 text-sky-500 focus:ring-sky-500 bg-slate-700"
-                checked={basicInfo.useMinashi300Husband}
-                onChange={(e) => setBasicInfo({ ...basicInfo, useMinashi300Husband: e.target.checked })}
-              />
-              <span className="text-sm text-slate-300">みなし300月を使用</span>
-            </label>
+            <InputGroup label={<span className="invisible">オプション</span>}>
+              <div className="space-y-1">
+                <label className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/30 border border-slate-700/50 cursor-pointer hover:bg-slate-800/50 transition-colors">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-slate-600 text-sky-500 focus:ring-sky-500 bg-slate-700"
+                    checked={basicInfo.useMinashi300Husband}
+                    onChange={(e) => setBasicInfo({ ...basicInfo, useMinashi300Husband: e.target.checked })}
+                  />
+                  <span className="text-sm text-slate-300">みなし300月を使用</span>
+                </label>
+                <p className="text-[10px] text-slate-500 ml-4">※現在厚生年金に加入している方はチェック</p>
+              </div>
+            </InputGroup>
 
             <InputGroup label="老齢年金開始年齢">
               <Select
@@ -370,13 +390,33 @@ function BasicInfoInput({
                   })}
                 />
               </InputGroup>
-              <InputGroup label="加入月数">
+              <InputGroup label={
+                <div className="flex items-end gap-2">
+                  <span>厚生年金加入月数</span>
+                  <span className="text-[10px] font-normal text-slate-400 normal-case tracking-normal">※一度でも加入していた方は記入</span>
+                </div>
+              }>
                 <input
                   type="number"
                   className="w-full rounded-lg px-3 py-2 bg-slate-800/50 border border-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-slate-100"
                   value={basicInfo.employeePensionMonths}
                   onChange={(e) => setBasicInfo({ ...basicInfo, employeePensionMonths: parseInt(e.target.value) || 0 })}
                 />
+              </InputGroup>
+
+              <InputGroup label={<span className="invisible">オプション</span>}>
+                <div className="space-y-1">
+                  <label className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/30 border border-slate-700/50 cursor-pointer hover:bg-slate-800/50 transition-colors">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-slate-600 text-emerald-500 focus:ring-emerald-500 bg-slate-700"
+                      checked={basicInfo.useMinashi300}
+                      onChange={(e) => setBasicInfo({ ...basicInfo, useMinashi300: e.target.checked })}
+                    />
+                    <span className="text-sm text-slate-300">みなし300月を使用</span>
+                  </label>
+                  <p className="text-[10px] text-slate-500 ml-4">※現在厚生年金に加入している方はチェック</p>
+                </div>
               </InputGroup>
             </div>
           </div>
@@ -541,7 +581,7 @@ export default function CustomerProfilePage() {
               onClick={() => {
                 // サンプルデータを入力（夫婦タイプ）
                 setProfile({
-                  monthlyLivingExpense: 280_000,
+                  monthlyLivingExpense: 300_000,
                   details: {
                     food: 60_000,
                     communication: 15_000,
@@ -585,7 +625,7 @@ export default function CustomerProfilePage() {
             <button
               onClick={() => {
                 setProfile({
-                  monthlyLivingExpense: 200_000,
+                  monthlyLivingExpense: 120_000,
                   details: {
                     food: 40_000,
                     communication: 10_000,
@@ -612,11 +652,11 @@ export default function CustomerProfilePage() {
                     avgStdMonthlyHusband: 0,
                     monthsHusband: 300,
                     useMinashi300Husband: false,
-                    age: 30,
+                    age: 25,
                     oldAgeStart: 65,
                     hasEmployeePension: true,
                     employeePensionMonths: 100,
-                    avgStdMonthly: 350_000,
+                    avgStdMonthly: 250_000,
                     useMinashi300: true,
                   },
                 });
