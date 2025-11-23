@@ -2,6 +2,12 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import {
+  EducationCourse,
+  EDUCATION_COURSE_LABELS,
+  calculateHouseholdEducationCost,
+  CramSchoolOptions
+} from '@/app/utils/education-costs';
 
 // Customer Profileの型定義
 type LivingExpenseDetail = {
@@ -46,6 +52,10 @@ type CustomerProfileBasicInfo = {
   employeePensionMonths: number; // 加入月数（0、1〜299、300以上）
   avgStdMonthly: number; // 平均標準報酬月額（2003年4月以降の値として扱う）
   useMinashi300: boolean; // 本人のみなし300月チェックボックス
+
+  // 教育費コース
+  educationCourse: EducationCourse;
+  cramSchoolOptions: CramSchoolOptions;
 };
 
 type CustomerProfile = {
@@ -53,10 +63,23 @@ type CustomerProfile = {
   details: LivingExpenseDetail;
   basicInfo: CustomerProfileBasicInfo; // 基本情報
   danshinHolder: ('husband' | 'wife')[]; // 団信加入者（デフォルトは['husband']）
+  isLivingExpenseDetailed: boolean; // 生活費の内訳入力モードかどうか
+};
+
+type SavedPlan = {
+  name: string;
+  profile: CustomerProfile;
+  savedAt: string;
+};
+
+type SavedPlans = {
+  [key: string]: SavedPlan;
 };
 
 const STORAGE_KEY = 'customer-profile';
 const STORAGE_KEY_BASIC = 'customer-profile-basic';
+const STORAGE_KEY_PLANS = 'customer-profile-plans';
+const STORAGE_KEY_CURRENT_PLAN = 'customer-profile-current-plan';
 
 // 1万円単位の選択肢（10万円から100万円まで）
 const TEN_THOUSAND_OPTIONS = Array.from({ length: 91 }, (_, i) => (i + 10) * 10_000);
@@ -139,6 +162,8 @@ function LivingExpenseSelector({
   basicInfo,
   danshinHolder,
   setDanshinHolder,
+  isDetailed,
+  setIsDetailed,
 }: {
   value: number;
   setValue: (v: number) => void;
@@ -147,8 +172,9 @@ function LivingExpenseSelector({
   basicInfo: CustomerProfileBasicInfo;
   danshinHolder: ('husband' | 'wife')[];
   setDanshinHolder: (h: ('husband' | 'wife')[]) => void;
+  isDetailed: boolean;
+  setIsDetailed: (b: boolean) => void;
 }) {
-  const [isDetailed, setIsDetailed] = useState(false);
   const [isAddition, setIsAddition] = useState(true);
 
   // 合計を計算する関数
@@ -156,14 +182,7 @@ function LivingExpenseSelector({
     return Object.values(currentDetails).reduce((a, b) => a + b, 0);
   };
 
-  // detailsに値が入っている場合は自動的に詳細入力モードを有効化
-  useEffect(() => {
-    const total = Object.values(details).reduce((a, b) => a + b, 0);
-    if (total > 0 && !isDetailed) {
-      setIsDetailed(true);
-      setValue(total);
-    }
-  }, [details, isDetailed, setValue]);
+
 
   // 世帯人数を計算
   const householdSize = useMemo(() => {
@@ -194,7 +213,7 @@ function LivingExpenseSelector({
     <div className="space-y-6">
       <div className="space-y-2">
         <label className="block text-sm font-semibold text-slate-300 mb-2">生活費（月額）</label>
-        
+
         {!isDetailed ? (
           <div className="relative">
             <select
@@ -227,10 +246,10 @@ function LivingExpenseSelector({
           <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isDetailed ? 'bg-sky-500 border-sky-500' : 'bg-slate-800 border-slate-600 group-hover:border-sky-500'}`}>
             {isDetailed && <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>}
           </div>
-          <input 
-            type="checkbox" 
-            className="hidden" 
-            checked={isDetailed} 
+          <input
+            type="checkbox"
+            className="hidden"
+            checked={isDetailed}
             onChange={(e) => handleModeChange(e.target.checked)}
           />
           <span className="text-sm text-slate-300 group-hover:text-white transition-colors">内訳を詳細に入力する</span>
@@ -239,13 +258,13 @@ function LivingExpenseSelector({
         {/* 加算・減算切替 (詳細モード時のみ) */}
         {isDetailed && (
           <div className="flex bg-slate-800 rounded-lg p-1 gap-1">
-            <button 
+            <button
               onClick={() => setIsAddition(true)}
               className={`px-3 py-1 text-xs rounded-md transition-all font-medium flex items-center gap-1 ${isAddition ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
             >
               <span>＋</span> 加算
             </button>
-            <button 
+            <button
               onClick={() => setIsAddition(false)}
               className={`px-3 py-1 text-xs rounded-md transition-all font-medium flex items-center gap-1 ${!isAddition ? 'bg-rose-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
             >
@@ -289,11 +308,10 @@ function LivingExpenseSelector({
                               setDanshinHolder([...danshinHolder, holder]);
                             }
                           }}
-                          className={`px-3 py-1 text-[10px] rounded-sm transition-all ${
-                            isSelected
-                              ? 'bg-emerald-600 text-white shadow-sm font-bold'
-                              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
-                          }`}
+                          className={`px-3 py-1 text-[10px] rounded-sm transition-all ${isSelected
+                            ? 'bg-emerald-600 text-white shadow-sm font-bold'
+                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+                            }`}
                         >
                           {holder === 'husband' ? '夫' : '妻'}
                         </button>
@@ -303,17 +321,41 @@ function LivingExpenseSelector({
                 </div>
               )}
 
+              {/* 教育費の再計算ボタン */}
+              {key === 'education' && basicInfo.childrenCount !== undefined && basicInfo.childrenCount > 0 && (
+                <div className="flex flex-col gap-2 mt-2 p-3 bg-slate-800/30 rounded-lg border border-slate-700/50">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-slate-400">コース: {EDUCATION_COURSE_LABELS[basicInfo.educationCourse]}</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const cost = calculateHouseholdEducationCost(
+                        basicInfo.educationCourse,
+                        basicInfo.childrenAges,
+                        basicInfo.cramSchoolOptions
+                      );
+                      handleDetailChange('education', cost);
+                    }}
+                    className="text-[10px] text-sky-400 hover:text-sky-300 flex items-center gap-1 transition-colors"
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                    </svg>
+                    <span>{EDUCATION_COURSE_LABELS[basicInfo.educationCourse]}で再計算</span>
+                  </button>
+                </div>
+              )}
+
               {/* 加減算ボタン */}
               <div className="flex justify-end gap-2">
                 {[10000, 5000, 1000].map((amount) => (
                   <button
                     key={amount}
                     onClick={() => handleDetailChange(key, (details[key] || 0) + (isAddition ? amount : -amount))}
-                    className={`px-2 py-1 rounded border text-[10px] transition-all font-medium ${
-                      isAddition 
-                        ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/10' 
-                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-rose-400 hover:border-rose-500/50 hover:bg-rose-500/10'
-                    }`}
+                    className={`px-2 py-1 rounded border text-[10px] transition-all font-medium ${isAddition
+                      ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/10'
+                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-rose-400 hover:border-rose-500/50 hover:bg-rose-500/10'
+                      }`}
                   >
                     {isAddition ? '+' : '-'}{amount.toLocaleString()}
                   </button>
@@ -464,6 +506,72 @@ function BasicInfoInput({
                 />
               </div>
             ))}
+          </div>
+
+          {/* 教育費コース設定 */}
+          <div className="mt-6 pt-4 border-t border-slate-700/50">
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">教育費コース</label>
+            <Select
+              value={basicInfo.educationCourse}
+              onChange={(e: any) => setBasicInfo({ ...basicInfo, educationCourse: e.target.value as EducationCourse })}
+              options={Object.entries(EDUCATION_COURSE_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            />
+
+            <div className="mt-4 pt-4 border-t border-slate-700/50">
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">塾・習い事費用を含める</label>
+              <div className="flex flex-wrap gap-4">
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${basicInfo.cramSchoolOptions.elementary ? 'bg-emerald-500 border-emerald-500' : 'bg-slate-800 border-slate-600 group-hover:border-emerald-500'}`}>
+                    {basicInfo.cramSchoolOptions.elementary && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>}
+                  </div>
+                  <input
+                    type="checkbox"
+                    className="hidden"
+                    checked={basicInfo.cramSchoolOptions.elementary}
+                    onChange={(e) => setBasicInfo({
+                      ...basicInfo,
+                      cramSchoolOptions: { ...basicInfo.cramSchoolOptions, elementary: e.target.checked }
+                    })}
+                  />
+                  <span className="text-sm text-slate-300 group-hover:text-white transition-colors">小学校</span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${basicInfo.cramSchoolOptions.juniorHigh ? 'bg-emerald-500 border-emerald-500' : 'bg-slate-800 border-slate-600 group-hover:border-emerald-500'}`}>
+                    {basicInfo.cramSchoolOptions.juniorHigh && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>}
+                  </div>
+                  <input
+                    type="checkbox"
+                    className="hidden"
+                    checked={basicInfo.cramSchoolOptions.juniorHigh}
+                    onChange={(e) => setBasicInfo({
+                      ...basicInfo,
+                      cramSchoolOptions: { ...basicInfo.cramSchoolOptions, juniorHigh: e.target.checked }
+                    })}
+                  />
+                  <span className="text-sm text-slate-300 group-hover:text-white transition-colors">中学校</span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${basicInfo.cramSchoolOptions.highSchool ? 'bg-emerald-500 border-emerald-500' : 'bg-slate-800 border-slate-600 group-hover:border-emerald-500'}`}>
+                    {basicInfo.cramSchoolOptions.highSchool && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>}
+                  </div>
+                  <input
+                    type="checkbox"
+                    className="hidden"
+                    checked={basicInfo.cramSchoolOptions.highSchool}
+                    onChange={(e) => setBasicInfo({
+                      ...basicInfo,
+                      cramSchoolOptions: { ...basicInfo.cramSchoolOptions, highSchool: e.target.checked }
+                    })}
+                  />
+                  <span className="text-sm text-slate-300 group-hover:text-white transition-colors">高校</span>
+                </label>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-2">※月額目安: 小1.5〜3万 / 中2.5〜3万 / 高3.5〜4万</p>
+            </div>
           </div>
         </div>
       )}
@@ -707,10 +815,15 @@ export default function CustomerProfilePage() {
       employeePensionMonths: 300, // デフォルトは300月
       avgStdMonthly: 0, // 0は未入力として扱う（--を表示）
       useMinashi300: false,
+      educationCourse: 'private_hs', // デフォルト
+      cramSchoolOptions: { elementary: true, juniorHigh: true, highSchool: true }, // デフォルトでON
     },
+    isLivingExpenseDetailed: false,
   });
 
   const [notification, setNotification] = useState<string | null>(null);
+  const [savedPlans, setSavedPlans] = useState<SavedPlans>({});
+  const [currentPlanId, setCurrentPlanId] = useState<string | null>(null);
 
   const showNotification = (msg: string) => {
     setNotification(msg);
@@ -744,6 +857,23 @@ export default function CustomerProfilePage() {
           console.error('Failed to load customer profile basic info:', e);
         }
       }
+
+      // 保存済みプラン
+      const savedPlansData = localStorage.getItem(STORAGE_KEY_PLANS);
+      if (savedPlansData) {
+        try {
+          const parsedPlans = JSON.parse(savedPlansData);
+          setSavedPlans(parsedPlans);
+        } catch (e) {
+          console.error('Failed to load saved plans:', e);
+        }
+      }
+
+      // 現在のプランID
+      const currentPlan = localStorage.getItem(STORAGE_KEY_CURRENT_PLAN);
+      if (currentPlan) {
+        setCurrentPlanId(currentPlan);
+      }
     }
   }, []);
 
@@ -755,6 +885,7 @@ export default function CustomerProfilePage() {
         monthlyLivingExpense: newProfile.monthlyLivingExpense,
         details: newProfile.details,
         danshinHolder: newProfile.danshinHolder,
+        isLivingExpenseDetailed: newProfile.isLivingExpenseDetailed,
       }));
     }
   };
@@ -766,6 +897,71 @@ export default function CustomerProfilePage() {
       localStorage.setItem(STORAGE_KEY_BASIC, JSON.stringify(newBasicInfo));
       // カスタムイベントを発行して、他のページに変更を通知
       window.dispatchEvent(new Event('customer-profile-updated'));
+    }
+  };
+
+  // プラン保存
+  const handleSavePlan = () => {
+    const planId = currentPlanId || `plan-${Date.now()}`;
+    const planName = currentPlanId
+      ? savedPlans[currentPlanId]?.name || `プラン${Object.keys(savedPlans).length + 1}`
+      : `プラン${Object.keys(savedPlans).length + 1}`;
+
+    const newPlans = {
+      ...savedPlans,
+      [planId]: {
+        name: planName,
+        profile: profile,
+        savedAt: new Date().toISOString()
+      }
+    };
+
+    setSavedPlans(newPlans);
+    setCurrentPlanId(planId);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY_PLANS, JSON.stringify(newPlans));
+      localStorage.setItem(STORAGE_KEY_CURRENT_PLAN, planId);
+    }
+    showNotification(`${planName}を保存しました`);
+  };
+
+  // プラン読み込み
+  const handleLoadPlan = (planId: string) => {
+    if (!planId) {
+      setCurrentPlanId(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(STORAGE_KEY_CURRENT_PLAN);
+      }
+      return;
+    }
+
+    const plan = savedPlans[planId];
+    if (plan) {
+      setProfile(plan.profile);
+      setCurrentPlanId(planId);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY_CURRENT_PLAN, planId);
+      }
+      showNotification(`${plan.name}を読み込みました`);
+    }
+  };
+
+  // プラン削除
+  const handleDeletePlan = () => {
+    if (!currentPlanId) return;
+
+    const planName = savedPlans[currentPlanId]?.name || 'プラン';
+    if (confirm(`${planName}を削除しますか？`)) {
+      const newPlans = { ...savedPlans };
+      delete newPlans[currentPlanId];
+
+      setSavedPlans(newPlans);
+      setCurrentPlanId(null);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY_PLANS, JSON.stringify(newPlans));
+        localStorage.removeItem(STORAGE_KEY_CURRENT_PLAN);
+      }
+      showNotification(`${planName}を削除しました`);
     }
   };
 
@@ -781,8 +977,7 @@ export default function CustomerProfilePage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
-                // すべての入力値をクリア
-                setProfile({
+                const clearedProfile = {
                   monthlyLivingExpense: 0,
                   details: {
                     food: 50_000,
@@ -797,6 +992,7 @@ export default function CustomerProfilePage() {
                     savings: 50_000,
                   },
                   danshinHolder: ['husband'],
+                  isLivingExpenseDetailed: false,
                   basicInfo: {
                     childrenCount: undefined,
                     childrenAges: [],
@@ -817,8 +1013,13 @@ export default function CustomerProfilePage() {
                     employeePensionMonths: 300,
                     avgStdMonthly: 0,
                     useMinashi300: false,
+                    educationCourse: 'private_hs' as const,
+                    cramSchoolOptions: { elementary: false, juniorHigh: false, highSchool: false },
                   },
-                });
+                } as CustomerProfile;
+                setProfile(clearedProfile);
+                saveProfile(clearedProfile);
+                saveBasicInfo(clearedProfile.basicInfo);
                 showNotification('入力値をクリアしました');
               }}
               className="text-xs px-3 py-1.5 rounded-full border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
@@ -827,8 +1028,7 @@ export default function CustomerProfilePage() {
             </button>
             <button
               onClick={() => {
-                // サンプルデータを入力（夫婦タイプ）
-                setProfile({
+                const coupleProfile = {
                   monthlyLivingExpense: 300_000,
                   details: {
                     food: 60_000,
@@ -843,10 +1043,11 @@ export default function CustomerProfilePage() {
                     savings: 30_000,
                   },
                   danshinHolder: ['husband'],
+                  isLivingExpenseDetailed: true,
                   basicInfo: {
                     childrenCount: 2,
                     childrenAges: [3, 1],
-                    spouseType: 'couple',
+                    spouseType: 'couple' as const,
                     ageWife: 32,
                     oldAgeStartWife: 65,
                     avgStdMonthlyWife: 250_000,
@@ -863,8 +1064,13 @@ export default function CustomerProfilePage() {
                     employeePensionMonths: 300,
                     avgStdMonthly: 0,
                     useMinashi300: false,
+                    educationCourse: 'private_uni' as const,
+                    cramSchoolOptions: { elementary: false, juniorHigh: false, highSchool: true },
                   },
-                });
+                } as CustomerProfile;
+                setProfile(coupleProfile);
+                saveProfile(coupleProfile);
+                saveBasicInfo(coupleProfile.basicInfo);
                 showNotification('テストデータ（夫婦）を読み込みました');
               }}
               className="text-xs px-3 py-1.5 rounded-full border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
@@ -873,7 +1079,7 @@ export default function CustomerProfilePage() {
             </button>
             <button
               onClick={() => {
-                setProfile({
+                const singleProfile = {
                   monthlyLivingExpense: 120_000,
                   details: {
                     food: 40_000,
@@ -888,10 +1094,11 @@ export default function CustomerProfilePage() {
                     savings: 20_000,
                   },
                   danshinHolder: [],
+                  isLivingExpenseDetailed: false,
                   basicInfo: {
                     childrenCount: 0,
                     childrenAges: [],
-                    spouseType: 'none',
+                    spouseType: 'none' as const,
                     ageWife: 0,
                     oldAgeStartWife: 0,
                     avgStdMonthlyWife: 0,
@@ -908,13 +1115,53 @@ export default function CustomerProfilePage() {
                     employeePensionMonths: 100,
                     avgStdMonthly: 250_000,
                     useMinashi300: true,
+                    educationCourse: 'private_hs' as const,
+                    cramSchoolOptions: { elementary: false, juniorHigh: false, highSchool: false },
                   },
-                });
+                } as CustomerProfile;
+                setProfile(singleProfile);
+                saveProfile(singleProfile);
+                saveBasicInfo(singleProfile.basicInfo);
                 showNotification('テストデータ（独身）を読み込みました');
               }}
               className="text-xs px-3 py-1.5 rounded-full border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
             >
               例（独身）
+            </button>
+
+            {/* 区切り線 */}
+            <div className="h-6 w-px bg-slate-700"></div>
+
+            {/* プラン選択 */}
+            <select
+              value={currentPlanId || ''}
+              onChange={(e) => handleLoadPlan(e.target.value)}
+              className="text-xs px-3 py-1.5 rounded-full border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors bg-slate-900"
+            >
+              <option value="">新規プラン</option>
+              {Object.entries(savedPlans).map(([id, plan]) => (
+                <option key={id} value={id}>{plan.name}</option>
+              ))}
+            </select>
+
+            {/* 保存ボタン */}
+            <button
+              onClick={handleSavePlan}
+              className="text-xs px-3 py-1.5 rounded-full border border-emerald-700 text-emerald-400 hover:text-white hover:bg-emerald-800 transition-colors"
+            >
+              💾 保存
+            </button>
+
+            {/* 削除ボタン */}
+            <button
+              onClick={handleDeletePlan}
+              disabled={!currentPlanId}
+              className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${currentPlanId
+                  ? 'border-rose-700 text-rose-400 hover:text-white hover:bg-rose-800'
+                  : 'border-slate-800 text-slate-600 cursor-not-allowed'
+                }`}
+            >
+              🗑 削除
             </button>
           </div>
         </div>
@@ -960,6 +1207,8 @@ export default function CustomerProfilePage() {
             basicInfo={profile.basicInfo}
             danshinHolder={profile.danshinHolder}
             setDanshinHolder={(h) => saveProfile({ ...profile, danshinHolder: h })}
+            isDetailed={profile.isLivingExpenseDetailed}
+            setIsDetailed={(b) => saveProfile({ ...profile, isLivingExpenseDetailed: b })}
           />
         </div>
       </div>
