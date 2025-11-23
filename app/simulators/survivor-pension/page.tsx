@@ -43,8 +43,8 @@ type Geometry = {
   rawW: number[];
 };
 
-const BAR_HEIGHT = 96;
-const MIN_SEG_PX = 70;
+const BAR_HEIGHT = 150;
+const MIN_SEG_PX = 120;
 
 function CalculationLogic({ 
   details, 
@@ -64,7 +64,7 @@ function CalculationLogic({
   const bgColor = styles.bg;
   
   return (
-    <div className={`mt-4 rounded-xl border ${borderColor} ${bgColor} p-4`}>
+    <div className={`mt-0 rounded-b-xl rounded-t-none border border-t-0 ${borderColor} ${bgColor} p-4`}>
       <button
         onClick={() => setShowCalc(!showCalc)}
         className="text-sm text-slate-400 hover:text-slate-200 transition-colors flex items-center gap-2 w-full font-bold"
@@ -326,13 +326,13 @@ function PensionSegmentsBar({ segments, geometry }: { segments: Segment[]; geome
               {showText && (
                 <>
                   {monthlyText && (
-                    <AutoFitLine text={monthlyText} maxRem={1.5} minScale={0.95} className="text-white font-bold" align="left" />
+                    <AutoFitLine text={monthlyText} maxRem={1.5} minScale={0.6} className="text-white font-bold" align="left" />
                   )}
-                  <AutoFitLine text={amountText} maxRem={1.1} minScale={0.95} className="text-white/80 mt-1" align="left" />
+                  <AutoFitLine text={amountText} maxRem={1.1} minScale={0.6} className="text-white/80 mt-1" align="left" />
                   <AutoFitLine
                     text={titleText}
                     maxRem={1.0}
-                    minScale={0.95}
+                    minScale={0.5}
                     className="text-white/70 mt-1"
                     align="left"
                   />
@@ -348,7 +348,7 @@ function PensionSegmentsBar({ segments, geometry }: { segments: Segment[]; geome
 
 function AgeTicksBar({ ticks, geometry }: { ticks: Tick[]; geometry: Geometry }) {
   return (
-    <div className="relative h-20" style={{ width: geometry.used }}>
+    <div className="relative h-32" style={{ width: geometry.used }}>
       <div className="absolute left-0 right-0 top-5 h-[2px] bg-white/25 rounded" />
       {ticks.map((t, i) => {
         const leftPx =
@@ -419,12 +419,14 @@ function TimelineBlock({
   segments,
   ticks,
   blockNumber,
+  hasLogic = false,
 }: {
   title: string;
   color: 'emerald' | 'sky';
   segments: Segment[];
   ticks: Tick[];
   blockNumber?: 1 | 2;
+  hasLogic?: boolean;
 }) {
   
   // ①は緑系、②は青系に統一
@@ -454,8 +456,11 @@ function TimelineBlock({
     });
   }, [ticks, geometry.edgesRaw]);
 
+  const roundedClass = hasLogic ? 'rounded-t-2xl rounded-b-none border-b-0' : 'rounded-2xl';
+  const mbClass = hasLogic ? 'mb-0' : 'mb-8';
+
   return (
-    <div className={`rounded-2xl ${border} ${bg} p-8 md:p-10 mb-8`}>
+    <div className={`${roundedClass} ${border} ${bg} p-8 md:p-10 ${mbClass}`}>
       <div className="text-base font-semibold mb-3">{title}</div>
       <div ref={measureRef} className="w-full h-0 overflow-hidden" />
       <PensionSegmentsBar segments={segments} geometry={geometry} />
@@ -1071,16 +1076,20 @@ export default function SurvivorPensionPage() {
                           <div className="space-y-3">
                             <div>
                               <Label>年齢</Label>
-                              <Input value={ageWife} onChange={(e) => setAgeWife(Number(e.target.value))} />
+                              <Select
+                                value={ageWife}
+                                onChange={(e) => setAgeWife(Number(e.target.value))}
+                                options={Array.from({ length: 83 }, (_, i) => ({ value: 18 + i, label: `${18 + i}歳` }))}
+                              />
                             </div>
                             <div>
                               <Label>平均標準報酬月額 (万円)</Label>
                               <div className="relative">
-                                <Input 
-                                  value={(avgStdMonthlyWife / 10000)} 
-                                  onChange={(e) => setAvgStdMonthlyWife(Number(e.target.value) * 10000)} 
+                                <Select
+                                  value={avgStdMonthlyWife / 10000}
+                                  onChange={(e) => setAvgStdMonthlyWife(Number(e.target.value) * 10000)}
+                                  options={Array.from({ length: 96 }, (_, i) => ({ value: 5 + i, label: `${5 + i}万円` }))}
                                 />
-                                <span className="absolute right-3 top-2 text-slate-500 text-sm">万円</span>
                               </div>
                             </div>
                             <div>
@@ -1116,16 +1125,20 @@ export default function SurvivorPensionPage() {
                           <div className="space-y-3">
                             <div>
                               <Label>年齢</Label>
-                              <Input value={ageHusband} onChange={(e) => setAgeHusband(Number(e.target.value))} />
+                              <Select
+                                value={ageHusband}
+                                onChange={(e) => setAgeHusband(Number(e.target.value))}
+                                options={Array.from({ length: 83 }, (_, i) => ({ value: 18 + i, label: `${18 + i}歳` }))}
+                              />
                             </div>
                             <div>
                               <Label>平均標準報酬月額 (万円)</Label>
                               <div className="relative">
-                                <Input 
-                                  value={(avgStdMonthlyHusband / 10000)} 
-                                  onChange={(e) => setAvgStdMonthlyHusband(Number(e.target.value) * 10000)} 
+                                <Select
+                                  value={avgStdMonthlyHusband / 10000}
+                                  onChange={(e) => setAvgStdMonthlyHusband(Number(e.target.value) * 10000)}
+                                  options={Array.from({ length: 96 }, (_, i) => ({ value: 5 + i, label: `${5 + i}万円` }))}
                                 />
-                                <span className="absolute right-3 top-2 text-slate-500 text-sm">万円</span>
                               </div>
                             </div>
                             <div>
@@ -1207,6 +1220,7 @@ export default function SurvivorPensionPage() {
                   segments={timelineDataHusband.block1.segments}
                   ticks={timelineDataHusband.block1.ticks}
                   blockNumber={1}
+                  hasLogic={true}
                 />
                 <CalculationLogic
                   color="emerald"
@@ -1228,6 +1242,7 @@ export default function SurvivorPensionPage() {
                 segments={timelineDataHusband.block2.segments}
                 ticks={timelineDataHusband.block2.ticks}
                 blockNumber={2}
+                hasLogic={true}
               />
             </div>
             <CalculationLogic
@@ -1305,6 +1320,7 @@ export default function SurvivorPensionPage() {
                   segments={timelineDataWife.block1.segments}
                   ticks={timelineDataWife.block1.ticks}
                   blockNumber={1}
+                  hasLogic={true}
                 />
                 <CalculationLogic
                   color="emerald"
@@ -1326,6 +1342,7 @@ export default function SurvivorPensionPage() {
                 segments={timelineDataWife.block2.segments}
                 ticks={timelineDataWife.block2.ticks}
                 blockNumber={2}
+                hasLogic={true}
               />
             </div>
             <CalculationLogic
