@@ -52,6 +52,7 @@ type CustomerProfile = {
   monthlyLivingExpense: number; // 生活費（月額）
   details: LivingExpenseDetail;
   basicInfo: CustomerProfileBasicInfo; // 基本情報
+  danshinHolder: ('husband' | 'wife')[]; // 団信加入者（デフォルトは['husband']）
 };
 
 const STORAGE_KEY = 'customer-profile';
@@ -136,15 +137,33 @@ function LivingExpenseSelector({
   details,
   setDetails,
   basicInfo,
+  danshinHolder,
+  setDanshinHolder,
 }: {
   value: number;
   setValue: (v: number) => void;
   details: LivingExpenseDetail;
   setDetails: (d: LivingExpenseDetail) => void;
   basicInfo: CustomerProfileBasicInfo;
+  danshinHolder: ('husband' | 'wife')[];
+  setDanshinHolder: (h: ('husband' | 'wife')[]) => void;
 }) {
   const [isDetailed, setIsDetailed] = useState(false);
   const [isAddition, setIsAddition] = useState(true);
+
+  // 合計を計算する関数
+  const calculateTotal = (currentDetails: LivingExpenseDetail) => {
+    return Object.values(currentDetails).reduce((a, b) => a + b, 0);
+  };
+
+  // detailsに値が入っている場合は自動的に詳細入力モードを有効化
+  useEffect(() => {
+    const total = Object.values(details).reduce((a, b) => a + b, 0);
+    if (total > 0 && !isDetailed) {
+      setIsDetailed(true);
+      setValue(total);
+    }
+  }, [details, isDetailed, setValue]);
 
   // 世帯人数を計算
   const householdSize = useMemo(() => {
@@ -156,11 +175,6 @@ function LivingExpenseSelector({
 
   // 適用する平均値データを取得（4人以上は4人のデータを使用）
   const averageExpenses = AVERAGE_EXPENSES_BY_SIZE[Math.min(Math.max(householdSize, 1), 4)] || AVERAGE_EXPENSES_BY_SIZE[1];
-
-  // 合計を計算する関数
-  const calculateTotal = (currentDetails: LivingExpenseDetail) => {
-    return Object.values(currentDetails).reduce((a, b) => a + b, 0);
-  };
 
   // 詳細項目の変更ハンドラ
   const handleDetailChange = (key: keyof LivingExpenseDetail, val: number) => {
@@ -257,6 +271,37 @@ function LivingExpenseSelector({
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500">円</span>
               </div>
+
+              {/* 団信選択UI (住宅ローンの場合のみ表示) */}
+              {key === 'housingLoan' && (
+                <div className="flex items-center gap-2 justify-end mt-2 animate-fade-in">
+                  <span className="text-[10px] text-slate-400 font-bold">団信加入者:</span>
+                  <div className="flex bg-slate-800 rounded-md p-0.5 border border-slate-700">
+                    {(['husband', 'wife'] as const).map((holder) => {
+                      const isSelected = danshinHolder.includes(holder);
+                      return (
+                        <button
+                          key={holder}
+                          onClick={() => {
+                            if (isSelected) {
+                              setDanshinHolder(danshinHolder.filter((h) => h !== holder));
+                            } else {
+                              setDanshinHolder([...danshinHolder, holder]);
+                            }
+                          }}
+                          className={`px-3 py-1 text-[10px] rounded-sm transition-all ${
+                            isSelected
+                              ? 'bg-emerald-600 text-white shadow-sm font-bold'
+                              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+                          }`}
+                        >
+                          {holder === 'husband' ? '夫' : '妻'}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* 加減算ボタン */}
               <div className="flex justify-end gap-2">
@@ -641,6 +686,7 @@ export default function CustomerProfilePage() {
       lifeInsurance: 15_000,
       savings: 50_000,
     },
+    danshinHolder: ['husband'], // デフォルトは夫
     basicInfo: {
       childrenCount: undefined, // undefinedは「--」として表示
       childrenAges: [],
@@ -708,6 +754,7 @@ export default function CustomerProfilePage() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         monthlyLivingExpense: newProfile.monthlyLivingExpense,
         details: newProfile.details,
+        danshinHolder: newProfile.danshinHolder,
       }));
     }
   };
@@ -749,6 +796,7 @@ export default function CustomerProfilePage() {
                     lifeInsurance: 15_000,
                     savings: 50_000,
                   },
+                  danshinHolder: ['husband'],
                   basicInfo: {
                     childrenCount: undefined,
                     childrenAges: [],
@@ -787,13 +835,14 @@ export default function CustomerProfilePage() {
                     communication: 15_000,
                     utilities: 20_000,
                     education: 20_000,
-                    housingLoan: 0,
-                    rent: 90_000,
+                    housingLoan: 90_000,
+                    rent: 0,
                     dailyGoods: 25_000,
                     entertainment: 25_000,
                     lifeInsurance: 15_000,
                     savings: 30_000,
                   },
+                  danshinHolder: ['husband'],
                   basicInfo: {
                     childrenCount: 2,
                     childrenAges: [3, 1],
@@ -838,6 +887,7 @@ export default function CustomerProfilePage() {
                     lifeInsurance: 10_000,
                     savings: 20_000,
                   },
+                  danshinHolder: [],
                   basicInfo: {
                     childrenCount: 0,
                     childrenAges: [],
@@ -908,6 +958,8 @@ export default function CustomerProfilePage() {
               saveProfile({ ...profile, details: d, monthlyLivingExpense: total });
             }}
             basicInfo={profile.basicInfo}
+            danshinHolder={profile.danshinHolder}
+            setDanshinHolder={(h) => saveProfile({ ...profile, danshinHolder: h })}
           />
         </div>
       </div>

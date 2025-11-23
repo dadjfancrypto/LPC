@@ -39,11 +39,12 @@ type CustomerProfile = {
     monthlyLivingExpense: number;
     details: Record<string, unknown>;
     basicInfo: CustomerProfileBasicInfo;
+    danshinHolder?: ('husband' | 'wife')[];
 };
 
 /* ===================== UI Components ===================== */
 
-function CupVisualization({ expenseMonthly, pensionMonthly, gapMonthly, pensionLabel = '公的年金', colorTheme = 'sky' }: { expenseMonthly: number; pensionMonthly: number; gapMonthly: number; pensionLabel?: string; colorTheme?: 'sky' | 'emerald' | 'rose' | 'amber' | 'slate'; }) {
+function CupVisualization({ expenseMonthly, pensionMonthly, gapMonthly, pensionLabel = '公的年金', colorTheme = 'sky', exemptedAmount = 0 }: { expenseMonthly: number; pensionMonthly: number; gapMonthly: number; pensionLabel?: string; colorTheme?: 'sky' | 'emerald' | 'rose' | 'amber' | 'slate'; exemptedAmount?: number; }) {
     const totalHeight = 320;
     const maxAmount = Math.max(expenseMonthly, pensionMonthly) * 1.2;
     const scale = maxAmount > 0 ? totalHeight / maxAmount : 0;
@@ -62,6 +63,15 @@ function CupVisualization({ expenseMonthly, pensionMonthly, gapMonthly, pensionL
 
     return (
         <div className="flex flex-col items-center justify-center py-4 relative">
+            {/* 団信メッセージ */}
+            {exemptedAmount > 0 && (
+                <div className="absolute -top-2 left-0 right-0 flex justify-center z-20 pointer-events-none">
+                    <div className="bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 px-4 py-1.5 rounded-full text-sm font-bold backdrop-blur-md shadow-lg animate-pulse flex items-center gap-1.5 whitespace-nowrap">
+                        <span className="text-base">✨</span> 団信適用: 住宅ローン{(exemptedAmount / 10000).toFixed(1)}万円免除
+                    </div>
+                </div>
+            )}
+
             {/* メインのコップエリア */}
             <div className="relative" style={{ width: 340, height: totalHeight }}>
                 {/* 必要生活費ライン（左側） */}
@@ -72,18 +82,23 @@ function CupVisualization({ expenseMonthly, pensionMonthly, gapMonthly, pensionL
                     {/* 天井のライン（点線） */}
                     <div className="absolute left-12 right-12 top-0 border-t border-dashed border-slate-500/50" />
 
-                    {/* 左側の縦ラベル */}
-                    <div className="absolute left-4 top-0 bottom-0 flex flex-col justify-center items-center w-8">
-                        <div className="absolute transform -rotate-90 whitespace-nowrap flex items-center gap-2">
-                            <span className="text-xl font-bold text-slate-200 tracking-wider">
-                                {(expenseMonthly / 10000).toFixed(1)}<span className="text-sm font-normal ml-1">万円</span>
-                            </span>
-                            <span className="text-xs text-slate-400 tracking-widest">必要生活費</span>
+                    {/* 左側の寸法線エリア */}
+                    <div className="absolute left-0 top-0 bottom-0 w-[60px]">
+                        {/* 縦線 */}
+                        <div className="absolute right-4 top-0 bottom-0 w-px bg-slate-500/60">
+                            {/* 上端のヒゲ */}
+                            <div className="absolute -left-1 top-0 w-3 h-px bg-slate-500/60" />
+                            {/* 下端のヒゲ */}
+                            <div className="absolute -left-1 bottom-0 w-3 h-px bg-slate-500/60" />
                         </div>
-                        {/* 高さを示す縦線 */}
-                        <div className="absolute right-[-8px] top-0 bottom-0 w-px bg-slate-700"></div>
-                        <div className="absolute right-[-8px] top-0 w-2 h-px bg-slate-700"></div>
-                        <div className="absolute right-[-8px] bottom-0 w-2 h-px bg-slate-700"></div>
+
+                        {/* ラベル（横書き・寸法線の上端付近） */}
+                        <div className="absolute right-6 top-0 -translate-y-1/2 flex flex-col items-end whitespace-nowrap">
+                            <span className="text-[10px] text-slate-400 leading-none mb-1">必要生活費</span>
+                            <span className="text-lg font-bold text-slate-200 leading-none">
+                                {(expenseMonthly / 10000).toFixed(1)}<span className="text-xs font-normal ml-0.5">万円</span>
+                            </span>
+                        </div>
                     </div>
                 </div>
 
@@ -185,8 +200,8 @@ export default function NecessaryCoveragePage() {
 
         const { basicInfo } = profile;
         const currentExpense = profile.monthlyLivingExpense || 0;
-        const targetExpenseSurvivor = Math.round(currentExpense * (expenseRatioSurvivor / 100));
-        const targetExpenseDisability = Math.round(currentExpense * (expenseRatioDisability / 100));
+        const housingLoan = (profile.details?.housingLoan as number) || 0;
+        const danshinHolder = profile.danshinHolder || ['husband'];
 
         const childrenAges = basicInfo.childrenAges ?? [];
         const eligibleChildrenForDisability = calculateEligibleChildrenCount(
@@ -194,8 +209,21 @@ export default function NecessaryCoveragePage() {
             DISABILITY_LEVEL,
         );
 
-        const makeResult = (annual: number | null, isDisability: boolean = false) => {
-            const expenseToUse = isDisability ? targetExpenseDisability : targetExpenseSurvivor;
+        const makeResult = (annual: number | null, isDisability: boolean = false, targetPerson: 'husband' | 'wife' | 'single' | null = null) => {
+            let exemptedAmount = 0;
+
+            // 団信適用判定（死亡時のみ、かつ対象者が団信加入者の場合）
+            if (!isDisability && targetPerson) {
+                if (targetPerson === 'husband' && danshinHolder.includes('husband')) {
+                    exemptedAmount = housingLoan;
+                } else if (targetPerson === 'wife' && danshinHolder.includes('wife')) {
+                    exemptedAmount = housingLoan;
+                }
+            }
+
+            const ratio = isDisability ? expenseRatioDisability : expenseRatioSurvivor;
+            // 住宅ローン分を引いてから、生活費率を掛ける
+            const expenseToUse = Math.round(Math.max(0, currentExpense - exemptedAmount) * (ratio / 100));
 
             if (!annual || annual <= 0) {
                 return {
@@ -203,11 +231,12 @@ export default function NecessaryCoveragePage() {
                     gapMonthly: expenseToUse,
                     pensionAnnual: 0,
                     targetExpense: expenseToUse,
+                    exemptedAmount,
                 };
             }
             const pensionMonthly = Math.floor(annual / 12);
             const gapMonthly = Math.max(0, expenseToUse - pensionMonthly);
-            return { pensionMonthly, gapMonthly, pensionAnnual: annual, targetExpense: expenseToUse };
+            return { pensionMonthly, gapMonthly, pensionAnnual: annual, targetExpense: expenseToUse, exemptedAmount };
         };
 
         // --- 夫死亡時 ---
@@ -281,13 +310,13 @@ export default function NecessaryCoveragePage() {
         }
 
         return {
-            targetExpense: targetExpenseSurvivor,
-            husbandDeath: makeResult(husbandDeathAnnual, false),
-            wifeDeath: makeResult(wifeDeathAnnual, false),
-            singleDeath: makeResult(singleDeathAnnual, false),
-            husbandDisability: makeResult(husbandDisabilityAnnual, true),
-            wifeDisability: makeResult(wifeDisabilityAnnual, true),
-            singleDisability: makeResult(singleDisabilityAnnual, true),
+            targetExpense: Math.round(currentExpense * (expenseRatioSurvivor / 100)), // 参考値として残す
+            husbandDeath: makeResult(husbandDeathAnnual, false, 'husband'),
+            wifeDeath: makeResult(wifeDeathAnnual, false, 'wife'),
+            singleDeath: makeResult(singleDeathAnnual, false, 'single'),
+            husbandDisability: makeResult(husbandDisabilityAnnual, true, 'husband'),
+            wifeDisability: makeResult(wifeDisabilityAnnual, true, 'wife'),
+            singleDisability: makeResult(singleDisabilityAnnual, true, 'single'),
         };
     }, [profile, expenseRatioSurvivor, expenseRatioDisability, DISABILITY_LEVEL]);
 
@@ -422,6 +451,7 @@ export default function NecessaryCoveragePage() {
                                                 gapMonthly={scenarios.husbandDeath.gapMonthly}
                                                 pensionLabel="遺族年金"
                                                 colorTheme="emerald"
+                                                exemptedAmount={scenarios.husbandDeath.exemptedAmount}
                                             />
                                         </div>
                                         <div className="flex flex-col items-center px-2">
@@ -432,6 +462,7 @@ export default function NecessaryCoveragePage() {
                                                 gapMonthly={scenarios.wifeDisability.gapMonthly}
                                                 pensionLabel="障害年金"
                                                 colorTheme="amber"
+                                                // 障害時は団信免除なし
                                             />
                                         </div>
                                     </div>
@@ -448,6 +479,7 @@ export default function NecessaryCoveragePage() {
                                                 gapMonthly={scenarios.wifeDeath.gapMonthly}
                                                 pensionLabel="遺族年金"
                                                 colorTheme="emerald"
+                                                exemptedAmount={scenarios.wifeDeath.exemptedAmount}
                                             />
                                         </div>
                                         <div className="flex flex-col items-center px-2">
