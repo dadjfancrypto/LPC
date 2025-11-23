@@ -27,6 +27,7 @@ type Segment = {
   widthYears?: number;
   className: string;
   amountYear?: number;
+  style?: React.CSSProperties;
 };
 
 type Tick = {
@@ -45,6 +46,22 @@ type Geometry = {
 
 const BAR_HEIGHT = 150;
 const MIN_SEG_PX = 120;
+
+function getGradientColor(baseColor: 'amber' | 'emerald' | 'sky' | 'blue', index: number) {
+  const rgbMap = {
+    amber: '217, 119, 6',   // amber-600
+    emerald: '5, 150, 105', // emerald-600
+    sky: '14, 165, 233',    // sky-500
+    blue: '59, 130, 246',   // blue-500
+  };
+  const rgb = rgbMap[baseColor] || rgbMap.amber;
+  const maxOpacity = 0.9;
+  const minOpacity = 0.4;
+  const step = 0.1;
+  const opacity = Math.max(minOpacity, maxOpacity - (index * step));
+  
+  return `rgba(${rgb}, ${opacity})`;
+}
 
 function CalculationLogic({ 
   details, 
@@ -319,8 +336,8 @@ function PensionSegmentsBar({ segments, geometry }: { segments: Segment[]; geome
           return (
             <div
               key={i}
-              className={`${s.className} ring-1 ring-white/15 relative flex flex-col justify-center items-stretch px-3 overflow-hidden`}
-              style={{ width: w }}
+              className={`${s.className} ring-1 ring-white/15 relative flex flex-col justify-center items-stretch px-1 overflow-hidden`}
+              style={{ width: w, ...s.style }}
               title={titleText}
             >
               {showText && (
@@ -754,15 +771,12 @@ export default function SurvivorPensionPage() {
         const basicPension = calculateSurvivorBasicPension(eligibleCount);
         const amount = basicPension + caseHusbandDeath.employeePension;
 
-        // セクションごとに色を変える（緑系のグラデーション）
-        const greenColors = ['bg-emerald-600/80', 'bg-emerald-500/80', 'bg-emerald-400/80'];
-        const colorClass = greenColors[i % greenColors.length];
-
         block1.segments.push({
           label: `子${eligibleCount}人`,
           years: duration,
           widthYears: widen(duration),
-          className: `${colorClass} ring-1 ring-white/20`,
+          className: `ring-1 ring-white/20`,
+          style: { backgroundColor: getGradientColor('emerald', i) },
           amountYear: amount
         });
 
@@ -804,7 +818,8 @@ export default function SurvivorPensionPage() {
         label: isChukorei ? '寡婦加算' : '遺族厚生',
         years: period1Duration,
         widthYears: widen(period1Duration),
-        className: 'bg-blue-500/80 ring-1 ring-white/20',
+        className: 'ring-1 ring-white/20',
+        style: { backgroundColor: getGradientColor('blue', segmentCount) },
         amountYear: caseHusbandDeath.afterChildrenAmount
       });
       segmentCount++;
@@ -816,7 +831,8 @@ export default function SurvivorPensionPage() {
         label: '老齢年金',
         years: period2Duration,
         widthYears: widen(period2Duration),
-        className: 'bg-blue-500/80 ring-1 ring-white/20',
+        className: 'ring-1 ring-white/20',
+        style: { backgroundColor: getGradientColor('blue', segmentCount) },
         amountYear: caseHusbandDeath.oldAgeAmount
       });
       segmentCount++;
@@ -888,15 +904,12 @@ export default function SurvivorPensionPage() {
         const basicPension = calculateSurvivorBasicPension(eligibleCount);
         const amount = basicPension + caseWifeDeath.employeePension;
 
-        // セクションごとに色を変える（緑系のグラデーション）
-        const greenColors = ['bg-emerald-600/80', 'bg-emerald-500/80', 'bg-emerald-400/80'];
-        const colorClass = greenColors[i % greenColors.length];
-
         block1.segments.push({
           label: `子${eligibleCount}人`,
           years: duration,
           widthYears: widen(duration),
-          className: `${colorClass} ring-1 ring-white/20`,
+          className: `ring-1 ring-white/20`,
+          style: { backgroundColor: getGradientColor('emerald', i) },
           amountYear: amount
         });
 
@@ -935,7 +948,8 @@ export default function SurvivorPensionPage() {
         label: '遺族厚生',
         years: period1Duration,
         widthYears: widen(period1Duration),
-        className: 'bg-blue-500/80 ring-1 ring-white/20',
+        className: 'ring-1 ring-white/20',
+        style: { backgroundColor: getGradientColor('blue', segmentCount) },
         amountYear: caseWifeDeath.afterChildrenAmount
       });
       segmentCount++;
@@ -947,7 +961,8 @@ export default function SurvivorPensionPage() {
         label: '老齢年金',
         years: period2Duration,
         widthYears: widen(period2Duration),
-        className: 'bg-blue-500/80 ring-1 ring-white/20',
+        className: 'ring-1 ring-white/20',
+        style: { backgroundColor: getGradientColor('blue', segmentCount) },
         amountYear: caseWifeDeath.oldAgeAmount
       });
       segmentCount++;

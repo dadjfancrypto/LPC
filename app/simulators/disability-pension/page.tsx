@@ -20,6 +20,7 @@ type Segment = {
   widthYears?: number;
   className: string;
   amountYear?: number;
+  style?: React.CSSProperties;
 };
 
 type Tick = {
@@ -39,6 +40,22 @@ type Geometry = {
 const BAR_HEIGHT = 150;
 const MIN_SEG_PX = 120;
 const SPOUSE_BONUS = 239300; // 配偶者加給年金額（令和7年度）
+
+function getGradientColor(baseColor: 'amber' | 'emerald' | 'sky' | 'blue', index: number) {
+  const rgbMap = {
+    amber: '217, 119, 6',   // amber-600
+    emerald: '5, 150, 105', // emerald-600
+    sky: '14, 165, 233',    // sky-500
+    blue: '59, 130, 246',   // blue-500
+  };
+  const rgb = rgbMap[baseColor] || rgbMap.amber;
+  const maxOpacity = 0.9;
+  const minOpacity = 0.4;
+  const step = 0.1;
+  const opacity = Math.max(minOpacity, maxOpacity - (index * step));
+  
+  return `rgba(${rgb}, ${opacity})`;
+}
 
 /* ===================== UI Components ===================== */
 
@@ -294,8 +311,8 @@ function PensionSegmentsBar({ segments, geometry }: { segments: Segment[]; geome
           return (
             <div
               key={i}
-              className={`${s.className} ring-1 ring-white/15 relative flex flex-col justify-center items-stretch px-3 overflow-hidden`}
-              style={{ width: w }}
+              className={`${s.className} ring-1 ring-white/15 relative flex flex-col justify-center items-stretch px-1 overflow-hidden`}
+              style={{ width: w, ...s.style }}
               title={titleText}
             >
               {showText && (
@@ -619,10 +636,6 @@ export default function DisabilityPensionPage() {
             const currentEmployee = calculateDisabilityEmployeePension(levelWife, currentSpouseBonus, 0, avgStdMonthlyWife, monthsWife, useMinashi300Wife);
             const currentTotal = currentBasic + currentEmployee;
             
-            // 色: Amber gradient
-            const amberColors = ['bg-amber-600/80', 'bg-amber-500/80', 'bg-amber-400/80'];
-            const colorClass = amberColors[i % amberColors.length];
-            
             let label = `障害${levelWife}級`;
             if (currentEligible > 0) label += `+子${currentEligible}`;
             if (currentSpouseBonus > 0) label += `+配偶者`;
@@ -631,14 +644,13 @@ export default function DisabilityPensionPage() {
                 label,
                 years: duration,
                 widthYears: widen(duration),
-                className: `${colorClass} ring-1 ring-white/20`,
+                className: `ring-1 ring-white/20`,
+                style: { backgroundColor: getGradientColor('amber', i) },
                 amountYear: currentTotal
             });
             
             // Ticks
             const lines = [`妻${ageWife + endY}`, `夫${ageHusband + endY}`];
-            if (ageWife + endY === 65) lines.push('老齢開始');
-            else if (ageHusband + endY === 65) lines.push('夫65歳');
             
             childrenAges.forEach(age => {
                 const curr = age + endY;
@@ -666,7 +678,8 @@ export default function DisabilityPensionPage() {
             label: '障害年金（継続）',
             years: duration2,
             widthYears: widen(duration2),
-            className: 'bg-sky-500/80 ring-1 ring-white/20',
+            className: 'ring-1 ring-white/20',
+            style: { backgroundColor: getGradientColor('sky', 0) },
             amountYear: finalTotal
         });
         
@@ -750,9 +763,6 @@ export default function DisabilityPensionPage() {
             const currentEmployee = calculateDisabilityEmployeePension(levelHusband, currentSpouseBonus, 0, avgStdMonthlyHusband, monthsHusband, useMinashi300Husband);
             const currentTotal = currentBasic + currentEmployee;
             
-            const amberColors = ['bg-amber-600/80', 'bg-amber-500/80', 'bg-amber-400/80'];
-            const colorClass = amberColors[i % amberColors.length];
-            
             let label = `障害${levelHusband}級`;
             if (currentEligible > 0) label += `+子${currentEligible}`;
             if (currentSpouseBonus > 0) label += `+配偶者`;
@@ -761,13 +771,12 @@ export default function DisabilityPensionPage() {
                 label,
                 years: duration,
                 widthYears: widen(duration),
-                className: `${colorClass} ring-1 ring-white/20`,
+                className: `ring-1 ring-white/20`,
+                style: { backgroundColor: getGradientColor('amber', i) },
                 amountYear: currentTotal
             });
             
             const lines = [`夫${ageHusband + endY}`, `妻${ageWife + endY}`];
-            if (ageHusband + endY === 65) lines.push('老齢開始');
-            else if (ageWife + endY === 65) lines.push('妻65歳');
             
             childrenAges.forEach(age => {
                 const curr = age + endY;
@@ -793,7 +802,8 @@ export default function DisabilityPensionPage() {
             label: '障害年金（継続）',
             years: duration2,
             widthYears: widen(duration2),
-            className: 'bg-sky-500/80 ring-1 ring-white/20',
+            className: 'ring-1 ring-white/20',
+            style: { backgroundColor: getGradientColor('sky', 0) },
             amountYear: finalTotal
         });
         
