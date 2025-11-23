@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 
 // Customer Profileの型定義
@@ -63,34 +63,234 @@ const TEN_THOUSAND_OPTIONS = Array.from({ length: 91 }, (_, i) => (i + 10) * 10_
 // +1,000円〜+9,000円の調整選択肢
 const ADJUSTMENT_OPTIONS = Array.from({ length: 9 }, (_, i) => (i + 1) * 1_000);
 
+// 費目のラベル定義
+const EXPENSE_LABELS: Record<keyof LivingExpenseDetail, string> = {
+  food: '食費',
+  dailyGoods: '日用品',
+  utilities: '水道光熱費',
+  communication: '通信費',
+  rent: '家賃・地代',
+  housingLoan: '住宅ローン',
+  education: '教育費',
+  lifeInsurance: '保険料',
+  entertainment: '娯楽・交際費',
+  savings: '貯蓄・予備費',
+};
+
+// 世帯人数別平均目安（仮・総務省統計などを参考にした概算）
+const AVERAGE_EXPENSES_BY_SIZE: Record<number, Record<keyof LivingExpenseDetail, number>> = {
+  1: { // 単身
+    food: 40000,
+    dailyGoods: 8000,
+    utilities: 12000,
+    communication: 8000,
+    rent: 70000,
+    housingLoan: 0,
+    education: 0,
+    lifeInsurance: 10000,
+    entertainment: 20000,
+    savings: 30000,
+  },
+  2: { // 2人
+    food: 65000,
+    dailyGoods: 12000,
+    utilities: 20000,
+    communication: 15000,
+    rent: 90000,
+    housingLoan: 0,
+    education: 0,
+    lifeInsurance: 20000,
+    entertainment: 30000,
+    savings: 50000,
+  },
+  3: { // 3人
+    food: 75000,
+    dailyGoods: 15000,
+    utilities: 25000,
+    communication: 18000,
+    rent: 100000,
+    housingLoan: 0,
+    education: 20000,
+    lifeInsurance: 25000,
+    entertainment: 35000,
+    savings: 40000,
+  },
+  4: { // 4人以上
+    food: 85000,
+    dailyGoods: 18000,
+    utilities: 30000,
+    communication: 20000,
+    rent: 120000,
+    housingLoan: 0,
+    education: 40000,
+    lifeInsurance: 30000,
+    entertainment: 40000,
+    savings: 30000,
+  }
+};
+
 // 生活費選択コンポーネント
 function LivingExpenseSelector({
   value,
   setValue,
+  details,
+  setDetails,
+  basicInfo,
 }: {
   value: number;
   setValue: (v: number) => void;
+  details: LivingExpenseDetail;
+  setDetails: (d: LivingExpenseDetail) => void;
+  basicInfo: CustomerProfileBasicInfo;
 }) {
+  const [isDetailed, setIsDetailed] = useState(false);
+  const [isAddition, setIsAddition] = useState(true);
+
+  // 世帯人数を計算
+  const householdSize = useMemo(() => {
+    let count = 1; // 本人
+    if (basicInfo.spouseType === 'couple') count += 1; // 配偶者
+    if (basicInfo.childrenCount) count += basicInfo.childrenCount; // 子供
+    return count;
+  }, [basicInfo.spouseType, basicInfo.childrenCount]);
+
+  // 適用する平均値データを取得（4人以上は4人のデータを使用）
+  const averageExpenses = AVERAGE_EXPENSES_BY_SIZE[Math.min(Math.max(householdSize, 1), 4)] || AVERAGE_EXPENSES_BY_SIZE[1];
+
+  // 合計を計算する関数
+  const calculateTotal = (currentDetails: LivingExpenseDetail) => {
+    return Object.values(currentDetails).reduce((a, b) => a + b, 0);
+  };
+
+  // 詳細項目の変更ハンドラ
+  const handleDetailChange = (key: keyof LivingExpenseDetail, val: number) => {
+    const newDetails = { ...details, [key]: val };
+    setDetails(newDetails);
+  };
+
+  // モード切替時のハンドラ
+  const handleModeChange = (detailed: boolean) => {
+    setIsDetailed(detailed);
+    if (detailed) {
+      setValue(calculateTotal(details));
+    }
+  };
+
   return (
-    <div className="space-y-2">
-      <label className="block text-sm font-semibold text-slate-300 mb-2">生活費（月額）</label>
-      <div className="relative">
-        <select
-          className="w-full appearance-none rounded-xl px-4 py-3 bg-slate-800/50 border border-slate-700 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all text-slate-100 font-mono text-lg"
-          value={value || 0}
-          onChange={(e) => setValue(parseInt(e.target.value, 10) || 0)}
-        >
-          <option value={0}>-- 選択してください --</option>
-          {TEN_THOUSAND_OPTIONS.map((v) => (
-            <option key={v} value={v}>
-              {v.toLocaleString('ja-JP')}円
-            </option>
-          ))}
-        </select>
-        <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-slate-400">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-        </div>
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <label className="block text-sm font-semibold text-slate-300 mb-2">生活費（月額）</label>
+        
+        {!isDetailed ? (
+          <div className="relative">
+            <select
+              className="w-full appearance-none rounded-xl px-4 py-3 bg-slate-800/50 border border-slate-700 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all text-slate-100 font-mono text-lg"
+              value={value || 0}
+              onChange={(e) => setValue(parseInt(e.target.value, 10) || 0)}
+            >
+              <option value={0}>-- 選択してください --</option>
+              {TEN_THOUSAND_OPTIONS.map((v) => (
+                <option key={v} value={v}>
+                  {v.toLocaleString('ja-JP')}円
+                </option>
+              ))}
+            </select>
+            <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-slate-400">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+            </div>
+          </div>
+        ) : (
+          <div className="w-full rounded-xl px-4 py-3 bg-slate-800/50 border border-slate-700 text-slate-100 font-mono text-lg flex justify-between items-center">
+            <span>合計</span>
+            <span className="font-bold text-emerald-400">{value.toLocaleString('ja-JP')}円</span>
+          </div>
+        )}
       </div>
+
+      {/* 詳細入力モード切替 */}
+      <div className="flex items-center justify-between">
+        <label className="flex items-center gap-3 cursor-pointer group">
+          <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isDetailed ? 'bg-sky-500 border-sky-500' : 'bg-slate-800 border-slate-600 group-hover:border-sky-500'}`}>
+            {isDetailed && <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>}
+          </div>
+          <input 
+            type="checkbox" 
+            className="hidden" 
+            checked={isDetailed} 
+            onChange={(e) => handleModeChange(e.target.checked)}
+          />
+          <span className="text-sm text-slate-300 group-hover:text-white transition-colors">内訳を詳細に入力する</span>
+        </label>
+
+        {/* 加算・減算切替 (詳細モード時のみ) */}
+        {isDetailed && (
+          <div className="flex bg-slate-800 rounded-lg p-1 gap-1">
+            <button 
+              onClick={() => setIsAddition(true)}
+              className={`px-3 py-1 text-xs rounded-md transition-all font-medium flex items-center gap-1 ${isAddition ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              <span>＋</span> 加算
+            </button>
+            <button 
+              onClick={() => setIsAddition(false)}
+              className={`px-3 py-1 text-xs rounded-md transition-all font-medium flex items-center gap-1 ${!isAddition ? 'bg-rose-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              <span>－</span> 減算
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* 詳細入力フォーム */}
+      {isDetailed && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-800/50 animate-fade-in-up">
+          {(Object.keys(EXPENSE_LABELS) as Array<keyof LivingExpenseDetail>).map((key) => (
+            <div key={key} className="space-y-2">
+              <label className="text-xs font-bold text-slate-400">{EXPENSE_LABELS[key]}</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  className="w-full rounded-lg px-3 py-2 bg-slate-800/30 border border-slate-700 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all text-slate-100 text-right pr-8"
+                  value={details[key] || 0}
+                  onChange={(e) => handleDetailChange(key, parseInt(e.target.value) || 0)}
+                  step={1000}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500">円</span>
+              </div>
+
+              {/* 加減算ボタン */}
+              <div className="flex justify-end gap-2">
+                {[10000, 5000, 1000].map((amount) => (
+                  <button
+                    key={amount}
+                    onClick={() => handleDetailChange(key, (details[key] || 0) + (isAddition ? amount : -amount))}
+                    className={`px-2 py-1 rounded border text-[10px] transition-all font-medium ${
+                      isAddition 
+                        ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/10' 
+                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-rose-400 hover:border-rose-500/50 hover:bg-rose-500/10'
+                    }`}
+                  >
+                    {isAddition ? '+' : '-'}{amount.toLocaleString()}
+                  </button>
+                ))}
+              </div>
+
+              {/* 世帯平均目安 */}
+              <div
+                onClick={() => handleDetailChange(key, averageExpenses[key])}
+                className="flex items-center gap-1 text-xs text-slate-500 hover:text-sky-400 transition-colors cursor-pointer w-fit ml-auto"
+              >
+                <span className="underline decoration-dotted decoration-slate-600 hover:decoration-sky-400">
+                  平均目安({householdSize}人): {averageExpenses[key].toLocaleString()}円
+                </span>
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                </svg>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -702,6 +902,12 @@ export default function CustomerProfilePage() {
           <LivingExpenseSelector
             value={profile.monthlyLivingExpense}
             setValue={(v) => saveProfile({ ...profile, monthlyLivingExpense: v })}
+            details={profile.details}
+            setDetails={(d) => {
+              const total = Object.values(d).reduce((a, b) => a + b, 0);
+              saveProfile({ ...profile, details: d, monthlyLivingExpense: total });
+            }}
+            basicInfo={profile.basicInfo}
           />
         </div>
       </div>
