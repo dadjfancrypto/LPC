@@ -194,8 +194,8 @@ export function calculateDisabilityEmployeePension(
     }
 
     // 3級の最低保証額（令和7年度：623,800円）
-    if (level === 3 && amount < 623800) {
-        amount = 623800;
+    if (level === 3 && amount < 612000) {
+        amount = 612000;
     }
 
     // 配偶者加給年金（1級・2級のみ）
