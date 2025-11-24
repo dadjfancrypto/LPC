@@ -663,11 +663,21 @@ export default function SurvivorPensionPage() {
       }
     } else {
       // 現行制度
-      const chukoreiKasanAfter = (ageAfterChild >= 40 && ageAfterChild < 65) ? calculateChukoreiKasan() : 0;
-      afterChildrenAmount = survivorEmployeePension + chukoreiKasanAfter;
-      pensionTypesAfterChildren = ['遺族厚生年金'];
-      if (chukoreiKasanAfter > 0) {
-        pensionTypesAfterChildren.push('中高齢寡婦加算');
+      // 30歳未満の妻に対する5年有期給付
+      // 子がいない（または子が権利を失った）時点で30歳未満の場合、5年間の有期給付となる
+      if (ageAfterChild < 30) {
+        afterChildrenAmount = survivorEmployeePension;
+        pensionTypesAfterChildren = ['遺族厚生年金（5年間・30歳未満）'];
+        // 5年後に終了するため、タイムライン表示用のロジックで対応が必要
+        // ここではフラグや特別な値を返すか、タイムライン生成側で判定する
+        // 簡易的に、amountは設定するが、タイムライン生成側で期間を制限する
+      } else {
+        const chukoreiKasanAfter = (ageAfterChild >= 40 && ageAfterChild < 65) ? calculateChukoreiKasan() : 0;
+        afterChildrenAmount = survivorEmployeePension + chukoreiKasanAfter;
+        pensionTypesAfterChildren = ['遺族厚生年金'];
+        if (chukoreiKasanAfter > 0) {
+          pensionTypesAfterChildren.push('中高齢寡婦加算');
+        }
       }
     }
 
@@ -713,7 +723,12 @@ export default function SurvivorPensionPage() {
     // 最適化ロジック削除: ユーザー設定値をそのまま使用
     const effectiveOldAgeStartHusband = oldAgeStartHusband;
 
-    const withChildrenAmount = basicPension + survivorEmployeePension;
+    // 夫の遺族厚生年金（子がいる期間の併給）
+    // 妻死亡時に夫が55歳以上の場合のみ、遺族基礎年金と併給可能
+    // 55歳未満の場合は、遺族基礎年金のみ（遺族厚生年金は受給権なし）
+    const withChildrenAmount = (ageHusband >= 55)
+      ? basicPension + survivorEmployeePension
+      : basicPension;
 
     // 改正モード（2028年見直し）の場合
     let afterChildrenAmount = 0;
@@ -894,23 +909,64 @@ export default function SurvivorPensionPage() {
     let segmentCount = 0;
 
     if (period1Duration > 0) {
-      const isChukorei = startAge >= 40 && startAge < 65;
-      const startAges: string[] = [`妻${startAge}`, `夫${ageHusband + (startAge - ageWife)}`];
-      const endAges: string[] = [`妻${oldAgeStartWife}`, `夫${ageHusband + (oldAgeStartWife - ageWife)}`];
+      // 30歳未満の妻に対する5年有期給付の処理
+      if (startAge < 30) {
+        // 5年間の有期給付
+        const limitedDuration = 5;
+        const limitedEndAge = startAge + limitedDuration;
 
-      block2.segments.push({
-        label: isChukorei ? '寡婦加算' : '遺族厚生',
-        years: period1Duration,
-        widthYears: widen(period1Duration),
-        className: 'ring-1 ring-white/20',
-        style: { backgroundColor: getGradientColor('blue', segmentCount) },
-        amountYear: caseHusbandDeath.afterChildrenAmount,
-        startAge,
-        endAge: oldAgeStartWife,
-        startAges,
-        endAges: undefined // 最後のセグメントではないので終了年齢は非表示
-      });
-      segmentCount++;
+        // 1. 有期給付期間（5年）
+        block2.segments.push({
+          label: '遺族厚生（5年）',
+          years: limitedDuration,
+          widthYears: widen(limitedDuration),
+          className: 'ring-1 ring-white/20',
+          style: { backgroundColor: getGradientColor('blue', segmentCount) },
+          amountYear: caseHusbandDeath.afterChildrenAmount, // ここには既に計算済みの額が入っている
+          startAge,
+          endAge: limitedEndAge,
+          startAges: [`妻${startAge}`, `夫${ageHusband + (startAge - ageWife)}`],
+          endAges: [`妻${limitedEndAge}`, `夫${ageHusband + (limitedEndAge - ageWife)}`]
+        });
+        segmentCount++;
+
+        // 2. その後の期間（支給なし）
+        const remainingDuration = period1Duration - limitedDuration;
+        if (remainingDuration > 0) {
+          block2.segments.push({
+            label: '支給なし',
+            years: remainingDuration,
+            widthYears: widen(remainingDuration),
+            className: 'ring-1 ring-white/20',
+            style: { backgroundColor: 'rgba(100, 116, 139, 0.2)' }, // Slate-500 equivalent
+            amountYear: 0,
+            startAge: limitedEndAge,
+            endAge: oldAgeStartWife,
+            startAges: [`妻${limitedEndAge}`, `夫${ageHusband + (limitedEndAge - ageWife)}`],
+            endAges: [`妻${oldAgeStartWife}`, `夫${ageHusband + (oldAgeStartWife - ageWife)}`]
+          });
+          segmentCount++;
+        }
+      } else {
+        // 通常の処理（30歳以上）
+        const isChukorei = startAge >= 40 && startAge < 65;
+        const startAges: string[] = [`妻${startAge}`, `夫${ageHusband + (startAge - ageWife)}`];
+        const endAges: string[] = [`妻${oldAgeStartWife}`, `夫${ageHusband + (oldAgeStartWife - ageWife)}`];
+
+        block2.segments.push({
+          label: isChukorei ? '寡婦加算' : '遺族厚生',
+          years: period1Duration,
+          widthYears: widen(period1Duration),
+          className: 'ring-1 ring-white/20',
+          style: { backgroundColor: getGradientColor('blue', segmentCount) },
+          amountYear: caseHusbandDeath.afterChildrenAmount,
+          startAge,
+          endAge: oldAgeStartWife,
+          startAges,
+          endAges: undefined // 最後のセグメントではないので終了年齢は非表示
+        });
+        segmentCount++;
+      }
     }
 
     const period2Duration = endAge - oldAgeStartWife;
