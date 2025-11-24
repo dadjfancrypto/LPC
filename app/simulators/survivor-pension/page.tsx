@@ -733,15 +733,23 @@ export default function SurvivorPensionPage() {
         afterChildrenAmount = 0;
       }
     } else {
-      // Current system: Husband receives survivor employee pension from age 60 (suspended 55-59)
-      if (ageAfterChild >= 60) {
-        afterChildrenAmount = survivorEmployeePension;
-        pensionTypesAfterChildren = ['遺族厚生年金（60歳〜）'];
-      } else if (ageAfterChild >= 55 && ageAfterChild < 60) {
-        afterChildrenAmount = 0;
-        pensionTypesAfterChildren = ['遺族厚生年金（60歳まで停止）'];
+      // Current system: Husband receives survivor employee pension from age 60
+      // IMPORTANT: Husband must be 55 or older at wife's death to be eligible
+      if (ageHusband >= 55) {
+        // Eligible if husband was 55+ at wife's death
+        if (ageAfterChild >= 60) {
+          afterChildrenAmount = survivorEmployeePension;
+          pensionTypesAfterChildren = ['遺族厚生年金（60歳〜）'];
+        } else if (ageAfterChild >= 55 && ageAfterChild < 60) {
+          afterChildrenAmount = 0;
+          pensionTypesAfterChildren = ['遺族厚生年金（60歳まで停止）'];
+        } else {
+          // Under 55: will receive from age 60
+          afterChildrenAmount = 0;
+          pensionTypesAfterChildren = [];
+        }
       } else {
-        // Under 55: will receive from age 60
+        // NOT eligible: husband was under 55 at wife's death
         afterChildrenAmount = 0;
         pensionTypesAfterChildren = [];
       }
@@ -1063,54 +1071,86 @@ export default function SurvivorPensionPage() {
     // 60歳〜老齢年金開始: 遺族厚生年金
 
     if (period1Duration > 0) {
-      // 60歳より前の期間（待機期間）
-      if (startAge < 60) {
-        const waitingEndAge = Math.min(60, oldAgeStartHusband);
-        const waitingDuration = waitingEndAge - startAge;
+      // IMPORTANT: Husband must be 55 or older at wife's death to be eligible for survivor employee pension
+      if (ageHusband >= 55) {
+        // 60歳より前の期間（待機期間）
+        if (startAge < 60) {
+          const waitingEndAge = Math.min(60, oldAgeStartHusband);
+          const waitingDuration = waitingEndAge - startAge;
 
-        if (waitingDuration > 0) {
-          const startAges: string[] = [`夫${startAge}`, `妻${ageWife + (startAge - ageHusband)}`];
-          const endAges: string[] | undefined = waitingEndAge === oldAgeStartHusband ? undefined : [`夫${waitingEndAge}`, `妻${ageWife + (waitingEndAge - ageHusband)}`];
+          if (waitingDuration > 0) {
+            const startAges: string[] = [`夫${startAge}`, `妻${ageWife + (startAge - ageHusband)}`];
+            const endAges: string[] | undefined = waitingEndAge === oldAgeStartHusband ? undefined : [`夫${waitingEndAge}`, `妻${ageWife + (waitingEndAge - ageHusband)}`];
 
-          block2.segments.push({
-            label: startAge >= 55 ? '停止中' : '待機中',
-            years: waitingDuration,
-            widthYears: widen(waitingDuration),
-            className: 'ring-1 ring-white/20',
-            style: { backgroundColor: getGradientColor('blue', segmentCount) },
-            amountYear: 0,
-            startAge,
-            endAge: waitingEndAge,
-            startAges,
-            endAges
-          });
-          segmentCount++;
+            block2.segments.push({
+              label: startAge >= 55 ? '停止中' : '待機中',
+              years: waitingDuration,
+              widthYears: widen(waitingDuration),
+              className: 'ring-1 ring-white/20',
+              style: { backgroundColor: getGradientColor('blue', segmentCount) },
+              amountYear: 0,
+              startAge,
+              endAge: waitingEndAge,
+              startAges,
+              endAges
+            });
+            segmentCount++;
+          }
         }
-      }
 
-      // 60歳以降の期間（遺族厚生年金）
-      if (oldAgeStartHusband > 60 && startAge < oldAgeStartHusband) {
-        const pensionStartAge = Math.max(60, startAge);
-        const pensionDuration = oldAgeStartHusband - pensionStartAge;
+        // 60歳以降の期間（遺族厚生年金）
+        if (oldAgeStartHusband > 60 && startAge < oldAgeStartHusband) {
+          const pensionStartAge = Math.max(60, startAge);
+          const pensionDuration = oldAgeStartHusband - pensionStartAge;
 
-        if (pensionDuration > 0) {
-          const startAges: string[] = [`夫${pensionStartAge}`, `妻${ageWife + (pensionStartAge - ageHusband)}`];
-          const endAges: string[] = [`夫${oldAgeStartHusband}`, `妻${ageWife + (oldAgeStartHusband - ageHusband)}`];
+          if (pensionDuration > 0) {
+            const startAges: string[] = [`夫${pensionStartAge}`, `妻${ageWife + (pensionStartAge - ageHusband)}`];
+            const endAges: string[] = [`夫${oldAgeStartHusband}`, `妻${ageWife + (oldAgeStartHusband - ageHusband)}`];
 
-          block2.segments.push({
-            label: '遺族厚生',
-            years: pensionDuration,
-            widthYears: widen(pensionDuration),
-            className: 'ring-1 ring-white/20',
-            style: { backgroundColor: getGradientColor('blue', segmentCount) },
-            amountYear: caseWifeDeath.employeePension,
-            startAge: pensionStartAge,
-            endAge: oldAgeStartHusband,
-            startAges,
-            endAges: undefined // 最後のセグメントではないので終了年齢は非表示
-          });
-          segmentCount++;
+            block2.segments.push({
+              label: '遺族厚生',
+              years: pensionDuration,
+              widthYears: widen(pensionDuration),
+              className: 'ring-1 ring-white/20',
+              style: { backgroundColor: getGradientColor('blue', segmentCount) },
+              amountYear: caseWifeDeath.employeePension,
+              startAge: pensionStartAge,
+              endAge: oldAgeStartHusband,
+              startAges,
+              endAges: undefined // 最後のセグメントではないので終了年齢は非表示
+            });
+            segmentCount++;
+          }
         }
+      } else {
+        // Not eligible (under 55 at wife's death)
+        // Show as empty period or just skip?
+        // If we skip, there will be a gap. Let's fill it with "Not Eligible" or similar if needed, 
+        // but usually we just don't show pension segments.
+        // However, to make it clear, maybe we should show a gray segment?
+        // For now, let's just NOT add pension segments, effectively showing a gap or just connecting to old age pension.
+        // But wait, period1Duration is the gap between "After Children" and "Old Age Pension".
+        // If we don't add segments, there will be a visual gap in the timeline if the logic expects segments to fill the width.
+        // The timeline component renders segments. If total duration is fixed, we might need a filler.
+        // But looking at the code, `block2.segments` are just pushed.
+        // If we don't push anything, the timeline will just start with Old Age Pension?
+        // No, `period1Duration` is calculated based on startAge (after children) and oldAgeStartHusband.
+        // If we don't add segments for this period, the user might wonder what happens.
+        // Let's add a "支給なし" (No Payment) segment for clarity.
+
+        block2.segments.push({
+          label: '支給なし',
+          years: period1Duration,
+          widthYears: widen(period1Duration),
+          className: 'ring-1 ring-white/20',
+          style: { backgroundColor: 'rgba(100, 116, 139, 0.2)' }, // Slate-500 equivalent
+          amountYear: 0,
+          startAge,
+          endAge: oldAgeStartHusband,
+          startAges: [`夫${startAge}`, `妻${ageWife + (startAge - ageHusband)}`],
+          endAges: undefined
+        });
+        segmentCount++;
       }
     }
 
