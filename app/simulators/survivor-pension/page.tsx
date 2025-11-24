@@ -1,25 +1,8 @@
 'use client';
-
 import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
 import Link from 'next/link';
-import {
-  calculateAge,
-  calculateFiscalYearAge,
-  generateTimeline,
-  calculateSurvivorBasicPension,
-  calculateSurvivorEmployeePension,
-  calculateChukoreiKasan,
-  calculateWidowPension,
-  calculateLumpSumDeath,
-  formatCurrency,
-  TimelineItem,
-  PensionType,
-  calculateEligibleChildrenCount,
-  calculateOldAgeBasicPension,
-  calculateOldAgeEmployeePension,
-  PolicyMode,
-  POLICY_MODES,
-} from '../../utils/pension-calc';
+import { calculateOldAgeEmployeePension, calculateEligibleChildrenCount, calculateSurvivorBasicPension, calculateSurvivorEmployeePension, calculateOldAgeBasicPension, PolicyMode, POLICY_MODES, formatCurrency } from '../../utils/pension-calc';
+import { calculateSurvivorPensionAmounts, calculateOldAgePensionAdjustment as calculateOldAgePensionAdjustmentUtil } from '../../utils/survivor-pension-logic';
 
 type Segment = {
   label: string;
@@ -623,176 +606,43 @@ export default function SurvivorPensionPage() {
   }, [childrenCount]);
 
   const caseHusbandDeath = useMemo(() => {
-    const eligibleChildren = calculateEligibleChildrenCount(childrenAges);
-    const basicPension = calculateSurvivorBasicPension(eligibleChildren);
-    const survivorEmployeePension = calculateSurvivorEmployeePension(
-      avgStdMonthlyHusband,
-      monthsHusband,
-      useMinashi300Husband
-    );
-
-    const youngestChildAge = childrenAges.length > 0 ? Math.min(...childrenAges) : null;
-    const yearsUntilChild18 = youngestChildAge !== null ? Math.max(0, 18 - youngestChildAge) : 0;
-    const ageAfterChild = ageWife + yearsUntilChild18;
-
-    // 最適な老齢年金開始年齢を計算
-    const wifeOwnBasic = calculateOldAgeBasicPension();
-    const wifeOwnEmployee = calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife);
-
-    // 最適化ロジック削除: ユーザー設定値をそのまま使用
-    const effectiveOldAgeStartWife = oldAgeStartWife;
-
-    const withChildrenAmount = basicPension + survivorEmployeePension;
-
-    // 改正モード（2028年見直し）の場合
-    let afterChildrenAmount = 0;
-    let pensionTypesAfterChildren: string[] = [];
-
-    if (mode === 'revised2028') {
-      // 中高齢寡婦加算は廃止（0円）
-      // 子がいなくなった後は原則5年間のみ遺族厚生年金
-      const yearsAfterChild = effectiveOldAgeStartWife - ageAfterChild;
-      if (yearsAfterChild > 0 && yearsAfterChild <= 5) {
-        afterChildrenAmount = survivorEmployeePension;
-        pensionTypesAfterChildren = ['遺族厚生年金（5年間）'];
-      } else if (yearsAfterChild > 5) {
-        afterChildrenAmount = 0;
-        pensionTypesAfterChildren = [];
-      } else {
-        afterChildrenAmount = 0;
-      }
-    } else {
-      // 現行制度
-      // 30歳未満の妻に対する5年有期給付
-      // 子がいない（または子が権利を失った）時点で30歳未満の場合、5年間の有期給付となる
-      if (ageAfterChild < 30) {
-        afterChildrenAmount = survivorEmployeePension;
-        pensionTypesAfterChildren = ['遺族厚生年金（5年間・30歳未満）'];
-        // 5年後に終了するため、タイムライン表示用のロジックで対応が必要
-        // ここではフラグや特別な値を返すか、タイムライン生成側で判定する
-        // 簡易的に、amountは設定するが、タイムライン生成側で期間を制限する
-      } else {
-        const chukoreiKasanAfter = (ageAfterChild >= 40 && ageAfterChild < 65) ? calculateChukoreiKasan() : 0;
-        afterChildrenAmount = survivorEmployeePension + chukoreiKasanAfter;
-        pensionTypesAfterChildren = ['遺族厚生年金'];
-        if (chukoreiKasanAfter > 0) {
-          pensionTypesAfterChildren.push('中高齢寡婦加算');
-        }
-      }
-    }
-
-    // 妻自身の老齢年金（簡易計算）
-    const adjustedOwnBasic = calculateOldAgePensionAdjustment(wifeOwnBasic, effectiveOldAgeStartWife);
-    const adjustedOwnEmployee = calculateOldAgePensionAdjustment(wifeOwnEmployee, effectiveOldAgeStartWife);
-
-    const maxEmployeePart = Math.max(survivorEmployeePension, adjustedOwnEmployee);
-    const oldAgeAmount = adjustedOwnBasic + maxEmployeePart;
-
-    return {
-      basicPension,
-      employeePension: survivorEmployeePension,
-      total: basicPension + survivorEmployeePension,
-      withChildrenAmount,
-      afterChildrenAmount,
-      oldAgeAmount,
-      yearsUntilChild18,
-      ageAfterChild,
-      pensionTypesWithChildren: ['遺族基礎年金', '遺族厚生年金'],
-      pensionTypesAfterChildren,
-      pensionTypesOldAge: ['老齢基礎年金', '老齢厚生年金', '遺族厚生年金（差額）'],
-    };
+    return calculateSurvivorPensionAmounts({
+      ageWife,
+      ageHusband,
+      childrenAges,
+      survivorSource: {
+        avgStdMonthly: avgStdMonthlyHusband,
+        months: monthsHusband,
+        useMinashi300: useMinashi300Husband
+      },
+      ownSource: {
+        avgStdMonthly: avgStdMonthlyWife,
+        months: monthsWife
+      },
+      oldAgeStart: oldAgeStartWife,
+      isWifeDeath: false,
+      mode
+    });
   }, [mode, childrenAges, avgStdMonthlyHusband, monthsHusband, useMinashi300Husband, ageWife, oldAgeStartWife, avgStdMonthlyWife, monthsWife]);
 
   const caseWifeDeath = useMemo(() => {
-    const eligibleChildren = calculateEligibleChildrenCount(childrenAges);
-    const basicPension = calculateSurvivorBasicPension(eligibleChildren);
-    const survivorEmployeePension = calculateSurvivorEmployeePension(
-      avgStdMonthlyWife,
-      monthsWife,
-      useMinashi300Wife
-    );
-
-    const youngestChildAge = childrenAges.length > 0 ? Math.min(...childrenAges) : null;
-    const yearsUntilChild18 = youngestChildAge !== null ? Math.max(0, 18 - youngestChildAge) : 0;
-    const ageAfterChild = ageHusband + yearsUntilChild18;
-
-    // 最適な老齢年金開始年齢を計算
-    const husbandOwnBasicCalc = calculateOldAgeBasicPension();
-    const husbandOwnEmployeeCalc = calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband);
-
-    // 最適化ロジック削除: ユーザー設定値をそのまま使用
-    const effectiveOldAgeStartHusband = oldAgeStartHusband;
-
-    // 夫の遺族厚生年金（子がいる期間）
-    // 夫が55歳未満でも、子が遺族厚生年金を受給できるため、世帯としては「基礎＋厚生」となる
-    // したがって、年齢にかかわらず合算する
-    const withChildrenAmount = basicPension + survivorEmployeePension;
-
-    // 改正モード（2028年見直し）の場合
-    let afterChildrenAmount = 0;
-    let pensionTypesAfterChildren: string[] = [];
-    if (mode === 'revised2028') {
-      // 夫は中高齢寡婦加算なし（元々女性のみの制度）
-      // 子がいなくなった後は原則5年間のみ遺族厚生年金
-      const yearsAfterChild = effectiveOldAgeStartHusband - ageAfterChild;
-      if (yearsAfterChild > 0 && yearsAfterChild <= 5) {
-        afterChildrenAmount = survivorEmployeePension;
-        pensionTypesAfterChildren = ['遺族厚生年金（5年間）'];
-      } else if (yearsAfterChild > 5) {
-        afterChildrenAmount = 0;
-        pensionTypesAfterChildren = [];
-      } else {
-        afterChildrenAmount = 0;
-      }
-    } else {
-      // Current system: Husband receives survivor employee pension from age 60
-      // IMPORTANT: Husband must be 55 or older at wife's death to be eligible
-      if (ageHusband >= 55) {
-        // Eligible if husband was 55+ at wife's death
-        if (ageAfterChild >= 60) {
-          afterChildrenAmount = survivorEmployeePension;
-          pensionTypesAfterChildren = ['遺族厚生年金（60歳〜）'];
-        } else if (ageAfterChild >= 55 && ageAfterChild < 60) {
-          afterChildrenAmount = 0;
-          pensionTypesAfterChildren = ['遺族厚生年金（60歳まで停止）'];
-        } else {
-          // Under 55: will receive from age 60
-          afterChildrenAmount = 0;
-          pensionTypesAfterChildren = [];
-        }
-      } else {
-        // NOT eligible: husband was under 55 at wife's death
-        afterChildrenAmount = 0;
-        pensionTypesAfterChildren = [];
-      }
-    }
-
-    // 夫自身の老齢年金（簡易計算）
-    const adjustedOwnBasic = calculateOldAgePensionAdjustment(husbandOwnBasicCalc, effectiveOldAgeStartHusband);
-    const adjustedOwnEmployee = calculateOldAgePensionAdjustment(husbandOwnEmployeeCalc, effectiveOldAgeStartHusband);
-
-    // 夫が55歳未満（妻死亡時）の場合、遺族厚生年金の受給権自体がないため、自身の老齢厚生年金のみとなる
-    // 55歳以上の場合のみ、遺族厚生年金と自身の老齢厚生年金の高い方（併給調整後の合計）を受給
-    const isEligibleForSurvivor = ageHusband >= 55;
-    const maxEmployeePart = isEligibleForSurvivor
-      ? Math.max(survivorEmployeePension, adjustedOwnEmployee)
-      : adjustedOwnEmployee;
-
-    const oldAgeAmount = adjustedOwnBasic + maxEmployeePart;
-
-    return {
-      basicPension,
-      employeePension: survivorEmployeePension,
-      total: basicPension + survivorEmployeePension,
-      withChildrenAmount,
-      afterChildrenAmount,
-      oldAgeAmount,
-      yearsUntilChild18,
-      ageAfterChild,
-      pensionTypesWithChildren: ['遺族基礎年金', '遺族厚生年金'],
-      pensionTypesAfterChildren,
-      pensionTypesOldAge: ['老齢基礎年金', '老齢厚生年金', '遺族厚生年金（差額）'],
-    };
+    return calculateSurvivorPensionAmounts({
+      ageWife,
+      ageHusband,
+      childrenAges,
+      survivorSource: {
+        avgStdMonthly: avgStdMonthlyWife,
+        months: monthsWife,
+        useMinashi300: useMinashi300Wife
+      },
+      ownSource: {
+        avgStdMonthly: avgStdMonthlyHusband,
+        months: monthsHusband
+      },
+      oldAgeStart: oldAgeStartHusband,
+      isWifeDeath: true,
+      mode
+    });
   }, [mode, childrenAges, avgStdMonthlyWife, monthsWife, useMinashi300Wife, ageHusband, oldAgeStartHusband, avgStdMonthlyHusband, monthsHusband]);
 
   const timelineDataHusband = useMemo(() => {
@@ -1632,21 +1482,21 @@ export default function SurvivorPensionPage() {
                 ...(oldAgeStartHusband !== 65 ? [{
                   label: '　繰り上げ・繰り下げ調整',
                   value: oldAgeStartHusband < 65
-                    ? `83.2万円 × (1 - ${((65 - oldAgeStartHusband) * 12 * 0.4).toFixed(1)}%) = ${(calculateOldAgePensionAdjustment(calculateOldAgeBasicPension(), oldAgeStartHusband) / 10000).toFixed(1)}万円`
-                    : `83.2万円 × (1 + ${((oldAgeStartHusband - 65) * 12 * 0.7).toFixed(1)}%) = ${(calculateOldAgePensionAdjustment(calculateOldAgeBasicPension(), oldAgeStartHusband) / 10000).toFixed(1)}万円`
+                    ? `83.2万円 × (1 - ${((65 - oldAgeStartHusband) * 12 * 0.4).toFixed(1)}%) = ${(calculateOldAgePensionAdjustmentUtil(calculateOldAgeBasicPension(), oldAgeStartHusband) / 10000).toFixed(1)}万円`
+                    : `83.2万円 × (1 + ${((oldAgeStartHusband - 65) * 12 * 0.7).toFixed(1)}%) = ${(calculateOldAgePensionAdjustmentUtil(calculateOldAgeBasicPension(), oldAgeStartHusband) / 10000).toFixed(1)}万円`
                 }] : []),
-                { label: `夫の老齢厚生年金（${oldAgeStartHusband}歳〜）`, value: `${(calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband) / 10000).toFixed(1)}万円` },
+                { label: `夫の老齢厚生年金（${oldAgeStartHusband}歳〜）`, value: `${(calculateOldAgePensionAdjustmentUtil(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband) / 10000).toFixed(1)}万円` },
                 { label: '　平均標準報酬月額 × 厚生年金加入月数 × 5.481/1000', value: `${(avgStdMonthlyHusband / 10000).toFixed(1)}万 × ${monthsHusband}月 × 5.481/1000 = ${(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband) / 10000).toFixed(1)}万円` },
                 ...(oldAgeStartHusband !== 65 ? [{
                   label: '　繰り上げ・繰り下げ調整',
                   value: oldAgeStartHusband < 65
-                    ? `${(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband) / 10000).toFixed(1)}万円 × (1 - ${((65 - oldAgeStartHusband) * 12 * 0.4).toFixed(1)}%) = ${(calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband) / 10000).toFixed(1)}万円`
-                    : `${(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband) / 10000).toFixed(1)}万円 × (1 + ${((oldAgeStartHusband - 65) * 12 * 0.7).toFixed(1)}%) = ${(calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband) / 10000).toFixed(1)}万円`
+                    ? `${(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband) / 10000).toFixed(1)}万円 × (1 - ${((65 - oldAgeStartHusband) * 12 * 0.4).toFixed(1)}%) = ${(calculateOldAgePensionAdjustmentUtil(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband) / 10000).toFixed(1)}万円`
+                    : `${(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband) / 10000).toFixed(1)}万円 × (1 + ${((oldAgeStartHusband - 65) * 12 * 0.7).toFixed(1)}%) = ${(calculateOldAgePensionAdjustmentUtil(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband) / 10000).toFixed(1)}万円`
                 }] : []),
-                { label: '遺族厚生年金（差額調整後）', value: `${(Math.max(0, caseWifeDeath.employeePension - calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband)) / 10000).toFixed(1)}万円` },
-                { label: '　Max(遺族厚生年金 - 夫の老齢厚生年金, 0)', value: `Max(${(caseWifeDeath.employeePension / 10000).toFixed(1)}万 - ${(calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband) / 10000).toFixed(1)}万, 0) = ${(Math.max(0, caseWifeDeath.employeePension - calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband)) / 10000).toFixed(1)}万円` },
+                { label: '遺族厚生年金（差額調整後）', value: `${(Math.max(0, caseWifeDeath.employeePension - calculateOldAgePensionAdjustmentUtil(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband)) / 10000).toFixed(1)}万円` },
+                { label: '　Max(遺族厚生年金 - 夫の老齢厚生年金, 0)', value: `Max(${(caseWifeDeath.employeePension / 10000).toFixed(1)}万 - ${(calculateOldAgePensionAdjustmentUtil(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband) / 10000).toFixed(1)}万, 0) = ${(Math.max(0, caseWifeDeath.employeePension - calculateOldAgePensionAdjustmentUtil(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband)) / 10000).toFixed(1)}万円` },
                 { label: '65歳以降の合計（年額）', value: `${(caseWifeDeath.oldAgeAmount / 10000).toFixed(1)}万円` },
-                { label: '　老齢基礎 + 老齢厚生 + 遺族厚生（差額）', value: `${(calculateOldAgePensionAdjustment(calculateOldAgeBasicPension(), oldAgeStartHusband) / 10000).toFixed(1)}万 + ${(calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband) / 10000).toFixed(1)}万 + ${(Math.max(0, caseWifeDeath.employeePension - calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband)) / 10000).toFixed(1)}万 = ${(caseWifeDeath.oldAgeAmount / 10000).toFixed(1)}万円` },
+                { label: '　老齢基礎 + 老齢厚生 + 遺族厚生（差額）', value: `${(calculateOldAgePensionAdjustmentUtil(calculateOldAgeBasicPension(), oldAgeStartHusband) / 10000).toFixed(1)}万 + ${(calculateOldAgePensionAdjustmentUtil(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband) / 10000).toFixed(1)}万 + ${(Math.max(0, caseWifeDeath.employeePension - calculateOldAgePensionAdjustmentUtil(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband)) / 10000).toFixed(1)}万 = ${(caseWifeDeath.oldAgeAmount / 10000).toFixed(1)}万円` },
               ]}
             />
           </section>

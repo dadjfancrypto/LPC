@@ -4,15 +4,14 @@ import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 're
 import Link from 'next/link';
 import {
   calculateAge,
-  calculateDisabilityBasicPension,
-  calculateDisabilityEmployeePension,
-  calculateEligibleChildrenCount,
   calculateFiscalYearAge,
   calculateOldAgeBasicPension,
   calculateOldAgeEmployeePension,
   DisabilityLevel,
   formatCurrency,
+  POLICY_MODES,
 } from '../../utils/pension-calc';
+import { calculateDisabilityPensionAmounts, SPOUSE_BONUS_2024 as SPOUSE_BONUS } from '../../utils/disability-pension-logic';
 
 /* ===================== 型定義 & 定数 ===================== */
 
@@ -45,7 +44,6 @@ type Geometry = {
 
 const BAR_HEIGHT = 150;
 const MIN_SEG_PX = 120;
-const SPOUSE_BONUS = 234800; // 配偶者加給年金額（令和6年度）
 
 function getGradientColor(baseColor: 'amber' | 'emerald' | 'sky' | 'blue', index: number) {
   const rgbMap = {
@@ -62,8 +60,6 @@ function getGradientColor(baseColor: 'amber' | 'emerald' | 'sky' | 'blue', index
 
   return `rgba(${rgb}, ${opacity})`;
 }
-
-/* ===================== UI Components ===================== */
 
 function CalculationLogic({
   details,
@@ -631,12 +627,16 @@ export default function DisabilityPensionPage() {
 
     // 配偶者加給年金判定
     const hasSpouse = true; // Couple mode
-    const spouseBonus = (hasSpouse && ageHusband < 65) ? SPOUSE_BONUS : 0;
 
-    const basicPension = calculateDisabilityBasicPension(levelWife, eligibleChildren);
-    const employeePension = calculateDisabilityEmployeePension(levelWife, spouseBonus, 0, avgStdMonthlyWife, monthsWife, useMinashi300Wife);
-
-    const total = basicPension + employeePension;
+    const { basicPension, employeePension, total, spouseBonus } = calculateDisabilityPensionAmounts({
+      level: levelWife,
+      hasSpouse,
+      ageSpouse: ageHusband,
+      childrenAges,
+      avgStdMonthly: avgStdMonthlyWife,
+      months: monthsWife,
+      useMinashi300: useMinashi300Wife
+    });
 
     // 2. タイムライン構築
     // Block 1: 子がいる期間（子の加算対象期間）
@@ -678,13 +678,16 @@ export default function DisabilityPensionPage() {
         const currentEligible = calculateEligibleChildrenCount(currentChildrenAges);
         const currentHusbandAge = ageHusband + startY;
         const currentWifeAge = ageWife + startY;
-        const currentSpouseBonus = (currentHusbandAge < 65) ? SPOUSE_BONUS : 0;
 
-        // 65歳を超えていたら計算しない（ループ抜けるべきだが、pointsフィルタしてるのでここは65以下）
-
-        const currentBasic = calculateDisabilityBasicPension(levelWife, currentEligible);
-        const currentEmployee = calculateDisabilityEmployeePension(levelWife, currentSpouseBonus, 0, avgStdMonthlyWife, monthsWife, useMinashi300Wife);
-        const currentTotal = currentBasic + currentEmployee;
+        const { basicPension: currentBasic, employeePension: currentEmployee, total: currentTotal, spouseBonus: currentSpouseBonus } = calculateDisabilityPensionAmounts({
+          level: levelWife,
+          hasSpouse: true,
+          ageSpouse: currentHusbandAge,
+          childrenAges: currentChildrenAges,
+          avgStdMonthly: avgStdMonthlyWife,
+          months: monthsWife,
+          useMinashi300: useMinashi300Wife
+        });
 
         let label = `障害${levelWife}級`;
         if (currentEligible > 0) label += `+子${currentEligible}`;
