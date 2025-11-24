@@ -1058,23 +1058,60 @@ export default function SurvivorPensionPage() {
     const period1Duration = Math.max(0, oldAgeStartHusband - startAge);
     let segmentCount = 0;
 
-    if (period1Duration > 0) {
-      const startAges: string[] = [`夫${startAge}`, `妻${ageWife + (startAge - ageHusband)}`];
-      const endAges: string[] = [`夫${oldAgeStartHusband}`, `妻${ageWife + (oldAgeStartHusband - ageHusband)}`];
+    // 夫の遺族厚生年金は60歳から支給
+    // 子がいなくなった後〜60歳: 待機期間（0円）
+    // 60歳〜老齢年金開始: 遺族厚生年金
 
-      block2.segments.push({
-        label: '遺族厚生',
-        years: period1Duration,
-        widthYears: widen(period1Duration),
-        className: 'ring-1 ring-white/20',
-        style: { backgroundColor: getGradientColor('blue', segmentCount) },
-        amountYear: caseWifeDeath.afterChildrenAmount,
-        startAge,
-        endAge: oldAgeStartHusband,
-        startAges,
-        endAges: undefined // 最後のセグメントではないので終了年齢は非表示
-      });
-      segmentCount++;
+    if (period1Duration > 0) {
+      // 60歳より前の期間（待機期間）
+      if (startAge < 60) {
+        const waitingEndAge = Math.min(60, oldAgeStartHusband);
+        const waitingDuration = waitingEndAge - startAge;
+
+        if (waitingDuration > 0) {
+          const startAges: string[] = [`夫${startAge}`, `妻${ageWife + (startAge - ageHusband)}`];
+          const endAges: string[] | undefined = waitingEndAge === oldAgeStartHusband ? undefined : [`夫${waitingEndAge}`, `妻${ageWife + (waitingEndAge - ageHusband)}`];
+
+          block2.segments.push({
+            label: startAge >= 55 ? '停止中' : '待機中',
+            years: waitingDuration,
+            widthYears: widen(waitingDuration),
+            className: 'ring-1 ring-white/20',
+            style: { backgroundColor: getGradientColor('blue', segmentCount) },
+            amountYear: 0,
+            startAge,
+            endAge: waitingEndAge,
+            startAges,
+            endAges
+          });
+          segmentCount++;
+        }
+      }
+
+      // 60歳以降の期間（遺族厚生年金）
+      if (oldAgeStartHusband > 60 && startAge < oldAgeStartHusband) {
+        const pensionStartAge = Math.max(60, startAge);
+        const pensionDuration = oldAgeStartHusband - pensionStartAge;
+
+        if (pensionDuration > 0) {
+          const startAges: string[] = [`夫${pensionStartAge}`, `妻${ageWife + (pensionStartAge - ageHusband)}`];
+          const endAges: string[] = [`夫${oldAgeStartHusband}`, `妻${ageWife + (oldAgeStartHusband - ageHusband)}`];
+
+          block2.segments.push({
+            label: '遺族厚生',
+            years: pensionDuration,
+            widthYears: widen(pensionDuration),
+            className: 'ring-1 ring-white/20',
+            style: { backgroundColor: getGradientColor('blue', segmentCount) },
+            amountYear: caseWifeDeath.employeePension,
+            startAge: pensionStartAge,
+            endAge: oldAgeStartHusband,
+            startAges,
+            endAges: undefined // 最後のセグメントではないので終了年齢は非表示
+          });
+          segmentCount++;
+        }
+      }
     }
 
     const period2Duration = endAge - oldAgeStartHusband;
