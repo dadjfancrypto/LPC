@@ -174,7 +174,7 @@ export default function NecessaryCoveragePage() {
     const [expenseRatioDisability, setExpenseRatioDisability] = useState(110);
 
     const DISABILITY_LEVEL: DisabilityLevel = 2;
-    const SPOUSE_BONUS = 239300; // 配偶者加給年金額（令和7年度）
+    const SPOUSE_BONUS = 234800; // 配偶者加給年金額（令和6年度）
 
     // localStorageから読み込み
     useEffect(() => {

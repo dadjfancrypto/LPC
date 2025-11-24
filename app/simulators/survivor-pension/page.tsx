@@ -723,17 +723,14 @@ export default function SurvivorPensionPage() {
     // 最適化ロジック削除: ユーザー設定値をそのまま使用
     const effectiveOldAgeStartHusband = oldAgeStartHusband;
 
-    // 夫の遺族厚生年金（子がいる期間の併給）
-    // 妻死亡時に夫が55歳以上の場合のみ、遺族基礎年金と併給可能
-    // 55歳未満の場合は、遺族基礎年金のみ（遺族厚生年金は受給権なし）
-    const withChildrenAmount = (ageHusband >= 55)
-      ? basicPension + survivorEmployeePension
-      : basicPension;
+    // 夫の遺族厚生年金（子がいる期間）
+    // 夫が55歳未満でも、子が遺族厚生年金を受給できるため、世帯としては「基礎＋厚生」となる
+    // したがって、年齢にかかわらず合算する
+    const withChildrenAmount = basicPension + survivorEmployeePension;
 
     // 改正モード（2028年見直し）の場合
     let afterChildrenAmount = 0;
     let pensionTypesAfterChildren: string[] = [];
-
     if (mode === 'revised2028') {
       // 夫は中高齢寡婦加算なし（元々女性のみの制度）
       // 子がいなくなった後は原則5年間のみ遺族厚生年金

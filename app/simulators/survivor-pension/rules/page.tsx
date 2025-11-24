@@ -10,12 +10,12 @@ import Link from 'next/link';
  * - できるだけ平易な言葉で要点整理
  */
 
-// --- シミュレーターで用いている主な定数（令和7年度・説明用・表示のみ） ---
+// --- シミュレーターで用いている主な定数（令和6年度・説明用・表示のみ） ---
 const CONSTS = {
-  KISO_BASE: 831_700, // 遺族基礎年金（本体・年額）
-  CHILD_ADD_1_2: 239_300, // 子1・2人目の加算（年額）
-  CHILD_ADD_3P: 79_800, // 子3人目以降の加算（年額/人）
-  CHUKOREI_KASAN: 623_800, // 中高齢寡婦加算（年額）
+  KISO_BASE: 816_000, // 遺族基礎年金（本体・年額）
+  CHILD_ADD_1_2: 234_800, // 子1・2人目の加算（年額）
+  CHILD_ADD_3P: 78_300, // 子3人目以降の加算（年額/人）
+  CHUKOREI_KASAN: 612_000, // 中高齢寡婦加算（年額・令和6年度）
   COEF_POST2003: 5.481 / 1000, // 報酬比例の係数（2003/4以降・簡易）
   MIN_MONTHS: 300, // みなし300月
 };
@@ -54,16 +54,19 @@ export default function RulesPage() {
           </ul>
         </Card>
         <Card>
-          <h2 className="text-lg font-semibold mb-2">2028年見直し（試作の説明）</h2>
+          <h2 className="text-lg font-semibold mb-2">2028年制度改正議論（参考）</h2>
           <ul className="list-disc ml-5 space-y-1 text-sm opacity-90">
             <li>子がいる配偶者：基本的な考え方は現行と同様（基礎＋厚生）</li>
             <li>
               子がいない配偶者：<b>一定期間（原則5年）</b>の遺族厚生年金（所得等の要件・経過措置あり）
             </li>
             <li>
-              <b>中高齢寡婦加算は段階的に見直し・廃止方向</b>（本ページでは0円扱いで説明）
+              <b>中高齢寡婦加算は段階的に見直し・廃止方向</b>
             </li>
           </ul>
+          <div className="mt-3 text-xs opacity-70 border-t border-slate-700 pt-2">
+            ※現在は議論中の段階であり、決定事項ではありません
+          </div>
         </Card>
       </section>
 
@@ -124,7 +127,7 @@ export default function RulesPage() {
             <h3 className="font-semibold mb-1">妻が亡くなった場合（受給者：夫）</h3>
             <ul className="list-disc ml-5 text-sm space-y-1 opacity-90">
               <li>
-                子がいる：<b>基礎＋厚生</b>（夫が55歳以上で厚生に受給権）。
+                子がいる：<b>基礎＋厚生</b>（<b>年齢要件なし</b>。ただし子が18歳到達時に両方終了）。
               </li>
               <li>
                 子がいない：現行は<b>60歳から厚生</b>（55〜59歳は停止）。
