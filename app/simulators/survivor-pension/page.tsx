@@ -771,7 +771,13 @@ export default function SurvivorPensionPage() {
     const adjustedOwnBasic = calculateOldAgePensionAdjustment(husbandOwnBasicCalc, effectiveOldAgeStartHusband);
     const adjustedOwnEmployee = calculateOldAgePensionAdjustment(husbandOwnEmployeeCalc, effectiveOldAgeStartHusband);
 
-    const maxEmployeePart = Math.max(survivorEmployeePension, adjustedOwnEmployee);
+    // 夫が55歳未満（妻死亡時）の場合、遺族厚生年金の受給権自体がないため、自身の老齢厚生年金のみとなる
+    // 55歳以上の場合のみ、遺族厚生年金と自身の老齢厚生年金の高い方（併給調整後の合計）を受給
+    const isEligibleForSurvivor = ageHusband >= 55;
+    const maxEmployeePart = isEligibleForSurvivor
+      ? Math.max(survivorEmployeePension, adjustedOwnEmployee)
+      : adjustedOwnEmployee;
+
     const oldAgeAmount = adjustedOwnBasic + maxEmployeePart;
 
     return {
