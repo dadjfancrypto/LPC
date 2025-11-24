@@ -174,6 +174,7 @@ export default function NecessaryCoveragePage() {
     const [expenseRatioDisability, setExpenseRatioDisability] = useState(110);
 
     const DISABILITY_LEVEL: DisabilityLevel = 2;
+    const SPOUSE_BONUS = 239300; // 配偶者加給年金額（令和7年度）
 
     // localStorageから読み込み
     useEffect(() => {
@@ -283,8 +284,10 @@ export default function NecessaryCoveragePage() {
         if (basicInfo.spouseType === 'couple') {
             const level = DISABILITY_LEVEL;
             const basic = calculateDisabilityBasicPension(level, eligibleChildrenForDisability);
+            // 配偶者加給年金: 妻が65歳未満なら加算
+            const spouseBonus = (basicInfo.ageWife < 65) ? SPOUSE_BONUS : 0;
             const emp = calculateDisabilityEmployeePension(
-                level, 0, 0, basicInfo.avgStdMonthlyHusband || 0, basicInfo.monthsHusband || 0, true
+                level, spouseBonus, 0, basicInfo.avgStdMonthlyHusband || 0, basicInfo.monthsHusband || 0, true
             );
             husbandDisabilityAnnual = basic + emp;
         }
@@ -293,8 +296,10 @@ export default function NecessaryCoveragePage() {
         if (basicInfo.spouseType === 'couple') {
             const level = DISABILITY_LEVEL;
             const basic = calculateDisabilityBasicPension(level, eligibleChildrenForDisability);
+            // 配偶者加給年金: 夫が65歳未満なら加算
+            const spouseBonus = (basicInfo.ageHusband < 65) ? SPOUSE_BONUS : 0;
             const emp = calculateDisabilityEmployeePension(
-                level, 0, 0, basicInfo.avgStdMonthlyWife || 0, basicInfo.monthsWife || 0, true
+                level, spouseBonus, 0, basicInfo.avgStdMonthlyWife || 0, basicInfo.monthsWife || 0, true
             );
             wifeDisabilityAnnual = basic + emp;
         }
@@ -386,7 +391,7 @@ export default function NecessaryCoveragePage() {
                                 className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
                             />
                             <p className="text-xs text-slate-500 mt-2">現在の生活費に対する割合（一般的に70%程度と言われています）</p>
-                            
+
                             <div className="mt-6 p-4 rounded-xl bg-slate-950/50 border border-slate-800 flex items-center justify-between">
                                 <div>
                                     <div className="text-xs text-slate-400">シミュレーション上の生活費</div>
@@ -462,7 +467,7 @@ export default function NecessaryCoveragePage() {
                                                 gapMonthly={scenarios.wifeDisability.gapMonthly}
                                                 pensionLabel="障害年金"
                                                 colorTheme="amber"
-                                                // 障害時は団信免除なし
+                                            // 障害時は団信免除なし
                                             />
                                         </div>
                                     </div>
