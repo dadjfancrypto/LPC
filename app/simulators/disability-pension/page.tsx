@@ -303,7 +303,7 @@ function PensionSegmentsBar({ segments, geometry }: { segments: Segment[]; geome
   return (
     <div className="relative" style={{ width: geometry.used }}>
       <div
-        className="relative flex overflow-visible rounded-2xl border border-white/15"
+        className="relative flex overflow-hidden rounded-2xl border border-white/15"
         style={{ width: geometry.used, height: BAR_HEIGHT }}
       >
         {segments.map((s, i) => {
@@ -313,14 +313,9 @@ function PensionSegmentsBar({ segments, geometry }: { segments: Segment[]; geome
           const amountText = s.amountYear !== undefined ? `${(s.amountYear / 10000).toFixed(0)}万円` : '';
           const monthlyText = s.amountYear !== undefined ? `月${(s.amountYear / 120000).toFixed(1)}万` : '';
           const titleText = `${s.label} ${s.years}年`;
-          const isLast = i === segments.length - 1;
 
           return (
-            <div
-              key={i}
-              className="relative flex flex-col"
-              style={{ width: w }}
-            >
+            <div key={i} className="relative" style={{ width: w }}>
               <div
                 className={`${s.className} ring-1 ring-white/15 relative flex flex-col justify-center items-stretch px-1 overflow-hidden`}
                 style={{ width: w, height: BAR_HEIGHT, ...s.style }}
@@ -342,11 +337,20 @@ function PensionSegmentsBar({ segments, geometry }: { segments: Segment[]; geome
                   </>
                 )}
               </div>
-              {/* 年齢ラベル表示エリア */}
-              <div className="relative min-h-[60px] flex items-start justify-between mt-1">
-                {/* すべてのセグメントの開始地点に年齢リストを表示 */}
+            </div>
+          );
+        })}
+      </div>
+      <div className="relative flex mt-2" style={{ width: geometry.used }}>
+        {segments.map((s, i) => {
+          const w = geometry.rawW[i];
+          if (w <= 1) return null;
+          const isLast = i === segments.length - 1;
+          return (
+            <div key={`ages-${i}`} className="relative" style={{ width: w }}>
+              <div className="min-h-[60px] flex items-start justify-between px-0.5">
                 {s.startAges && s.startAges.length > 0 && (
-                  <div className="text-[10px] text-slate-400 leading-tight pl-0.5">
+                  <div className="text-[11px] sm:text-xs md:text-sm text-slate-300 leading-tight">
                     {s.startAges.map((ageLabel, idx) => (
                       <div key={idx} className="whitespace-nowrap">
                         {ageLabel}
@@ -354,9 +358,8 @@ function PensionSegmentsBar({ segments, geometry }: { segments: Segment[]; geome
                     ))}
                   </div>
                 )}
-                {/* 最後のセグメントの終了地点に年齢リストを表示 */}
                 {isLast && s.endAges && s.endAges.length > 0 && (
-                  <div className="text-[10px] text-slate-400 leading-tight text-right pr-0.5">
+                  <div className="text-[11px] sm:text-xs md:text-sm text-slate-300 leading-tight text-right">
                     {s.endAges.map((ageLabel, idx) => (
                       <div key={idx} className="whitespace-nowrap">
                         {ageLabel}
@@ -703,9 +706,7 @@ export default function DisabilityPensionPage() {
         const startAges: string[] = [`妻${ageWife + startY}`, `夫${ageHusband + startY}`];
         childrenAges.forEach((age) => {
           const currentAge = age + startY;
-          if (currentAge <= 18) {
-            startAges.push(`子${currentAge}`);
-          }
+          startAges.push(`子${currentAge}`);
         });
 
         // 終了時点の家族年齢リスト（最後のセグメントのみ）
@@ -714,9 +715,7 @@ export default function DisabilityPensionPage() {
           endAges.push(`妻${ageWife + endY}`, `夫${ageHusband + endY}`);
           childrenAges.forEach((age) => {
             const currentAge = age + endY;
-            if (currentAge <= 18) {
-              endAges!.push(`子${currentAge}`);
-            }
+            endAges!.push(`子${currentAge}`);
           });
         }
 
@@ -759,7 +758,15 @@ export default function DisabilityPensionPage() {
       const finalTotal = finalBasic + finalEmployee;
 
       const startAges: string[] = [`妻${startAge}`, `夫${ageHusband + (startAge - ageWife)}`];
+      childrenAges.forEach((age) => {
+        const currentAge = age + (startAge - ageWife);
+        startAges.push(`子${currentAge}`);
+      });
       const endAges: string[] = [`妻${endAge}`, `夫${ageHusband + (endAge - ageWife)}`];
+      childrenAges.forEach((age) => {
+        const currentAge = age + (endAge - ageWife);
+        endAges.push(`子${currentAge}`);
+      });
 
       block2.segments.push({
         label: '障害年金（継続）',
@@ -842,7 +849,15 @@ export default function DisabilityPensionPage() {
       // 65歳〜切り替え年齢まで: 障害年金
       if (durationBeforeSwitch > 0) {
         const startAges: string[] = [`妻${startAge65}`, `夫${ageHusband + (startAge65 - ageWife)}`];
+        childrenAges.forEach((age) => {
+          const currentAge = age + (startAge65 - ageWife);
+          startAges.push(`子${currentAge}`);
+        });
         const endAges: string[] = [`妻${switchAge}`, `夫${ageHusband + (switchAge - ageWife)}`];
+        childrenAges.forEach((age) => {
+          const currentAge = age + (switchAge - ageWife);
+          endAges.push(`子${currentAge}`);
+        });
 
         block2_65plus.segments.push({
           label: '障害年金',
@@ -865,7 +880,15 @@ export default function DisabilityPensionPage() {
         const switchAmountFinal = (oldAgeBasicBase + oldAgeEmployeeBase) * multiplier;
 
         const startAges: string[] = [`妻${switchAge}`, `夫${ageHusband + (switchAge - ageWife)}`];
+        childrenAges.forEach((age) => {
+          const currentAge = age + (switchAge - ageWife);
+          startAges.push(`子${currentAge}`);
+        });
         const endAges: string[] = [`妻${endAge100}`, `夫${ageHusband + (endAge100 - ageWife)}`];
+        childrenAges.forEach((age) => {
+          const currentAge = age + (endAge100 - ageWife);
+          endAges.push(`子${currentAge}`);
+        });
 
         block2_65plus.segments.push({
           label: `${switchAge}歳繰下げ`,
@@ -889,7 +912,15 @@ export default function DisabilityPensionPage() {
 
       const duration = endAge100 - startAge65;
       const startAges: string[] = [`妻${startAge65}`, `夫${ageHusband + (startAge65 - ageWife)}`];
+      childrenAges.forEach((age) => {
+        const currentAge = age + (startAge65 - ageWife);
+        startAges.push(`子${currentAge}`);
+      });
       const endAges: string[] = [`妻${endAge100}`, `夫${ageHusband + (endAge100 - ageWife)}`];
+      childrenAges.forEach((age) => {
+        const currentAge = age + (endAge100 - ageWife);
+        endAges.push(`子${currentAge}`);
+      });
 
       block2_65plus.segments.push({
         label: '障害年金（継続）',
@@ -1007,9 +1038,7 @@ export default function DisabilityPensionPage() {
         const startAges: string[] = [`夫${ageHusband + startY}`, `妻${ageWife + startY}`];
         childrenAges.forEach((age) => {
           const currentAge = age + startY;
-          if (currentAge <= 18) {
-            startAges.push(`子${currentAge}`);
-          }
+          startAges.push(`子${currentAge}`);
         });
 
         // 終了時点の家族年齢リスト（最後のセグメントのみ）
@@ -1018,9 +1047,7 @@ export default function DisabilityPensionPage() {
           endAges.push(`夫${ageHusband + endY}`, `妻${ageWife + endY}`);
           childrenAges.forEach((age) => {
             const currentAge = age + endY;
-            if (currentAge <= 18) {
-              endAges!.push(`子${currentAge}`);
-            }
+            endAges!.push(`子${currentAge}`);
           });
         }
 
@@ -1060,7 +1087,15 @@ export default function DisabilityPensionPage() {
       const finalTotal = finalBasic + finalEmployee;
 
       const startAges: string[] = [`夫${startAge}`, `妻${ageWife + (startAge - ageHusband)}`];
+      childrenAges.forEach((age) => {
+        const currentAge = age + (startAge - ageHusband);
+        startAges.push(`子${currentAge}`);
+      });
       const endAges: string[] = [`夫${endAge}`, `妻${ageWife + (endAge - ageHusband)}`];
+      childrenAges.forEach((age) => {
+        const currentAge = age + (endAge - ageHusband);
+        endAges.push(`子${currentAge}`);
+      });
 
       block2.segments.push({
         label: '障害年金（継続）',
@@ -1143,7 +1178,15 @@ export default function DisabilityPensionPage() {
       // 65歳〜切り替え年齢まで: 障害年金
       if (durationBeforeSwitch > 0) {
         const startAges: string[] = [`夫${startAge65}`, `妻${ageWife + (startAge65 - ageHusband)}`];
+        childrenAges.forEach((age) => {
+          const currentAge = age + (startAge65 - ageHusband);
+          startAges.push(`子${currentAge}`);
+        });
         const endAges: string[] = [`夫${switchAge}`, `妻${ageWife + (switchAge - ageHusband)}`];
+        childrenAges.forEach((age) => {
+          const currentAge = age + (switchAge - ageHusband);
+          endAges.push(`子${currentAge}`);
+        });
 
         block2_65plus.segments.push({
           label: '障害年金',
@@ -1166,7 +1209,15 @@ export default function DisabilityPensionPage() {
         const switchAmountFinal = (oldAgeBasicBase + oldAgeEmployeeBase) * multiplier;
 
         const startAges: string[] = [`夫${switchAge}`, `妻${ageWife + (switchAge - ageHusband)}`];
+        childrenAges.forEach((age) => {
+          const currentAge = age + (switchAge - ageHusband);
+          startAges.push(`子${currentAge}`);
+        });
         const endAges: string[] = [`夫${endAge100}`, `妻${ageWife + (endAge100 - ageHusband)}`];
+        childrenAges.forEach((age) => {
+          const currentAge = age + (endAge100 - ageHusband);
+          endAges.push(`子${currentAge}`);
+        });
 
         block2_65plus.segments.push({
           label: `${switchAge}歳繰下げ`,
@@ -1190,7 +1241,15 @@ export default function DisabilityPensionPage() {
 
       const duration = endAge100 - startAge65;
       const startAges: string[] = [`夫${startAge65}`, `妻${ageWife + (startAge65 - ageHusband)}`];
+      childrenAges.forEach((age) => {
+        const currentAge = age + (startAge65 - ageHusband);
+        startAges.push(`子${currentAge}`);
+      });
       const endAges: string[] = [`夫${endAge100}`, `妻${ageWife + (endAge100 - ageHusband)}`];
+      childrenAges.forEach((age) => {
+        const currentAge = age + (endAge100 - ageHusband);
+        endAges.push(`子${currentAge}`);
+      });
 
       block2_65plus.segments.push({
         label: '障害年金（継続）',
@@ -1489,7 +1548,7 @@ export default function DisabilityPensionPage() {
                 {timelineDataWife.block1 && (
                   <>
                     <TimelineBlock
-                      title="💊 ① 加算あり期間（子・配偶者）"
+                      title="① 👶 子がいる期間（加算あり期間）"
                       color="amber"
                       segments={timelineDataWife.block1.segments}
                       ticks={timelineDataWife.block1.ticks}
@@ -1514,7 +1573,7 @@ export default function DisabilityPensionPage() {
                   <>
                     <div className="mt-8">
                       <TimelineBlock
-                        title="💼 ② 加算終了後 〜"
+                        title="② 💼 加算終了後 〜"
                         color="sky"
                         segments={timelineDataWife.block2.segments}
                         ticks={timelineDataWife.block2.ticks}
@@ -1536,7 +1595,7 @@ export default function DisabilityPensionPage() {
                   <>
                     <div className="mt-8">
                       <TimelineBlock
-                        title={`✨ ${timelineDataWife.block2.segments.length > 0 ? '③' : '②'} 65歳以降（最適給付）${timelineDataWife.block2_65plus.breakEvenAge ? ` [損益分岐点: ${timelineDataWife.block2_65plus.breakEvenAge}歳]` : ' [障害年金の方が有利]'}`}
+                        title={`${timelineDataWife.block2.segments.length > 0 ? '③' : '②'} ✨ 65歳以降（最適給付）${timelineDataWife.block2_65plus.breakEvenAge ? ` [損益分岐点: ${timelineDataWife.block2_65plus.breakEvenAge}歳]` : ' [障害年金の方が有利]'}`}
                         color="sky"
                         segments={timelineDataWife.block2_65plus.segments}
                         ticks={timelineDataWife.block2_65plus.ticks}
@@ -1626,7 +1685,7 @@ export default function DisabilityPensionPage() {
                 {timelineDataHusband.block1 && (
                   <>
                     <TimelineBlock
-                      title="💊 ① 加算あり期間（子・配偶者）"
+                      title="① 👶 子がいる期間（加算あり期間）"
                       color="amber"
                       segments={timelineDataHusband.block1.segments}
                       ticks={timelineDataHusband.block1.ticks}
@@ -1651,7 +1710,7 @@ export default function DisabilityPensionPage() {
                   <>
                     <div className="mt-8">
                       <TimelineBlock
-                        title="💼 ② 加算終了後 〜"
+                        title="② 💼 加算終了後 〜"
                         color="sky"
                         segments={timelineDataHusband.block2.segments}
                         ticks={timelineDataHusband.block2.ticks}
@@ -1673,7 +1732,7 @@ export default function DisabilityPensionPage() {
                   <>
                     <div className="mt-8">
                       <TimelineBlock
-                        title={`✨ ${timelineDataHusband.block2.segments.length > 0 ? '③' : '②'} 65歳以降（最適給付）${timelineDataHusband.block2_65plus.breakEvenAge ? ` [損益分岐点: ${timelineDataHusband.block2_65plus.breakEvenAge}歳]` : ' [障害年金の方が有利]'}`}
+                        title={`${timelineDataHusband.block2.segments.length > 0 ? '③' : '②'} ✨ 65歳以降（最適給付）${timelineDataHusband.block2_65plus.breakEvenAge ? ` [損益分岐点: ${timelineDataHusband.block2_65plus.breakEvenAge}歳]` : ' [障害年金の方が有利]'}`}
                         color="sky"
                         segments={timelineDataHusband.block2_65plus.segments}
                         ticks={timelineDataHusband.block2_65plus.ticks}

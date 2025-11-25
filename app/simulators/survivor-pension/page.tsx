@@ -310,7 +310,7 @@ function PensionSegmentsBar({ segments, geometry }: { segments: Segment[]; geome
   return (
     <div className="relative" style={{ width: geometry.used }}>
       <div
-        className="relative flex overflow-visible rounded-2xl border border-white/15"
+        className="relative flex overflow-hidden rounded-2xl border border-white/15"
         style={{ width: geometry.used, height: BAR_HEIGHT }}
       >
         {segments.map((s, i) => {
@@ -320,14 +320,9 @@ function PensionSegmentsBar({ segments, geometry }: { segments: Segment[]; geome
           const amountText = s.amountYear !== undefined ? `${(s.amountYear / 10000).toFixed(0)}万円` : '';
           const monthlyText = s.amountYear !== undefined ? `月${(s.amountYear / 120000).toFixed(1)}万` : '';
           const titleText = `${s.label} ${s.years}年`;
-          const isLast = i === segments.length - 1;
 
           return (
-            <div
-              key={i}
-              className="relative flex flex-col"
-              style={{ width: w }}
-            >
+            <div key={i} className="relative" style={{ width: w }}>
               <div
                 className={`${s.className} ring-1 ring-white/15 relative flex flex-col justify-center items-stretch px-1 overflow-hidden`}
                 style={{ width: w, height: BAR_HEIGHT, ...s.style }}
@@ -349,11 +344,20 @@ function PensionSegmentsBar({ segments, geometry }: { segments: Segment[]; geome
                   </>
                 )}
               </div>
-              {/* 年齢ラベル表示エリア */}
-              <div className="relative min-h-[60px] flex items-start justify-between mt-1">
-                {/* すべてのセグメントの開始地点に年齢リストを表示 */}
+            </div>
+          );
+        })}
+      </div>
+      <div className="relative flex mt-2" style={{ width: geometry.used }}>
+        {segments.map((s, i) => {
+          const w = geometry.rawW[i];
+          if (w <= 1) return null;
+          const isLast = i === segments.length - 1;
+          return (
+            <div key={`ages-${i}`} className="relative" style={{ width: w }}>
+              <div className="min-h-[60px] flex items-start justify-between px-0.5">
                 {s.startAges && s.startAges.length > 0 && (
-                  <div className="text-[10px] text-slate-400 leading-tight pl-0.5">
+                  <div className="text-[11px] sm:text-xs md:text-sm text-slate-300 leading-tight">
                     {s.startAges.map((ageLabel, idx) => (
                       <div key={idx} className="whitespace-nowrap">
                         {ageLabel}
@@ -361,9 +365,8 @@ function PensionSegmentsBar({ segments, geometry }: { segments: Segment[]; geome
                     ))}
                   </div>
                 )}
-                {/* 最後のセグメントの終了地点に年齢リストを表示 */}
                 {isLast && s.endAges && s.endAges.length > 0 && (
-                  <div className="text-[10px] text-slate-400 leading-tight text-right pr-0.5">
+                  <div className="text-[11px] sm:text-xs md:text-sm text-slate-300 leading-tight text-right">
                     {s.endAges.map((ageLabel, idx) => (
                       <div key={idx} className="whitespace-nowrap">
                         {ageLabel}
@@ -695,24 +698,20 @@ export default function SurvivorPensionPage() {
         const startAge = ageWife + startY;
         const endAge = ageWife + endY;
 
-        // 開始時点の家族年齢リスト
-        const startAges: string[] = [`妻${ageWife + startY}`, `夫${ageHusband + startY}`];
+        // 開始時点の家族年齢リスト（亡くなった夫は除外）
+        const startAges: string[] = [`妻${ageWife + startY}`];
         childrenAges.forEach((age) => {
           const currentAge = age + startY;
-          if (currentAge <= 18) {
-            startAges.push(`子${currentAge}`);
-          }
+          startAges.push(`子${currentAge}`);
         });
 
-        // 終了時点の家族年齢リスト（最後のセグメントのみ）
+        // 終了時点の家族年齢リスト（最後のセグメントのみ、亡くなった夫は除外）
         const endAges: string[] | undefined = i === points.length - 2 ? [] : undefined;
         if (endAges) {
-          endAges.push(`妻${ageWife + endY}`, `夫${ageHusband + endY}`);
+          endAges.push(`妻${ageWife + endY}`);
           childrenAges.forEach((age) => {
             const currentAge = age + endY;
-            if (currentAge <= 18) {
-              endAges!.push(`子${currentAge}`);
-            }
+            endAges!.push(`子${currentAge}`);
           });
         }
 
@@ -739,9 +738,7 @@ export default function SurvivorPensionPage() {
 
         childrenAges.forEach((age, idx) => {
           const currentAge = age + endY;
-          if (currentAge <= 18) {
-            lines.push(`子${currentAge}`);
-          }
+          lines.push(`子${currentAge}`);
         });
         block1.ticks.push({
           edgeIndex: i + 1,
@@ -769,6 +766,16 @@ export default function SurvivorPensionPage() {
         const limitedEndAge = startAge + limitedDuration;
 
         // 1. 有期給付期間（5年）
+        const startAges1: string[] = [`妻${startAge}`];
+        childrenAges.forEach((age) => {
+          const currentAge = age + (startAge - ageWife);
+          startAges1.push(`子${currentAge}`);
+        });
+        const endAges1: string[] = [`妻${limitedEndAge}`];
+        childrenAges.forEach((age) => {
+          const currentAge = age + (limitedEndAge - ageWife);
+          endAges1.push(`子${currentAge}`);
+        });
         block2.segments.push({
           label: '遺族厚生（5年）',
           years: limitedDuration,
@@ -778,14 +785,24 @@ export default function SurvivorPensionPage() {
           amountYear: caseHusbandDeath.afterChildrenAmount, // ここには既に計算済みの額が入っている
           startAge,
           endAge: limitedEndAge,
-          startAges: [`妻${startAge}`, `夫${ageHusband + (startAge - ageWife)}`],
-          endAges: [`妻${limitedEndAge}`, `夫${ageHusband + (limitedEndAge - ageWife)}`]
+          startAges: startAges1,
+          endAges: endAges1
         });
         segmentCount++;
 
         // 2. その後の期間（支給なし）
         const remainingDuration = period1Duration - limitedDuration;
         if (remainingDuration > 0) {
+          const startAges2: string[] = [`妻${limitedEndAge}`];
+          childrenAges.forEach((age) => {
+            const currentAge = age + (limitedEndAge - ageWife);
+            startAges2.push(`子${currentAge}`);
+          });
+          const endAges2: string[] = [`妻${oldAgeStartWife}`];
+          childrenAges.forEach((age) => {
+            const currentAge = age + (oldAgeStartWife - ageWife);
+            endAges2.push(`子${currentAge}`);
+          });
           block2.segments.push({
             label: '支給なし',
             years: remainingDuration,
@@ -795,16 +812,24 @@ export default function SurvivorPensionPage() {
             amountYear: 0,
             startAge: limitedEndAge,
             endAge: oldAgeStartWife,
-            startAges: [`妻${limitedEndAge}`, `夫${ageHusband + (limitedEndAge - ageWife)}`],
-            endAges: [`妻${oldAgeStartWife}`, `夫${ageHusband + (oldAgeStartWife - ageWife)}`]
+            startAges: startAges2,
+            endAges: endAges2
           });
           segmentCount++;
         }
       } else {
         // 通常の処理（30歳以上）
         const isChukorei = startAge >= 40 && startAge < 65;
-        const startAges: string[] = [`妻${startAge}`, `夫${ageHusband + (startAge - ageWife)}`];
-        const endAges: string[] = [`妻${oldAgeStartWife}`, `夫${ageHusband + (oldAgeStartWife - ageWife)}`];
+        const startAges: string[] = [`妻${startAge}`];
+        childrenAges.forEach((age) => {
+          const currentAge = age + (startAge - ageWife);
+          startAges.push(`子${currentAge}`);
+        });
+        const endAges: string[] = [`妻${oldAgeStartWife}`];
+        childrenAges.forEach((age) => {
+          const currentAge = age + (oldAgeStartWife - ageWife);
+          endAges.push(`子${currentAge}`);
+        });
 
         block2.segments.push({
           label: isChukorei ? '寡婦加算' : '遺族厚生',
@@ -824,8 +849,16 @@ export default function SurvivorPensionPage() {
 
     const period2Duration = endAge - oldAgeStartWife;
     if (period2Duration > 0) {
-      const startAges: string[] = [`妻${oldAgeStartWife}`, `夫${ageHusband + (oldAgeStartWife - ageWife)}`];
-      const endAges: string[] = [`妻${endAge}`, `夫${ageHusband + (endAge - ageWife)}`];
+      const startAges: string[] = [`妻${oldAgeStartWife}`];
+      childrenAges.forEach((age) => {
+        const currentAge = age + (oldAgeStartWife - ageWife);
+        startAges.push(`子${currentAge}`);
+      });
+      const endAges: string[] = [`妻${endAge}`];
+      childrenAges.forEach((age) => {
+        const currentAge = age + (endAge - ageWife);
+        endAges.push(`子${currentAge}`);
+      });
 
       block2.segments.push({
         label: '老齢年金',
@@ -911,24 +944,20 @@ export default function SurvivorPensionPage() {
         const startAge = ageHusband + startY;
         const endAge = ageHusband + endY;
 
-        // 開始時点の家族年齢リスト
-        const startAges: string[] = [`夫${ageHusband + startY}`, `妻${ageWife + startY}`];
+        // 開始時点の家族年齢リスト（亡くなった妻は除外）
+        const startAges: string[] = [`夫${ageHusband + startY}`];
         childrenAges.forEach((age) => {
           const currentAge = age + startY;
-          if (currentAge <= 18) {
-            startAges.push(`子${currentAge}`);
-          }
+          startAges.push(`子${currentAge}`);
         });
 
-        // 終了時点の家族年齢リスト（最後のセグメントのみ）
+        // 終了時点の家族年齢リスト（最後のセグメントのみ、亡くなった妻は除外）
         const endAges: string[] | undefined = i === points.length - 2 ? [] : undefined;
         if (endAges) {
-          endAges.push(`夫${ageHusband + endY}`, `妻${ageWife + endY}`);
+          endAges.push(`夫${ageHusband + endY}`);
           childrenAges.forEach((age) => {
             const currentAge = age + endY;
-            if (currentAge <= 18) {
-              endAges!.push(`子${currentAge}`);
-            }
+            endAges!.push(`子${currentAge}`);
           });
         }
 
@@ -955,9 +984,7 @@ export default function SurvivorPensionPage() {
 
         childrenAges.forEach((age, idx) => {
           const currentAge = age + endY;
-          if (currentAge <= 18) {
-            lines.push(`子${currentAge}`);
-          }
+          lines.push(`子${currentAge}`);
         });
         block1.ticks.push({
           edgeIndex: i + 1,
@@ -988,8 +1015,18 @@ export default function SurvivorPensionPage() {
           const waitingDuration = waitingEndAge - startAge;
 
           if (waitingDuration > 0) {
-            const startAges: string[] = [`夫${startAge}`, `妻${ageWife + (startAge - ageHusband)}`];
-            const endAges: string[] | undefined = waitingEndAge === oldAgeStartHusband ? undefined : [`夫${waitingEndAge}`, `妻${ageWife + (waitingEndAge - ageHusband)}`];
+            const startAges: string[] = [`夫${startAge}`];
+            childrenAges.forEach((age) => {
+              const currentAge = age + (startAge - ageHusband);
+              startAges.push(`子${currentAge}`);
+            });
+            const endAges: string[] | undefined = waitingEndAge === oldAgeStartHusband ? undefined : [`夫${waitingEndAge}`];
+            if (endAges) {
+              childrenAges.forEach((age) => {
+                const currentAge = age + (waitingEndAge - ageHusband);
+                endAges.push(`子${currentAge}`);
+              });
+            }
 
             block2.segments.push({
               label: startAge >= 55 ? '停止中' : '待機中',
@@ -1013,8 +1050,16 @@ export default function SurvivorPensionPage() {
           const pensionDuration = oldAgeStartHusband - pensionStartAge;
 
           if (pensionDuration > 0) {
-            const startAges: string[] = [`夫${pensionStartAge}`, `妻${ageWife + (pensionStartAge - ageHusband)}`];
-            const endAges: string[] = [`夫${oldAgeStartHusband}`, `妻${ageWife + (oldAgeStartHusband - ageHusband)}`];
+            const startAges: string[] = [`夫${pensionStartAge}`];
+            childrenAges.forEach((age) => {
+              const currentAge = age + (pensionStartAge - ageHusband);
+              startAges.push(`子${currentAge}`);
+            });
+            const endAges: string[] = [`夫${oldAgeStartHusband}`];
+            childrenAges.forEach((age) => {
+              const currentAge = age + (oldAgeStartHusband - ageHusband);
+              endAges.push(`子${currentAge}`);
+            });
 
             block2.segments.push({
               label: '遺族厚生',
@@ -1047,6 +1092,11 @@ export default function SurvivorPensionPage() {
         // If we don't add segments for this period, the user might wonder what happens.
         // Let's add a "支給なし" (No Payment) segment for clarity.
 
+        const startAgesNoPay: string[] = [`夫${startAge}`];
+        childrenAges.forEach((age) => {
+          const currentAge = age + (startAge - ageHusband);
+          startAgesNoPay.push(`子${currentAge}`);
+        });
         block2.segments.push({
           label: '支給なし',
           years: period1Duration,
@@ -1056,7 +1106,7 @@ export default function SurvivorPensionPage() {
           amountYear: 0,
           startAge,
           endAge: oldAgeStartHusband,
-          startAges: [`夫${startAge}`, `妻${ageWife + (startAge - ageHusband)}`],
+          startAges: startAgesNoPay,
           endAges: undefined
         });
         segmentCount++;
@@ -1065,8 +1115,16 @@ export default function SurvivorPensionPage() {
 
     const period2Duration = endAge - oldAgeStartHusband;
     if (period2Duration > 0) {
-      const startAges: string[] = [`夫${oldAgeStartHusband}`, `妻${ageWife + (oldAgeStartHusband - ageHusband)}`];
-      const endAges: string[] = [`夫${endAge}`, `妻${ageWife + (endAge - ageHusband)}`];
+      const startAges: string[] = [`夫${oldAgeStartHusband}`];
+      childrenAges.forEach((age) => {
+        const currentAge = age + (oldAgeStartHusband - ageHusband);
+        startAges.push(`子${currentAge}`);
+      });
+      const endAges: string[] = [`夫${endAge}`];
+      childrenAges.forEach((age) => {
+        const currentAge = age + (endAge - ageHusband);
+        endAges.push(`子${currentAge}`);
+      });
 
       block2.segments.push({
         label: '老齢年金',
@@ -1345,7 +1403,7 @@ export default function SurvivorPensionPage() {
             {timelineDataHusband.block1 && (
               <>
                 <TimelineBlock
-                  title="👶 ① 子がいる期間（遺族基礎年金支給）"
+                  title="① 👶 子がいる期間（加算あり期間）"
                   color="emerald"
                   segments={timelineDataHusband.block1.segments}
                   ticks={timelineDataHusband.block1.ticks}
@@ -1367,7 +1425,7 @@ export default function SurvivorPensionPage() {
 
             <div className="mt-8">
               <TimelineBlock
-                title="💼 ② 子がいなくなった後 〜 老後"
+                title="② 💼 子がいなくなった後 〜 老後"
                 color="sky"
                 segments={timelineDataHusband.block2.segments}
                 ticks={timelineDataHusband.block2.ticks}
@@ -1445,7 +1503,7 @@ export default function SurvivorPensionPage() {
             {timelineDataWife.block1 && (
               <>
                 <TimelineBlock
-                  title="👶 ① 子がいる期間（遺族基礎年金支給）"
+                  title="① 👶 子がいる期間（加算あり期間）"
                   color="emerald"
                   segments={timelineDataWife.block1.segments}
                   ticks={timelineDataWife.block1.ticks}
@@ -1467,7 +1525,7 @@ export default function SurvivorPensionPage() {
 
             <div className="mt-8">
               <TimelineBlock
-                title="💼 ② 子がいなくなった後 〜 老後"
+                title="② 💼 子がいなくなった後 〜 老後"
                 color="sky"
                 segments={timelineDataWife.block2.segments}
                 ticks={timelineDataWife.block2.ticks}

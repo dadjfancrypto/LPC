@@ -24,197 +24,186 @@ const yen = (n: number) => Math.round(n).toLocaleString('ja-JP');
 
 export default function RulesPage() {
   return (
-    <main className="p-6 max-w-4xl mx-auto text-slate-100">
-      <header className="mb-6">
-        <div className="text-sm opacity-70 mb-1">
-          <Link href="/simulators/survivor-pension" className="underline hover:opacity-90">
+    <main className="min-h-screen bg-[#0B0E14] text-slate-100">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
+        <header className="bg-gradient-to-br from-slate-900/80 via-slate-900/40 to-slate-800/40 border border-slate-800 rounded-3xl p-6 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+          <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-3">SURVIVOR PENSION GUIDE</p>
+          <h1 className="text-3xl font-semibold tracking-tight">遺族年金のルールをひと目で整理</h1>
+          <p className="text-sm text-slate-300 mt-3 leading-relaxed">
+            シミュレーター本編と同じ配色・コンポーネントで「現行制度」と「2028年見直し案」の要点を横断比較。
+            支給対象や金額感を視覚的に把握できます。
+          </p>
+        </header>
+
+        {/* 現行 vs 改正案 */}
+        <div className="grid md:grid-cols-2 gap-4">
+          <SectionCard icon="📘" title="現行制度（〜2027）">
+            <ul className="text-sm text-slate-200 space-y-2 list-disc ml-5">
+              <li>子がいる配偶者：遺族基礎年金＋遺族厚生年金</li>
+              <li>子がいない妻（40〜65歳未満）：中高齢寡婦加算が上乗せ</li>
+              <li>子がいない夫：60歳から遺族厚生（55〜59歳は支給停止）</li>
+            </ul>
+          </SectionCard>
+          <SectionCard icon="🧭" title="2028年改正議論（参考）">
+            <ul className="text-sm text-slate-200 space-y-2 list-disc ml-5">
+              <li>子がいる配偶者：基本は現行と同様（基礎＋厚生）</li>
+              <li>子がいない配偶者：原則5年間の遺族厚生年金（所得要件・経過措置あり）</li>
+              <li>中高齢寡婦加算は段階的に見直し・廃止方向</li>
+            </ul>
+            <p className="text-[11px] text-slate-500 border-t border-slate-800 mt-3 pt-2">
+              ※まだ議論段階であり、決定事項ではありません。
+            </p>
+          </SectionCard>
+        </div>
+
+        {/* 遺族基礎年金 */}
+        <SectionCard icon="🌤️" title="遺族基礎年金（すべての世帯共通の土台）">
+          <p className="text-sm text-slate-300 leading-relaxed">
+            18歳になる年度末までの子がいる配偶者に支給。子の人数に応じて加算され、シミュレーターでも同じ金額を使用しています。
+          </p>
+          <BadgeGrid
+            items={[
+              { label: '本体（年額）', value: `${yen(CONSTS.KISO_BASE)} 円` },
+              { label: '子の加算（第1・2子 各）', value: `${yen(CONSTS.CHILD_ADD_1_2)} 円` },
+              { label: '子の加算（第3子以降/人）', value: `${yen(CONSTS.CHILD_ADD_3P)} 円` },
+            ]}
+          />
+          <NoteCard title="ポイント">
+            <p className="text-sm text-slate-200">子がいない配偶者のみでは支給対象になりません。</p>
+          </NoteCard>
+        </SectionCard>
+
+        {/* 遺族厚生年金 */}
+        <SectionCard icon="🏛️" title="遺族厚生年金（会社員・公務員などの上乗せ）">
+          <p className="text-sm text-slate-300 leading-relaxed">
+            亡くなった方が厚生年金加入者の場合に支給。シミュレーターでは報酬比例部分から簡易計算し、その
+            <span className="text-emerald-400 font-semibold"> 3/4 </span>
+            を遺族厚生年金として扱います。
+          </p>
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4 text-xs text-slate-300 space-y-2">
+            <div className="font-semibold text-slate-100 tracking-wide">計算ロジック（シミュレーター）</div>
+            <FormulaLine label="報酬比例" value="平均標準報酬月額 × 5.481‰ × max(加入月数, 300)" />
+            <FormulaLine label="遺族厚生年金" value="報酬比例 × 3 / 4" />
+            <ul className="list-disc ml-5 text-[11px] text-slate-500 space-y-1">
+              <li>加入月数300月未満でも「みなし300月」で計算</li>
+              <li>端数処理・年度改定など細部は簡略化しています</li>
+            </ul>
+          </div>
+        </SectionCard>
+
+        {/* 夫婦別の違い */}
+        <SectionCard icon="👥" title="夫が亡くなった場合／妻が亡くなった場合">
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-5 space-y-2">
+              <div className="text-sm text-slate-400">CASE A</div>
+              <h3 className="text-xl font-semibold">夫が亡くなった場合（受給者：妻）</h3>
+              <ul className="text-sm text-slate-200 list-disc ml-5 space-y-1.5">
+                <li>子がいる：基礎＋厚生。子が独立後は厚生中心。</li>
+                <li>40〜65歳未満で子なし：中高齢寡婦加算がプラス。</li>
+                <li>2028案：中高齢寡婦加算は段階的に縮小（本シミュでは0円）。</li>
+              </ul>
+            </div>
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-5 space-y-2">
+              <div className="text-sm text-slate-400">CASE B</div>
+              <h3 className="text-xl font-semibold">妻が亡くなった場合（受給者：夫）</h3>
+              <ul className="text-sm text-slate-200 list-disc ml-5 space-y-1.5">
+                <li>子がいる：基礎＋厚生（年齢要件なし）。子18歳到達で両方終了。</li>
+                <li>子がいない：現行は60歳から厚生（55〜59歳は停止）。</li>
+                <li>2028案：一定期間（原則5年）の厚生に短縮される想定。</li>
+              </ul>
+            </div>
+          </div>
+        </SectionCard>
+
+        {/* FAQ */}
+        <SectionCard icon="💬" title="よくある質問">
+          <div className="grid gap-4">
+            <FAQ q="『18歳になる年度末』とはいつまで？" a="誕生日を含む年度の3月31日まで。シミュレーターでは子の年齢から単純化して計算しています。" />
+            <FAQ q="自分の老齢年金と同時にもらえる？" a="65歳以降は併給調整により高い方へ差額加算が行われます。個別の年金額により変わるため、詳細試算が必要です。" />
+            <FAQ q="収入や再婚で支給は変わる？" a="生計維持要件、同順位者、再婚、所得状況によって支給の有無・金額が変動する場合があります。" />
+          </div>
+        </SectionCard>
+
+        <NoteCard title="免責・注意">
+          <p className="text-sm text-slate-200 leading-relaxed">
+            このページは制度理解のための簡易ガイドです。加入歴・所得・続柄・同居状況・再婚・端数処理・年度改定などで実際の受給は変わります。
+            申請前には年金事務所や公式資料で最新情報をご確認ください。
+          </p>
+        </NoteCard>
+
+        <div className="flex justify-center pt-4">
+          <Link
+            href="/simulators/survivor-pension"
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-white font-semibold shadow-lg shadow-blue-900/40 transition hover:bg-blue-700"
+          >
             ← シミュレーターへ戻る
           </Link>
         </div>
-        <h1 className="text-2xl font-bold">遺族年金について（お客様向けの簡単な説明）</h1>
-        <p className="text-sm opacity-80 mt-2">
-          複雑な制度を、まずは<strong>ざっくり理解</strong>できるように整理しました。詳細は個別事情により異なります。
-        </p>
-      </header>
-
-      {/* 現行 vs 2028年改正 概要 */}
-      <section className="grid md:grid-cols-2 gap-4 mb-6">
-        <Card>
-          <h2 className="text-lg font-semibold mb-2">現行（〜2027）</h2>
-          <ul className="list-disc ml-5 space-y-1 text-sm opacity-90">
-            <li>
-              子がいる配偶者：<b>遺族基礎年金</b>＋<b>遺族厚生年金</b>（会社員等の被保険者に限る）
-            </li>
-            <li>
-              子がいない妻（40〜65歳未満）：<b>中高齢寡婦加算</b>が上乗せ
-            </li>
-            <li>
-              子がいない夫：<b>60歳から</b>遺族厚生年金（55〜59歳は停止）
-            </li>
-          </ul>
-        </Card>
-        <Card>
-          <h2 className="text-lg font-semibold mb-2">2028年制度改正議論（参考）</h2>
-          <ul className="list-disc ml-5 space-y-1 text-sm opacity-90">
-            <li>子がいる配偶者：基本的な考え方は現行と同様（基礎＋厚生）</li>
-            <li>
-              子がいない配偶者：<b>一定期間（原則5年）</b>の遺族厚生年金（所得等の要件・経過措置あり）
-            </li>
-            <li>
-              <b>中高齢寡婦加算は段階的に見直し・廃止方向</b>
-            </li>
-          </ul>
-          <div className="mt-3 text-xs opacity-70 border-t border-slate-700 pt-2">
-            ※現在は議論中の段階であり、決定事項ではありません
-          </div>
-        </Card>
-      </section>
-
-      {/* 遺族基礎年金とは */}
-      <Section title="遺族基礎年金（だれでも共通の“土台”）">
-        <p className="text-sm opacity-90">
-          18歳になる年度末までの子がいる配偶者に支給されます。金額は次のとおり（年額）。
-        </p>
-        <div className="mt-3 grid md:grid-cols-2 gap-3">
-          <MiniStat label="本体" value={`${yen(CONSTS.KISO_BASE)} 円`} />
-          <MiniStat label="子の加算（1・2人目 各）" value={`${yen(CONSTS.CHILD_ADD_1_2)} 円`} />
-          <MiniStat label="子の加算（3人目以降/人）" value={`${yen(CONSTS.CHILD_ADD_3P)} 円`} />
-        </div>
-        <Note>子がいない場合、遺族基礎年金は支給されません（配偶者のみでは対象外）。</Note>
-      </Section>
-
-      {/* 遺族厚生年金とは */}
-      <Section title="遺族厚生年金（会社員・公務員などの“上乗せ”部分）">
-        <p className="text-sm opacity-90">
-          亡くなった方が厚生年金に加入していた場合に支給されます。シミュレーターでは簡易式：
-          <code className="mx-1 px-1 rounded bg-slate-800 border border-slate-700">
-            平均標準報酬月額 × 係数(5.481‰) × max(加入月数, 300)
-          </code>
-          を「報酬比例」とし、その<b>3/4</b>を遺族厚生年金としています。
-        </p>
-        <div className="mt-3 rounded-lg border border-slate-700 bg-slate-900/60 p-3 text-xs">
-          <div className="font-semibold mb-1">シミュレーターの前提</div>
-          <ul className="list-disc ml-5 space-y-1 opacity-90">
-            <li>
-              加入月数が300月未満でも、<b>みなし300月</b>として計算（最低保障のため）
-            </li>
-            <li>
-              報酬比例の係数は<b>2003年4月以降</b>の簡易係数（5.481‰）を仮定
-            </li>
-            <li>端数処理や年度改定、被保険者種別の違いなどは簡略化</li>
-          </ul>
-        </div>
-      </Section>
-
-      {/* 夫側・妻側の違い */}
-      <Section title="夫が亡くなった場合／妻が亡くなった場合の主な違い">
-        <div className="grid md:grid-cols-2 gap-4">
-          <Card>
-            <h3 className="font-semibold mb-1">夫が亡くなった場合（受給者：妻）</h3>
-            <ul className="list-disc ml-5 text-sm space-y-1 opacity-90">
-              <li>
-                子がいる：<b>基礎＋厚生</b>。子が0になった後は<b>厚生</b>中心。
-              </li>
-              <li>
-                現行では、40〜65歳未満・子なしの一定条件で<b>中高齢寡婦加算</b>が加わる。
-              </li>
-              <li>
-                2028見直しでは、<b>中高齢寡婦加算の見直し（本シミュでは0円扱い）</b>。
-              </li>
-            </ul>
-          </Card>
-          <Card>
-            <h3 className="font-semibold mb-1">妻が亡くなった場合（受給者：夫）</h3>
-            <ul className="list-disc ml-5 text-sm space-y-1 opacity-90">
-              <li>
-                子がいる：<b>基礎＋厚生</b>（<b>年齢要件なし</b>。ただし子が18歳到達時に両方終了）。
-              </li>
-              <li>
-                子がいない：現行は<b>60歳から厚生</b>（55〜59歳は停止）。
-              </li>
-              <li>
-                2028見直し：<b>一定期間（原則5年）</b>の厚生（所得等の要件・経過措置あり）。
-              </li>
-            </ul>
-          </Card>
-        </div>
-      </Section>
-
-      {/* よくある質問 */}
-      <Section title="よくある質問（FAQ）">
-        <FAQ
-          q="『18歳になる年度末』っていつまで？"
-          a="誕生日のある年度の3/31までです。本シミュレーターは年齢から簡易に推計しています。"
-        />
-        <FAQ
-          q="自分の老齢年金と同時にもらえるの？"
-          a="65歳以降は併給調整で『高い方に一部上乗せ』の差額支給になります。個別に試算が必要です。"
-        />
-        <FAQ
-          q="収入や再婚で変わる？"
-          a="生計維持要件や同順位者、再婚、所得状況などにより支給の有無や額が変わる場合があります。"
-        />
-      </Section>
-
-      {/* 免責・注意 */}
-      <Note>
-        このページは制度理解のための<strong>簡易ガイド</strong>です。実際の受給は、加入歴・所得・続柄・同居状況・再婚・端数処理・年度改定等で異なります。
-        最終判断や申請前には、年金事務所・自治体・各制度の公式資料をご確認ください。
-      </Note>
-
-      <div className="mt-6">
-        <Link
-          href="/simulators/survivor-pension"
-          className="inline-flex items-center gap-2 rounded-md border border-sky-700/50 bg-sky-900/20 px-3 py-2 text-sky-200 underline hover:bg-sky-900/30"
-        >
-          ← シミュレーターへ戻る
-        </Link>
       </div>
     </main>
   );
 }
 
 /* -------------------- 小さなUI -------------------- */
-function Card({ children }: { children: React.ReactNode }) {
+function SectionCard({ icon, title, children }: { icon: string; title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
-      {children}
-    </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="mb-6">
-      <h2 className="text-lg font-semibold mb-2">{title}</h2>
-      <div className="space-y-3">{children}</div>
+    <section className="bg-slate-950/40 border border-slate-900 rounded-2xl p-6 shadow-[0_10px_40px_rgba(0,0,0,0.35)]">
+      <div className="flex items-center gap-3 mb-4">
+        <span className="text-2xl">{icon}</span>
+        <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
+      </div>
+      <div className="space-y-4">{children}</div>
     </section>
   );
 }
 
-function MiniStat({ label, value }: { label: string; value: string }) {
+function BadgeGrid({ items }: { items: { label: string; value: string }[] }) {
   return (
-    <div className="rounded-lg border border-slate-700 bg-slate-800 p-3">
-      <div className="text-xs opacity-80">{label}</div>
-      <div className="text-lg font-bold">{value}</div>
+    <div className="grid gap-3 sm:grid-cols-2">
+      {items.map((item) => (
+        <StatBadge key={item.label} label={item.label} value={item.value} />
+      ))}
     </div>
   );
 }
 
-function Note({ children }: { children: React.ReactNode }) {
+function StatBadge({ label, value }: { label: string; value: string }) {
   return (
-    <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-900/20 p-3 text-xs md:text-sm">
-      <div className="font-semibold mb-1">注意</div>
-      <div className="opacity-90">{children}</div>
+    <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
+      <div className="text-xs uppercase tracking-widest text-slate-500">{label}</div>
+      <div className="text-2xl font-bold text-emerald-400 mt-1">{value}</div>
+    </div>
+  );
+}
+
+function NoteCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5 shadow-inner">
+      <div className="text-sm font-semibold text-amber-300 mb-2 flex items-center gap-2">
+        <span>⚠️</span>
+        <span>{title}</span>
+      </div>
+      {children}
     </div>
   );
 }
 
 function FAQ({ q, a }: { q: string; a: string }) {
   return (
-    <div className="rounded-lg border border-slate-700 bg-slate-900/60 p-3">
-      <div className="text-sm font-semibold">Q. {q}</div>
-      <div className="text-sm opacity-90 mt-1">A. {a}</div>
+    <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4">
+      <div className="text-sm font-semibold text-white">Q. {q}</div>
+      <div className="text-sm text-slate-300 mt-1 leading-relaxed">A. {a}</div>
+    </div>
+  );
+}
+
+function FormulaLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-[13px]">
+      <span className="text-slate-400">{label}</span>
+      <code className="flex-1 rounded-xl border border-slate-800 bg-black/30 px-3 py-1 font-mono text-[12px] text-slate-100">
+        {value}
+      </code>
     </div>
   );
 }

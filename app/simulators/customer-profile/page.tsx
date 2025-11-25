@@ -290,6 +290,12 @@ function LivingExpenseSelector({
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500">円</span>
               </div>
+              {key === 'education' && (
+                <div className="space-y-0.5">
+                  <p className="text-[10px] text-slate-500">※塾・習い事費用を含む</p>
+                  <p className="text-[10px] text-slate-500">※月額目安: 小1.5〜3万 / 中2.5〜3万 / 高3.5〜4万</p>
+                </div>
+              )}
 
               {/* 団信選択UI (住宅ローンの場合のみ表示) */}
               {key === 'housingLoan' && (
@@ -518,60 +524,6 @@ function BasicInfoInput({
                 <option key={key} value={key}>{label}</option>
               ))}
             />
-
-            <div className="mt-4 pt-4 border-t border-slate-700/50">
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">塾・習い事費用を含める</label>
-              <div className="flex flex-wrap gap-4">
-                <label className="flex items-center gap-2 cursor-pointer group">
-                  <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${basicInfo.cramSchoolOptions.elementary ? 'bg-emerald-500 border-emerald-500' : 'bg-slate-800 border-slate-600 group-hover:border-emerald-500'}`}>
-                    {basicInfo.cramSchoolOptions.elementary && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>}
-                  </div>
-                  <input
-                    type="checkbox"
-                    className="hidden"
-                    checked={basicInfo.cramSchoolOptions.elementary}
-                    onChange={(e) => setBasicInfo({
-                      ...basicInfo,
-                      cramSchoolOptions: { ...basicInfo.cramSchoolOptions, elementary: e.target.checked }
-                    })}
-                  />
-                  <span className="text-sm text-slate-300 group-hover:text-white transition-colors">小学校</span>
-                </label>
-
-                <label className="flex items-center gap-2 cursor-pointer group">
-                  <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${basicInfo.cramSchoolOptions.juniorHigh ? 'bg-emerald-500 border-emerald-500' : 'bg-slate-800 border-slate-600 group-hover:border-emerald-500'}`}>
-                    {basicInfo.cramSchoolOptions.juniorHigh && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>}
-                  </div>
-                  <input
-                    type="checkbox"
-                    className="hidden"
-                    checked={basicInfo.cramSchoolOptions.juniorHigh}
-                    onChange={(e) => setBasicInfo({
-                      ...basicInfo,
-                      cramSchoolOptions: { ...basicInfo.cramSchoolOptions, juniorHigh: e.target.checked }
-                    })}
-                  />
-                  <span className="text-sm text-slate-300 group-hover:text-white transition-colors">中学校</span>
-                </label>
-
-                <label className="flex items-center gap-2 cursor-pointer group">
-                  <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${basicInfo.cramSchoolOptions.highSchool ? 'bg-emerald-500 border-emerald-500' : 'bg-slate-800 border-slate-600 group-hover:border-emerald-500'}`}>
-                    {basicInfo.cramSchoolOptions.highSchool && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>}
-                  </div>
-                  <input
-                    type="checkbox"
-                    className="hidden"
-                    checked={basicInfo.cramSchoolOptions.highSchool}
-                    onChange={(e) => setBasicInfo({
-                      ...basicInfo,
-                      cramSchoolOptions: { ...basicInfo.cramSchoolOptions, highSchool: e.target.checked }
-                    })}
-                  />
-                  <span className="text-sm text-slate-300 group-hover:text-white transition-colors">高校</span>
-                </label>
-              </div>
-              <p className="text-[10px] text-slate-500 mt-2">※月額目安: 小1.5〜3万 / 中2.5〜3万 / 高3.5〜4万</p>
-            </div>
           </div>
         </div>
       )}

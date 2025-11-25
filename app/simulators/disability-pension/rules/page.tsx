@@ -27,231 +27,225 @@ const yen = (n: number) => Math.round(n).toLocaleString('ja-JP');
 
 export default function RulesPage() {
   return (
-    <main className="p-6 max-w-4xl mx-auto text-slate-100">
-      <header className="mb-6">
-        <div className="text-sm opacity-70 mb-1">
-          <Link href="/simulators/disability-pension" className="underline hover:opacity-90">
+    <main className="min-h-screen bg-[#0B0E14] text-slate-100">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
+        <header className="bg-gradient-to-br from-slate-900/70 via-slate-900/40 to-slate-800/40 border border-slate-800 rounded-3xl p-6 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+          <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-3">DISABILITY PENSION GUIDE</p>
+          <h1 className="text-3xl font-semibold tracking-tight">障害年金ルールをひと目で整理</h1>
+          <p className="text-sm text-slate-300 mt-3 leading-relaxed">
+            シミュレーターと同じ前提・デザインで、「障害基礎年金」「障害厚生年金」「加算」の要点をまとめました。
+            家族構成や等級ごとの違いをダッシュボード感覚で確認できます。
+          </p>
+        </header>
+
+        {/* 障害基礎年金とは */}
+        <SectionCard icon="🌱" title="障害基礎年金（国民年金）">
+          <p className="text-sm text-slate-300 leading-relaxed">
+            初診日が国民年金の加入中・20歳前・60〜64歳国内居住のいずれかに該当し、障害認定日に1級または2級なら支給対象です。
+          </p>
+          <BadgeGrid
+            items={[
+              { label: '1級（年額）', value: `${yen(CONSTS.BASE_1_LEVEL)} 円` },
+              { label: '2級（年額）', value: `${yen(CONSTS.BASE_2_LEVEL)} 円` },
+              { label: '子の加算（第1・2子 各）', value: `${yen(CONSTS.CHILD_ADD_1_2)} 円` },
+              { label: '子の加算（第3子以降/人）', value: `${yen(CONSTS.CHILD_ADD_3P)} 円` },
+            ]}
+          />
+          <NoteCard title="受給要件">
+            <ul className="list-disc ml-5 space-y-1 text-sm text-slate-200">
+              <li>初診日が国民年金の被保険者期間中、20歳前、または60〜64歳の国内居住期間</li>
+              <li>障害認定日に障害等級1級または2級に該当</li>
+              <li>保険料納付要件：納付＋免除期間が3分の2以上、または直近1年未納なし</li>
+            </ul>
+          </NoteCard>
+        </SectionCard>
+
+        {/* 障害厚生年金とは */}
+        <SectionCard icon="🏢" title="障害厚生年金（会社員・公務員の上乗せ）">
+          <p className="text-sm text-slate-300 leading-relaxed">
+            厚生年金の被保険者期間に初診日がある場合、1〜3級で受給できます。報酬比例部分を基準に、1級は1.25倍、3級は最低保障額を設定。
+          </p>
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4 text-xs text-slate-300 space-y-2">
+            <div className="font-semibold text-slate-100 tracking-wide">報酬比例の計算式</div>
+            <FormulaLine label="平成15年3月以前" value="平均標準報酬月額 × 7.125‰ × 加入月数" />
+            <FormulaLine label="平成15年4月以降" value="平均標準報酬額 × 5.481‰ × 加入月数" />
+            <p className="text-[11px] text-slate-500">※ シミュレーターでは加入月数が300月未満でもみなし300月として計算します。</p>
+          </div>
+          <BadgeGrid
+            items={[
+              { label: '1級', value: '報酬比例 × 1.25 + 配偶者加給' },
+              { label: '2級', value: '報酬比例 + 配偶者加給' },
+              { label: '3級（最低保障）', value: `${yen(CONSTS.MIN_LEVEL3)} 円` },
+            ]}
+          />
+          <NoteCard title="受給要件">
+            <ul className="list-disc ml-5 space-y-1 text-sm text-slate-200">
+              <li>初診日が厚生年金被保険者期間内</li>
+              <li>障害認定日に1〜3級に該当</li>
+              <li>保険料納付要件は障害基礎年金に準じます</li>
+            </ul>
+          </NoteCard>
+        </SectionCard>
+
+        {/* 等級別 */}
+        <SectionCard icon="📊" title="障害等級ごとの主な違い">
+          <div className="grid gap-4 md:grid-cols-3">
+            {[
+              {
+                level: '1級',
+                summary: [
+                  `基礎：${yen(CONSTS.BASE_1_LEVEL)}円 + 子の加算`,
+                  '厚生：報酬比例×1.25 + 配偶者加給',
+                  '常時介助が必要な状態',
+                ],
+              },
+              {
+                level: '2級',
+                summary: [
+                  `基礎：${yen(CONSTS.BASE_2_LEVEL)}円 + 子の加算`,
+                  '厚生：報酬比例 + 配偶者加給',
+                  '日常生活が著しく制限',
+                ],
+              },
+              {
+                level: '3級',
+                summary: [
+                  '基礎：支給なし',
+                  `厚生：報酬比例（最低 ${yen(CONSTS.MIN_LEVEL3)}円）`,
+                  '労働に制限がある状態',
+                ],
+              },
+            ].map((item) => (
+              <div key={item.level} className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+                <div className="text-sm text-slate-400">LEVEL</div>
+                <div className="text-2xl font-semibold text-white mb-3">{item.level}</div>
+                <ul className="text-sm text-slate-200 space-y-1.5 list-disc ml-5">
+                  {item.summary.map((text) => (
+                    <li key={text}>{text}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+
+        {/* 加算 */}
+        <SectionCard icon="➕" title="子の加算・配偶者加給">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5 space-y-3">
+              <div className="text-sm text-slate-400">CHILD BONUS</div>
+              <h3 className="text-xl font-semibold">子の加算（障害基礎年金のみ）</h3>
+              <BadgeGrid
+                items={[
+                  { label: '第1・2子', value: `${yen(CONSTS.CHILD_ADD_1_2)} 円 / 年` },
+                  { label: '第3子以降', value: `${yen(CONSTS.CHILD_ADD_3P)} 円 / 年` },
+                ]}
+              />
+              <p className="text-sm text-slate-300">18歳年度末まで、または20歳未満で障害1・2級の子が対象。</p>
+            </div>
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5 space-y-3">
+              <div className="text-sm text-slate-400">SPOUSE BONUS</div>
+              <h3 className="text-xl font-semibold">配偶者加給年金（厚生1・2級のみ）</h3>
+              <StatBadge label="年額" value={`${yen(CONSTS.SPOUSE_ADD)} 円`} />
+              <ul className="text-sm text-slate-300 list-disc ml-5 space-y-1.5">
+                <li>生計維持関係にある65歳未満の配偶者が対象</li>
+                <li>3級には加算されません</li>
+              </ul>
+            </div>
+          </div>
+        </SectionCard>
+
+        {/* FAQ */}
+        <SectionCard icon="💡" title="よくある質問">
+          <div className="grid gap-4">
+            <FAQ q="『初診日』とは何ですか？" a="障害の原因となった病気やけがについて、最初に医師の診療を受けた日です。複数受診している場合は最も早い受診日が初診日になります。" />
+            <FAQ q="『障害認定日』とは何ですか？" a="初診日から1年6ヶ月経過した日、またはそれ以前に症状が固定した日を指し、その時点の障害状態で等級が決まります。" />
+            <FAQ q="保険料納付要件の『3分の2』や『直近1年間未納なし』とは？" a="初診日前々月までの期間で納付＋免除が3分の2以上、または直近1年に未納が無い場合に要件を満たします（令和18年3月末の特例）。" />
+            <FAQ q="老齢年金と同時にもらえますか？" a="原則は選択ですが、条件を満たせば併給調整で一定額を受け取れるケースがあります。個別試算が必要です。" />
+            <FAQ q="働きながらでももらえますか？" a="収入制限は基本ありませんが、障害状態が改善した場合は支給停止の可能性があります。" />
+          </div>
+        </SectionCard>
+
+        <NoteCard title="免責・注意">
+          <p className="text-sm text-slate-200 leading-relaxed">
+            このページは制度理解のための簡易ガイドです。実際の受給は初診日・加入歴・保険料納付状況・障害の程度など個別事情で変わります。
+            申請前には年金事務所や公式資料で最新情報を必ず確認してください。
+          </p>
+        </NoteCard>
+
+        <div className="flex justify-center pt-4">
+          <Link
+            href="/simulators/disability-pension"
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-white font-semibold shadow-lg shadow-blue-900/40 transition hover:bg-blue-700"
+          >
             ← シミュレーターへ戻る
           </Link>
         </div>
-        <h1 className="text-2xl font-bold">障害年金について（お客様向けの簡単な説明）</h1>
-        <p className="text-sm opacity-80 mt-2">
-          複雑な制度を、まずは<strong>ざっくり理解</strong>できるように整理しました。詳細は個別事情により異なります。
-        </p>
-      </header>
-
-      {/* 障害基礎年金とは */}
-      <Section title="障害基礎年金（国民年金の障害年金）">
-        <p className="text-sm opacity-90">
-          病気やけがで障害が残り、その初診日が国民年金加入期間中、または20歳前、または60歳以上65歳未満の国内居住期間中である場合に支給されます。
-        </p>
-        <div className="mt-3 grid md:grid-cols-2 gap-3">
-          <MiniStat label="1級（年額）" value={`${yen(CONSTS.BASE_1_LEVEL)} 円`} />
-          <MiniStat label="2級（年額）" value={`${yen(CONSTS.BASE_2_LEVEL)} 円`} />
-          <MiniStat label="子の加算（1・2人目 各）" value={`${yen(CONSTS.CHILD_ADD_1_2)} 円`} />
-          <MiniStat label="子の加算（3人目以降/人）" value={`${yen(CONSTS.CHILD_ADD_3P)} 円`} />
-        </div>
-        <Note>
-          <div className="font-semibold mb-1">受給要件</div>
-          <ul className="list-disc ml-5 space-y-1">
-            <li>初診日が国民年金加入期間中、または20歳前、または60歳以上65歳未満の国内居住期間中</li>
-            <li>障害認定日において、障害等級1級または2級に該当すること</li>
-            <li>
-              保険料納付要件：初診日の前々月までの被保険者期間で、納付済み＋免除期間が3分の2以上、または直近1年間に未納なし
-            </li>
-          </ul>
-        </Note>
-      </Section>
-
-      {/* 障害厚生年金とは */}
-      <Section title="障害厚生年金（厚生年金の障害年金）">
-        <p className="text-sm opacity-90">
-          厚生年金被保険者期間中に初診日がある場合に支給されます。障害等級1級・2級・3級に該当する場合に受給できます。
-        </p>
-        <div className="mt-3 rounded-lg border border-slate-700 bg-slate-900/60 p-3 text-xs">
-          <div className="font-semibold mb-1">報酬比例部分の計算式</div>
-          <div className="space-y-2 opacity-90">
-            <div>
-              <strong>平成15年3月以前の加入期間：</strong>
-              <code className="mx-1 px-1 rounded bg-slate-800 border border-slate-700">
-                平均標準報酬月額 × 7.125/1,000 × 加入月数
-              </code>
-            </div>
-            <div>
-              <strong>平成15年4月以降の加入期間：</strong>
-              <code className="mx-1 px-1 rounded bg-slate-800 border border-slate-700">
-                平均標準報酬額 × 5.481/1,000 × 加入月数
-              </code>
-            </div>
-          </div>
-        </div>
-        <div className="mt-3 grid md:grid-cols-3 gap-3">
-          <MiniStat label="1級（報酬比例×1.25）" value="報酬比例×1.25" />
-          <MiniStat label="2級（報酬比例）" value="報酬比例" />
-          <MiniStat label="3級（最低保障額）" value={`${yen(CONSTS.MIN_LEVEL3)} 円`} />
-        </div>
-        <Note>
-          <div className="font-semibold mb-1">受給要件</div>
-          <ul className="list-disc ml-5 space-y-1">
-            <li>初診日が厚生年金被保険者期間中であること</li>
-            <li>障害認定日において、障害等級1級・2級・3級に該当すること</li>
-            <li>保険料納付要件：障害基礎年金と同様</li>
-          </ul>
-        </Note>
-      </Section>
-
-      {/* 等級別の違い */}
-      <Section title="障害等級と年金額の違い">
-        <div className="grid md:grid-cols-3 gap-4">
-          <Card>
-            <h3 className="font-semibold mb-1">1級</h3>
-            <ul className="list-disc ml-5 text-sm space-y-1 opacity-90">
-              <li>
-                障害基礎年金：<b>{yen(CONSTS.BASE_1_LEVEL)}円/年</b> + 子の加算
-              </li>
-              <li>
-                障害厚生年金：報酬比例 × <b>1.25倍</b> + 配偶者加給
-              </li>
-              <li>日常生活で常時介助が必要な状態</li>
-            </ul>
-          </Card>
-          <Card>
-            <h3 className="font-semibold mb-1">2級</h3>
-            <ul className="list-disc ml-5 text-sm space-y-1 opacity-90">
-              <li>
-                障害基礎年金：<b>{yen(CONSTS.BASE_2_LEVEL)}円/年</b> + 子の加算
-              </li>
-              <li>
-                障害厚生年金：報酬比例 + 配偶者加給
-              </li>
-              <li>日常生活が著しく制限される状態</li>
-            </ul>
-          </Card>
-          <Card>
-            <h3 className="font-semibold mb-1">3級</h3>
-            <ul className="list-disc ml-5 text-sm space-y-1 opacity-90">
-              <li>
-                障害基礎年金：<b>なし</b>（厚生年金のみ）
-              </li>
-              <li>
-                障害厚生年金：報酬比例（最低保障：<b>{yen(CONSTS.MIN_LEVEL3)}円/年</b>）
-              </li>
-              <li>労働が制限される状態</li>
-            </ul>
-          </Card>
-        </div>
-      </Section>
-
-      {/* 加算について */}
-      <Section title="子の加算と配偶者加給年金額">
-        <div className="grid md:grid-cols-2 gap-4">
-          <Card>
-            <h3 className="font-semibold mb-1">子の加算（障害基礎年金のみ）</h3>
-            <ul className="list-disc ml-5 text-sm space-y-1 opacity-90">
-              <li>
-                第1子・第2子：各<b>{yen(CONSTS.CHILD_ADD_1_2)}円/年</b>
-              </li>
-              <li>
-                第3子以降：各<b>{yen(CONSTS.CHILD_ADD_3P)}円/年</b>
-              </li>
-              <li>対象：18歳到達年度末までの子、または20歳未満で障害1・2級の子</li>
-            </ul>
-          </Card>
-          <Card>
-            <h3 className="font-semibold mb-1">配偶者加給年金額（障害厚生年金1・2級のみ）</h3>
-            <ul className="list-disc ml-5 text-sm space-y-1 opacity-90">
-              <li>
-                金額：<b>{yen(CONSTS.SPOUSE_ADD)}円/年</b>
-              </li>
-              <li>対象：生計を維持している65歳未満の配偶者がいる場合</li>
-              <li>※ 3級には加算されません</li>
-            </ul>
-          </Card>
-        </div>
-      </Section>
-
-      {/* よくある質問 */}
-      <Section title="よくある質問（FAQ）">
-        <FAQ
-          q="『初診日』とは何ですか？"
-          a="障害の原因となった病気やけがについて、初めて医師の診療を受けた日を指します。同一の病気やけがについて、複数の医療機関を受診した場合は、最も早い受診日が初診日となります。"
-        />
-        <FAQ
-          q="『障害認定日』とは何ですか？"
-          a="初診日から1年6ヶ月を経過した日、または1年6ヶ月以内に症状が固定した日を指します。この時点での障害の程度で等級が決定されます。"
-        />
-        <FAQ
-          q="保険料納付要件の『3分の2』や『直近1年間未納なし』とは？"
-          a="初診日の前々月までの被保険者期間のうち、保険料納付済期間と免除期間を合わせた期間が3分の2以上あればOKです。また、初診日が令和18年3月末日までで65歳未満の場合は、直近1年間に未納がなければOKです（特例要件）。"
-        />
-        <FAQ
-          q="老齢年金と同時にもらえますか？"
-          a="基本的に、老齢年金と障害年金は選択になりますが、一定の条件を満たせば併給できる場合があります。個別の試算が必要です。"
-        />
-        <FAQ
-          q="働きながらでももらえますか？"
-          a="収入や所得の制限は基本的にありませんが、障害状態が改善した場合など、年金が停止される場合があります。"
-        />
-      </Section>
-
-      {/* 免責・注意 */}
-      <Note>
-        このページは制度理解のための<strong>簡易ガイド</strong>です。実際の受給は、初診日、加入歴、保険料納付状況、障害の程度、個別の事情により異なります。
-        最終判断や申請前には、年金事務所・自治体・各制度の公式資料をご確認ください。特に、初診日証明や診断書などの書類が必要です。
-      </Note>
-
-      <div className="mt-6">
-        <Link
-          href="/simulators/disability-pension"
-          className="inline-flex items-center gap-2 rounded-md border border-sky-700/50 bg-sky-900/20 px-3 py-2 text-sky-200 underline hover:bg-sky-900/30"
-        >
-          ← シミュレーターへ戻る
-        </Link>
       </div>
     </main>
   );
 }
 
 /* -------------------- 小さなUI -------------------- */
-function Card({ children }: { children: React.ReactNode }) {
+function SectionCard({ icon, title, children }: { icon: string; title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
-      {children}
-    </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="mb-6">
-      <h2 className="text-lg font-semibold mb-2">{title}</h2>
-      <div className="space-y-3">{children}</div>
+    <section className="bg-slate-950/40 border border-slate-900 rounded-2xl p-6 shadow-[0_10px_40px_rgba(0,0,0,0.35)]">
+      <div className="flex items-center gap-3 mb-4">
+        <span className="text-2xl">{icon}</span>
+        <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
+      </div>
+      <div className="space-y-4">{children}</div>
     </section>
   );
 }
 
-function MiniStat({ label, value }: { label: string; value: string }) {
+function BadgeGrid({ items }: { items: { label: string; value: string }[] }) {
   return (
-    <div className="rounded-lg border border-slate-700 bg-slate-800 p-3">
-      <div className="text-xs opacity-80">{label}</div>
-      <div className="text-lg font-bold">{value}</div>
+    <div className="grid gap-3 sm:grid-cols-2">
+      {items.map((item) => (
+        <StatBadge key={item.label} label={item.label} value={item.value} />
+      ))}
     </div>
   );
 }
 
-function Note({ children }: { children: React.ReactNode }) {
+function StatBadge({ label, value }: { label: string; value: string }) {
   return (
-    <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-900/20 p-3 text-xs md:text-sm">
-      <div className="opacity-90">{children}</div>
+    <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
+      <div className="text-xs uppercase tracking-widest text-slate-500">{label}</div>
+      <div className="text-2xl font-bold text-emerald-400 mt-1">{value}</div>
+    </div>
+  );
+}
+
+function NoteCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5 shadow-inner">
+      <div className="text-sm font-semibold text-amber-300 mb-2 flex items-center gap-2">
+        <span>⚠️</span>
+        <span>{title}</span>
+      </div>
+      {children}
     </div>
   );
 }
 
 function FAQ({ q, a }: { q: string; a: string }) {
   return (
-    <div className="rounded-lg border border-slate-700 bg-slate-900/60 p-3">
-      <div className="text-sm font-semibold">Q. {q}</div>
-      <div className="text-sm opacity-90 mt-1">A. {a}</div>
+    <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4">
+      <div className="text-sm font-semibold text-white">Q. {q}</div>
+      <div className="text-sm text-slate-300 mt-1 leading-relaxed">A. {a}</div>
+    </div>
+  );
+}
+
+function FormulaLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-[13px]">
+      <span className="text-slate-400">{label}</span>
+      <code className="flex-1 rounded-xl border border-slate-800 bg-black/30 px-3 py-1 font-mono text-[12px] text-slate-100">
+        {value}
+      </code>
     </div>
   );
 }
