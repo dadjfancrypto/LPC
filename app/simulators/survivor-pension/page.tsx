@@ -557,7 +557,7 @@ export default function SurvivorPensionPage() {
   const [oldAgeStartWife, setOldAgeStartWife] = useState<number>(65);
 
   const [ageHusband, setAgeHusband] = useState<number>(38);
-  const [avgStdMonthlyHusband, setAvgStdMonthlyHusband] = useState<number>(450000);
+  const [avgStdMonthlyHusband, setAvgStdMonthlyHusband] = useState<number>(Math.round(5_000_000 / 12)); // 500万円（年収）
   const [monthsHusband, setMonthsHusband] = useState<number>(180);
   const [useMinashi300Husband, setUseMinashi300Husband] = useState<boolean>(true);
   const [oldAgeStartHusband, setOldAgeStartHusband] = useState<number>(65);
@@ -1271,12 +1271,18 @@ export default function SurvivorPensionPage() {
                         />
                       </div>
                       <div>
-                        <Label>平均標準報酬月額 (万円)</Label>
+                        <Label>昨年の年収（額面） (万円)</Label>
                         <div className="relative">
                           <Select
-                            value={avgStdMonthlyWife / 10000}
-                            onChange={(e) => setAvgStdMonthlyWife(Number(e.target.value) * 10000)}
-                            options={Array.from({ length: 96 }, (_, i) => ({ value: 5 + i, label: `${5 + i}万円` }))}
+                            value={Math.round(avgStdMonthlyWife * 12 / 10000)}
+                            onChange={(e) => {
+                              const annualIncome = Number(e.target.value) * 10000;
+                              setAvgStdMonthlyWife(Math.round(annualIncome / 12));
+                            }}
+                            options={Array.from({ length: 71 }, (_, i) => {
+                              const value = 300 + i * 10; // 300万円〜1000万円（10万円刻み）
+                              return { value, label: `${value}万円` };
+                            })}
                           />
                         </div>
                       </div>
@@ -1320,12 +1326,18 @@ export default function SurvivorPensionPage() {
                         />
                       </div>
                       <div>
-                        <Label>平均標準報酬月額 (万円)</Label>
+                        <Label>昨年の年収（額面） (万円)</Label>
                         <div className="relative">
                           <Select
-                            value={avgStdMonthlyHusband / 10000}
-                            onChange={(e) => setAvgStdMonthlyHusband(Number(e.target.value) * 10000)}
-                            options={Array.from({ length: 96 }, (_, i) => ({ value: 5 + i, label: `${5 + i}万円` }))}
+                            value={Math.round(avgStdMonthlyHusband * 12 / 10000)}
+                            onChange={(e) => {
+                              const annualIncome = Number(e.target.value) * 10000;
+                              setAvgStdMonthlyHusband(Math.round(annualIncome / 12));
+                            }}
+                            options={Array.from({ length: 71 }, (_, i) => {
+                              const value = 300 + i * 10; // 300万円〜1000万円（10万円刻み）
+                              return { value, label: `${value}万円` };
+                            })}
                           />
                         </div>
                       </div>

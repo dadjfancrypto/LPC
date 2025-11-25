@@ -510,7 +510,7 @@ function TimelineBlock({
       <div className="text-base font-semibold mb-3">{title}</div>
       <div ref={measureRef} className="w-full h-0 overflow-hidden" />
       <PensionSegmentsBar segments={segments} geometry={geometry} />
-    </div>
+      </div>
   );
 }
 
@@ -560,21 +560,21 @@ export default function DisabilityPensionPage() {
   // 妻の情報
   const [levelWife, setLevelWife] = useState<DisabilityLevel>(2);
   const [ageWife, setAgeWife] = useState<number>(35);
-  const [avgStdMonthlyWife, setAvgStdMonthlyWife] = useState<number>(300000);
+  const [avgStdMonthlyWife, setAvgStdMonthlyWife] = useState<number>(Math.round(3_000_000 / 12)); // 300万円（年収）
   const [monthsWife, setMonthsWife] = useState<number>(120);
   const [useMinashi300Wife, setUseMinashi300Wife] = useState<boolean>(true);
 
   // 夫の情報
   const [levelHusband, setLevelHusband] = useState<DisabilityLevel>(2);
   const [ageHusband, setAgeHusband] = useState<number>(38);
-  const [avgStdMonthlyHusband, setAvgStdMonthlyHusband] = useState<number>(450000);
+  const [avgStdMonthlyHusband, setAvgStdMonthlyHusband] = useState<number>(Math.round(5_000_000 / 12)); // 500万円（年収）
   const [monthsHusband, setMonthsHusband] = useState<number>(180);
   const [useMinashi300Husband, setUseMinashi300Husband] = useState<boolean>(true);
 
   // 本人の情報（単身用）
   const [levelSingle, setLevelSingle] = useState<DisabilityLevel>(2);
   const [ageSingle, setAgeSingle] = useState<number>(30);
-  const [avgStdMonthlySingle, setAvgStdMonthlySingle] = useState<number>(400000);
+  const [avgStdMonthlySingle, setAvgStdMonthlySingle] = useState<number>(Math.round(4_500_000 / 12)); // 450万円（年収）
   const [monthsSingle, setMonthsSingle] = useState<number>(150);
 
   const [showNotes, setShowNotes] = useState(false);
@@ -618,7 +618,7 @@ export default function DisabilityPensionPage() {
     if (childrenCount === null) return;
     if (childrenAges.length !== childrenCount) {
       const newAges = [...childrenAges];
-      while (newAges.length < childrenCount) newAges.push(0);
+        while (newAges.length < childrenCount) newAges.push(0);
       if (newAges.length > childrenCount) newAges.splice(childrenCount);
       setChildrenAges(newAges);
     }
@@ -1326,7 +1326,7 @@ export default function DisabilityPensionPage() {
             <Link href="/" className="text-sm text-slate-400 hover:text-white transition-colors">
               TOPへ戻る
             </Link>
-          </div>
+        </div>
         </div>
 
         {showNotes && (
@@ -1344,76 +1344,82 @@ export default function DisabilityPensionPage() {
       <div className="max-w-6xl mx-auto px-6 py-10">
         <div className="space-y-8">
 
-          <Accordion
+              <Accordion
             title="⚙️ 基本情報"
             headerContent="反映されている情報: Customer Profile"
-            defaultOpen={false}
-            onClear={() => {
-              setSpouseType('none');
-              setChildrenCount(null);
-              setChildrenAges([]);
-              setLevelWife(2);
-              setAvgStdMonthlyWife(300000);
-              setMonthsWife(120);
+                defaultOpen={false}
+                onClear={() => {
+                  setSpouseType('none');
+                  setChildrenCount(null);
+                  setChildrenAges([]);
+                  setLevelWife(2);
+                  setAvgStdMonthlyWife(300000);
+                  setMonthsWife(120);
               setUseMinashi300Wife(true);
-              setLevelHusband(2);
-              setAvgStdMonthlyHusband(450000);
-              setMonthsHusband(180);
+                  setLevelHusband(2);
+                  setAvgStdMonthlyHusband(450000);
+                  setMonthsHusband(180);
               setUseMinashi300Husband(true);
             }}
           >
             <div className="space-y-6">
-              <div>
-                <Label>子の人数</Label>
-                <Select
-                  value={childrenCount ?? ''}
-                  onChange={(e) => setChildrenCount(e.target.value ? Number(e.target.value) : null)}
-                  options={[{ value: '', label: '--' }, ...Array.from({ length: 6 }, (_, i) => ({ value: i, label: `${i}人` }))]}
-                />
-              </div>
-              {childrenCount !== null && childrenCount > 0 && (
-                <div className="grid grid-cols-3 gap-2">
-                  {Array.from({ length: childrenCount }).map((_, i) => (
-                    <div key={i}>
-                      <Label>{i + 1}人目の年齢</Label>
+                    <div>
+                      <Label>子の人数</Label>
                       <Select
-                        value={childrenAges[i] ?? 0}
-                        onChange={(e) => { const newAges = [...childrenAges]; newAges[i] = Number(e.target.value); setChildrenAges(newAges); }}
-                        options={Array.from({ length: 23 }, (_, j) => ({ value: j, label: `${j}歳` }))}
+                        value={childrenCount ?? ''}
+                        onChange={(e) => setChildrenCount(e.target.value ? Number(e.target.value) : null)}
+                  options={[{ value: '', label: '--' }, ...Array.from({ length: 6 }, (_, i) => ({ value: i, label: `${i}人` }))]}
                       />
                     </div>
-                  ))}
-                </div>
-              )}
+                    {childrenCount !== null && childrenCount > 0 && (
+                <div className="grid grid-cols-3 gap-2">
+                        {Array.from({ length: childrenCount }).map((_, i) => (
+                          <div key={i}>
+                            <Label>{i + 1}人目の年齢</Label>
+                            <Select
+                              value={childrenAges[i] ?? 0}
+                        onChange={(e) => { const newAges = [...childrenAges]; newAges[i] = Number(e.target.value); setChildrenAges(newAges); }}
+                              options={Array.from({ length: 23 }, (_, j) => ({ value: j, label: `${j}歳` }))}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
-              {spouseType === 'couple' && (
-                <>
+                {spouseType === 'couple' && (
+                  <>
                   <div className="pt-4 border-t border-slate-700">
                     <h3 className="text-sm font-bold text-rose-400 mb-3">妻の情報</h3>
                     <div className="space-y-3">
-                      <div>
-                        <Label>障害等級</Label>
-                        <Select
-                          value={levelWife}
-                          onChange={(e) => setLevelWife(Number(e.target.value) as DisabilityLevel)}
+                        <div>
+                          <Label>障害等級</Label>
+                          <Select
+                            value={levelWife}
+                            onChange={(e) => setLevelWife(Number(e.target.value) as DisabilityLevel)}
                           options={[{ value: 1, label: '1級' }, { value: 2, label: '2級' }, { value: 3, label: '3級' }]}
-                        />
-                      </div>
-                      <div>
+                          />
+                        </div>
+                        <div>
                         <Label>年齢</Label>
                         <Select
                           value={ageWife}
                           onChange={(e) => setAgeWife(Number(e.target.value))}
                           options={Array.from({ length: 83 }, (_, i) => ({ value: 18 + i, label: `${18 + i}歳` }))}
                         />
-                      </div>
-                      <div>
-                        <Label>平均標準報酬月額 (万円)</Label>
+                        </div>
+                        <div>
+                        <Label>昨年の年収（額面） (万円)</Label>
                         <div className="relative">
                           <Select
-                            value={avgStdMonthlyWife / 10000}
-                            onChange={(e) => setAvgStdMonthlyWife(Number(e.target.value) * 10000)}
-                            options={Array.from({ length: 96 }, (_, i) => ({ value: 5 + i, label: `${5 + i}万円` }))}
+                            value={Math.round(avgStdMonthlyWife * 12 / 10000)}
+                            onChange={(e) => {
+                              const annualIncome = Number(e.target.value) * 10000;
+                              setAvgStdMonthlyWife(Math.round(annualIncome / 12));
+                            }}
+                            options={Array.from({ length: 71 }, (_, i) => {
+                              const value = 300 + i * 10; // 300万円〜1000万円（10万円刻み）
+                              return { value, label: `${value}万円` };
+                            })}
                           />
                         </div>
                       </div>
@@ -1422,8 +1428,8 @@ export default function DisabilityPensionPage() {
                           厚生年金加入月数
                           <span className="text-[10px] font-normal text-slate-500 ml-2">（一度でも厚生年金に加入していた方は月数を記入ください）</span>
                         </Label>
-                        <Input value={monthsWife} onChange={(e) => setMonthsWife(Number(e.target.value))} />
-                      </div>
+                          <Input value={monthsWife} onChange={(e) => setMonthsWife(Number(e.target.value))} />
+                        </div>
                       <div className="flex items-start gap-2 mt-2">
                         <input
                           type="checkbox"
@@ -1443,31 +1449,37 @@ export default function DisabilityPensionPage() {
                   <div className="pt-4 border-t border-slate-700">
                     <h3 className="text-sm font-bold text-emerald-400 mb-3">夫の情報</h3>
                     <div className="space-y-3">
-                      <div>
-                        <Label>障害等級</Label>
-                        <Select
-                          value={levelHusband}
-                          onChange={(e) => setLevelHusband(Number(e.target.value) as DisabilityLevel)}
+                        <div>
+                          <Label>障害等級</Label>
+                          <Select
+                            value={levelHusband}
+                            onChange={(e) => setLevelHusband(Number(e.target.value) as DisabilityLevel)}
                           options={[{ value: 1, label: '1級' }, { value: 2, label: '2級' }, { value: 3, label: '3級' }]}
-                        />
-                      </div>
-                      <div>
+                          />
+                        </div>
+                        <div>
                         <Label>年齢</Label>
                         <Select
                           value={ageHusband}
                           onChange={(e) => setAgeHusband(Number(e.target.value))}
                           options={Array.from({ length: 83 }, (_, i) => ({ value: 18 + i, label: `${18 + i}歳` }))}
                         />
-                      </div>
-                      <div>
-                        <Label>平均標準報酬月額 (万円)</Label>
-                        <div className="relative">
-                          <Select
-                            value={avgStdMonthlyHusband / 10000}
-                            onChange={(e) => setAvgStdMonthlyHusband(Number(e.target.value) * 10000)}
-                            options={Array.from({ length: 96 }, (_, i) => ({ value: 5 + i, label: `${5 + i}万円` }))}
-                          />
                         </div>
+                        <div>
+                        <Label>昨年の年収（額面） (万円)</Label>
+                        <div className="relative">
+                        <Select
+                            value={Math.round(avgStdMonthlyHusband * 12 / 10000)}
+                            onChange={(e) => {
+                              const annualIncome = Number(e.target.value) * 10000;
+                              setAvgStdMonthlyHusband(Math.round(annualIncome / 12));
+                            }}
+                            options={Array.from({ length: 71 }, (_, i) => {
+                              const value = 300 + i * 10; // 300万円〜1000万円（10万円刻み）
+                              return { value, label: `${value}万円` };
+                            })}
+                        />
+                      </div>
                       </div>
                       <div>
                         <Label>
@@ -1488,29 +1500,29 @@ export default function DisabilityPensionPage() {
                           みなし300月を適用
                           <span className="block text-[10px] text-slate-500 mt-0.5">現在厚生年金に加入している方はチェック</span>
                         </label>
-                      </div>
                     </div>
-                  </div>
+              </div>
+              </div>
                 </>
               )}
             </div>
           </Accordion>
 
-          {spouseType === 'couple' && (
-            <>
+            {spouseType === 'couple' && (
+              <>
               {/* 妻が障害状態になった場合 */}
-              <section>
-                <div className="flex items-center gap-3 mb-6">
+                <section>
+                  <div className="flex items-center gap-3 mb-6">
                   <div className="w-12 h-12 rounded-xl bg-rose-500/10 flex items-center justify-center border border-rose-500/30">
                     <span className="text-2xl">👩</span>
-                  </div>
+                    </div>
                   <div>
                     <h2 className="text-2xl font-bold text-slate-100">妻の受給額</h2>
                     <p className="text-sm text-slate-400 mt-0.5">妻が障害状態になった場合</p>
                   </div>
-                </div>
+                  </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                   <PeriodCard
                     title="加算あり期間"
                     amount={timelineDataWife.total}
@@ -1543,7 +1555,7 @@ export default function DisabilityPensionPage() {
                           : ['老齢基礎年金', '老齢厚生年金']}
                     />
                   )}
-                </div>
+                      </div>
 
                 {timelineDataWife.block1 && (
                   <>
@@ -1602,7 +1614,7 @@ export default function DisabilityPensionPage() {
                         blockNumber={2}
                         hasLogic={true}
                       />
-                    </div>
+                  </div>
                     <CalculationLogic
                       color="sky"
                       details={[
@@ -1633,21 +1645,21 @@ export default function DisabilityPensionPage() {
                     />
                   </>
                 )}
-              </section>
+                </section>
 
               {/* 夫が障害状態になった場合 */}
-              <section className="pt-12 border-t border-slate-800">
-                <div className="flex items-center gap-3 mb-6">
+                <section className="pt-12 border-t border-slate-800">
+                  <div className="flex items-center gap-3 mb-6">
                   <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/30">
                     <span className="text-2xl">👨</span>
-                  </div>
+                    </div>
                   <div>
                     <h2 className="text-2xl font-bold text-slate-100">夫の受給額</h2>
                     <p className="text-sm text-slate-400 mt-0.5">夫が障害状態になった場合</p>
                   </div>
-                </div>
+                  </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                   <PeriodCard
                     title="加算あり期間"
                     amount={timelineDataHusband.total}
@@ -1680,7 +1692,7 @@ export default function DisabilityPensionPage() {
                           : ['老齢基礎年金', '老齢厚生年金']}
                     />
                   )}
-                </div>
+                      </div>
 
                 {timelineDataHusband.block1 && (
                   <>
@@ -1703,8 +1715,8 @@ export default function DisabilityPensionPage() {
                         { label: '配偶者加給年金（条件満たす場合）', value: `${((ageWife < 65 ? SPOUSE_BONUS : 0) / 10000).toFixed(1)}万円` },
                       ]}
                     />
-                  </>
-                )}
+              </>
+            )}
 
                 {timelineDataHusband.block2.segments.length > 0 && (
                   <>
@@ -1717,7 +1729,7 @@ export default function DisabilityPensionPage() {
                         blockNumber={2}
                         hasLogic={true}
                       />
-                    </div>
+                  </div>
                     <CalculationLogic
                       color="sky"
                       details={[

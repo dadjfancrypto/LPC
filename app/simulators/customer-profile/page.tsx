@@ -547,13 +547,17 @@ function BasicInfoInput({
               />
             </InputGroup>
 
-            <InputGroup label="平均標準報酬月額">
+            <InputGroup label="昨年の年収（額面）">
               <Select
-                value={basicInfo.avgStdMonthlyWife || 0}
-                onChange={(e: any) => setBasicInfo({ ...basicInfo, avgStdMonthlyWife: parseInt(e.target.value, 10) || 0 })}
-                options={Array.from({ length: 196 }, (_, i) => {
-                  const value = 50_000 + i * 10_000;
-                  return <option key={value} value={value}>{(value / 10_000).toFixed(0)}万円</option>;
+                value={basicInfo.avgStdMonthlyWife ? Math.round(basicInfo.avgStdMonthlyWife * 12 / 10000) : 0}
+                onChange={(e: any) => {
+                  const annualIncome = parseInt(e.target.value, 10) || 0;
+                  const monthlyIncome = Math.round(annualIncome * 10000 / 12);
+                  setBasicInfo({ ...basicInfo, avgStdMonthlyWife: monthlyIncome });
+                }}
+                options={Array.from({ length: 71 }, (_, i) => {
+                  const value = 300 + i * 10; // 300万円〜1000万円（10万円刻み）
+                  return <option key={value} value={value}>{value}万円</option>;
                 })}
               />
             </InputGroup>
@@ -614,13 +618,17 @@ function BasicInfoInput({
               />
             </InputGroup>
 
-            <InputGroup label="平均標準報酬月額">
+            <InputGroup label="昨年の年収（額面）">
               <Select
-                value={basicInfo.avgStdMonthlyHusband || 0}
-                onChange={(e: any) => setBasicInfo({ ...basicInfo, avgStdMonthlyHusband: parseInt(e.target.value, 10) || 0 })}
-                options={Array.from({ length: 196 }, (_, i) => {
-                  const value = 50_000 + i * 10_000;
-                  return <option key={value} value={value}>{(value / 10_000).toFixed(0)}万円</option>;
+                value={basicInfo.avgStdMonthlyHusband ? Math.round(basicInfo.avgStdMonthlyHusband * 12 / 10000) : 0}
+                onChange={(e: any) => {
+                  const annualIncome = parseInt(e.target.value, 10) || 0;
+                  const monthlyIncome = Math.round(annualIncome * 10000 / 12);
+                  setBasicInfo({ ...basicInfo, avgStdMonthlyHusband: monthlyIncome });
+                }}
+                options={Array.from({ length: 71 }, (_, i) => {
+                  const value = 300 + i * 10; // 300万円〜1000万円（10万円刻み）
+                  return <option key={value} value={value}>{value}万円</option>;
                 })}
               />
             </InputGroup>
@@ -685,13 +693,17 @@ function BasicInfoInput({
                   ))}
                 />
               </InputGroup>
-              <InputGroup label="平均標準報酬月額">
+              <InputGroup label="昨年の年収（額面）">
                 <Select
-                  value={basicInfo.avgStdMonthly || 0}
-                  onChange={(e: any) => setBasicInfo({ ...basicInfo, avgStdMonthly: parseInt(e.target.value) || 0 })}
-                  options={Array.from({ length: 196 }, (_, i) => {
-                    const val = 50000 + i * 10000;
-                    return <option key={val} value={val}>{(val / 10000).toFixed(0)}万円</option>
+                  value={basicInfo.avgStdMonthly ? Math.round(basicInfo.avgStdMonthly * 12 / 10000) : 0}
+                  onChange={(e: any) => {
+                    const annualIncome = parseInt(e.target.value, 10) || 0;
+                    const monthlyIncome = Math.round(annualIncome * 10000 / 12);
+                    setBasicInfo({ ...basicInfo, avgStdMonthly: monthlyIncome });
+                  }}
+                  options={Array.from({ length: 71 }, (_, i) => {
+                    const value = 300 + i * 10; // 300万円〜1000万円（10万円刻み）
+                    return <option key={value} value={value}>{value}万円</option>;
                   })}
                 />
               </InputGroup>
@@ -1002,12 +1014,12 @@ export default function CustomerProfilePage() {
                     spouseType: 'couple' as const,
                     ageWife: 32,
                     oldAgeStartWife: 65,
-                    avgStdMonthlyWife: 250_000,
+                    avgStdMonthlyWife: Math.round(3_000_000 / 12), // 300万円（年収）
                     monthsWife: 300,
                     useMinashi300Wife: true,
                     ageHusband: 32,
                     oldAgeStartHusband: 65,
-                    avgStdMonthlyHusband: 300_000,
+                    avgStdMonthlyHusband: Math.round(5_000_000 / 12), // 500万円（年収）
                     monthsHusband: 300,
                     useMinashi300Husband: true,
                     age: 0,
@@ -1065,7 +1077,7 @@ export default function CustomerProfilePage() {
                     oldAgeStart: 65,
                     hasEmployeePension: true,
                     employeePensionMonths: 100,
-                    avgStdMonthly: 250_000,
+                    avgStdMonthly: Math.round(4_500_000 / 12), // 450万円（年収）
                     useMinashi300: true,
                     educationCourse: 'private_hs' as const,
                     cramSchoolOptions: { elementary: false, juniorHigh: false, highSchool: false },
