@@ -21,6 +21,9 @@ export const KISO_BASE_ANNUAL = 816000; // 68歳未満（令和6年度）
 export const CHILD_ADDITION_1_2 = 234800; // 第1子・第2子
 export const CHILD_ADDITION_3_PLUS = 78300; // 第3子以降
 
+// 配偶者加給年金額（令和6年度）
+export const SPOUSE_BONUS = 234800;
+
 // 中高齢寡婦加算（年額）
 export const CHUKOREI_KASAN = 612000; // 令和6年度
 
