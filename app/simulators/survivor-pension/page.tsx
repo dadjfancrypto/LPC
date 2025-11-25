@@ -1,216 +1,13 @@
 'use client';
-import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { calculateOldAgeEmployeePension, calculateEligibleChildrenCount, calculateSurvivorBasicPension, calculateSurvivorEmployeePension, calculateOldAgeBasicPension, PolicyMode, POLICY_MODES, formatCurrency } from '../../utils/pension-calc';
-import { calculateSurvivorPensionAmounts, calculateOldAgePensionAdjustment as calculateOldAgePensionAdjustmentUtil } from '../../utils/survivor-pension-logic';
+import { calculateEligibleChildrenCount, PolicyMode } from '../../utils/pension-calc';
+import { calculateSurvivorPensionAmounts } from '../../utils/survivor-pension-logic';
+import { PensionCup, CashFlowTimeline } from '../../components/PensionVisualizations';
+import { calculateSurvivorWorkIncome, calculateRequiredExpenses } from '../../utils/financial-planning';
+import { calculateDisabilityPensionAmounts } from '../../utils/disability-pension-logic';
 
-type Segment = {
-  label: string;
-  years: number;
-  widthYears?: number;
-  className: string;
-  amountYear?: number;
-  style?: React.CSSProperties;
-  startAge?: number;
-  endAge?: number;
-  startAges?: string[]; // 開始時点の家族年齢リスト（例: ['妻32', '夫32', '子3', '子1']）
-  endAges?: string[]; // 終了時点の家族年齢リスト
-};
-
-type Tick = {
-  edgeIndex?: number;
-  posYears?: number;
-  posPx?: number;
-  labelLines: string[];
-};
-
-type Geometry = {
-  used: number;
-  edgesRaw: number[];
-  totalYears: number;
-  rawW: number[];
-};
-
-const BAR_HEIGHT = 150;
-const MIN_SEG_PX = 120;
-
-function getGradientColor(baseColor: 'amber' | 'emerald' | 'sky' | 'blue', index: number) {
-  const rgbMap = {
-    amber: '217, 119, 6',   // amber-600
-    emerald: '5, 150, 105', // emerald-600
-    sky: '14, 165, 233',    // sky-500
-    blue: '59, 130, 246',   // blue-500
-  };
-  const rgb = rgbMap[baseColor] || rgbMap.amber;
-  const maxOpacity = 0.9;
-  const minOpacity = 0.4;
-  const step = 0.1;
-  const opacity = Math.max(minOpacity, maxOpacity - (index * step));
-
-  return `rgba(${rgb}, ${opacity})`;
-}
-
-function CalculationLogic({
-  details,
-  color
-}: {
-  details: { label: string; value: string }[];
-  color: 'emerald' | 'sky'
-}) {
-  const [showCalc, setShowCalc] = useState(false);
-
-  const colorMap = {
-    emerald: { border: 'border-emerald-500/30', bg: 'bg-emerald-900/10' },
-    sky: { border: 'border-sky-500/30', bg: 'bg-sky-900/10' },
-  };
-  const styles = colorMap[color];
-  const borderColor = styles.border;
-  const bgColor = styles.bg;
-
-  return (
-    <div className={`mt-0 rounded-b-xl rounded-t-none border border-t-0 ${borderColor} ${bgColor} p-4`}>
-      <button
-        onClick={() => setShowCalc(!showCalc)}
-        className="text-sm text-slate-400 hover:text-slate-200 transition-colors flex items-center gap-2 w-full font-bold"
-      >
-        <span>{showCalc ? '▼' : '▶'}</span>
-        <span>計算ロジック</span>
-      </button>
-      {showCalc && (
-        <div className="mt-3 space-y-4 text-sm">
-          {details.map((detail, idx) => {
-            const isFormula = detail.label.startsWith('　');
-            const labelText = detail.label.replace(/^　+/, '');
-
-            // バッジの色を決定
-            let badgeClass = '';
-            let badgeText = '';
-            if (labelText.includes('基礎年金')) {
-              badgeClass = 'bg-blue-900/50 text-blue-200 border border-blue-700/50';
-              badgeText = '基礎年金';
-            } else if (labelText.includes('厚生年金')) {
-              badgeClass = 'bg-green-900/50 text-green-200 border border-green-700/50';
-              badgeText = '厚生年金';
-            } else if (labelText.includes('加算')) {
-              badgeClass = 'bg-gray-700/50 text-gray-300 border border-gray-600/50';
-              badgeText = '加算';
-            }
-
-            if (isFormula) {
-              // 数式の表示
-              return (
-                <div key={idx} className="pl-6 py-2 bg-black/30 rounded border border-slate-700/50">
-                  <div className="font-mono text-xs text-slate-300">
-                    <span className="text-slate-500">計算式:</span> {labelText}
-                  </div>
-                  <div className="font-mono text-xs text-emerald-400 mt-1">
-                    = {detail.value}
-                  </div>
-                </div>
-              );
-            } else {
-              // 通常の項目表示
-              return (
-                <div key={idx} className="flex items-start justify-between gap-4">
-                  <div className="flex items-center gap-2 flex-1">
-                    {badgeText && (
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap ${badgeClass}`}>
-                        {badgeText}
-                      </span>
-                    )}
-                    <span className="text-slate-300">{labelText}</span>
-                  </div>
-                  <span className="text-slate-100 font-semibold text-right">{detail.value}</span>
-                </div>
-              );
-            }
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function calculateOldAgePensionAdjustment(baseAmount: number, claimAge: number): number {
-  if (claimAge === 65) return baseAmount;
-
-  if (claimAge < 65) {
-    const monthsEarly = (65 - claimAge) * 12;
-    const reductionRate = monthsEarly * 0.004;
-    return baseAmount * (1 - reductionRate);
-  } else {
-    const monthsLate = (claimAge - 65) * 12;
-    const increaseRate = monthsLate * 0.007;
-    return baseAmount * (1 + increaseRate);
-  }
-}
-
-function AutoFitLine({
-  text,
-  className = '',
-  maxRem = 1.0,
-  minScale = 0.5,
-  align = 'center',
-}: {
-  text: string;
-  className?: string;
-  maxRem?: number;
-  minScale?: number;
-  align?: 'left' | 'center' | 'right';
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
-
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const parent = el.parentElement;
-    if (!parent) return;
-
-    el.style.transform = 'none';
-    el.style.width = 'auto';
-    el.style.whiteSpace = 'nowrap';
-
-    const pW = parent.clientWidth;
-    const cW = el.scrollWidth;
-
-    if (cW > pW && cW > 0) {
-      const s = Math.max(minScale, pW / cW);
-      setScale(s);
-    } else {
-      setScale(1);
-    }
-  }, [text, minScale]);
-
-  const origin = align === 'left' ? 'left center' : align === 'right' ? 'right center' : 'center center';
-
-  return (
-    <div
-      ref={ref}
-      className={`origin-left whitespace-nowrap leading-none ${className}`}
-      style={{
-        fontSize: `${maxRem}rem`,
-        transform: `scale(${scale})`,
-        transformOrigin: origin,
-        width: scale < 1 ? '100%' : 'auto',
-      }}
-    >
-      {text}
-    </div>
-  );
-}
-
-function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={`bg-slate-900/40 border border-slate-800 rounded-2xl backdrop-blur-sm ${className}`}>
-      {children}
-    </div>
-  );
-}
-
-function Label({ children }: { children: React.ReactNode }) {
-  return <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">{children}</label>;
-}
+// --- Helper Components ---
 
 function Input({ type = "number", value, onChange, className = "" }: { type?: string; value: number | string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; className?: string }) {
   return (
@@ -244,167 +41,8 @@ function Select({ value, onChange, options }: { value: number | string; onChange
   );
 }
 
-function useSharedGeometry(measureRef: React.RefObject<HTMLDivElement | null>, segments: Segment[]): Geometry {
-  const [innerW, setInnerW] = useState(0);
-  useLayoutEffect(() => {
-    const resize = () => setInnerW(measureRef.current?.clientWidth ?? 0);
-    resize();
-    const ro = new ResizeObserver(resize);
-    if (measureRef.current) ro.observe(measureRef.current);
-    return () => ro.disconnect();
-  }, [measureRef]);
-
-  return useMemo(() => {
-    const barW = innerW;
-    const widthYearsArr = segments.map((s) => Math.max(0, s.widthYears ?? s.years));
-    const totalYearsRaw = widthYearsArr.reduce((s, x) => s + x, 0);
-    const totalYears = Math.max(1e-6, totalYearsRaw);
-
-    const ideal = widthYearsArr.map((y) => (y / totalYears) * barW);
-    const smallFlags = ideal.map((w, i) => widthYearsArr[i] > 0 && w < MIN_SEG_PX);
-    const minTotal = smallFlags.reduce((sum, f) => sum + (f ? MIN_SEG_PX : 0), 0);
-    const largeIdeal = ideal.map((w, i) => (smallFlags[i] ? 0 : w));
-    const largeIdealSum = largeIdeal.reduce((a, b) => a + b, 0);
-    const remain = Math.max(0, barW - minTotal);
-
-    const floatW = segments.map((_, i) => {
-      if (widthYearsArr[i] <= 0) return 0;
-      return smallFlags[i] ? MIN_SEG_PX : largeIdealSum > 0 ? (largeIdeal[i] / largeIdealSum) * remain : 0;
-    });
-
-    const quantW = floatW.map((w) => Math.floor(w));
-    let usedFloor = quantW.reduce((a, b) => a + b, 0);
-    let delta = barW - usedFloor;
-    if (delta !== 0) {
-      const idx = quantW
-        .map((w, i) => ({ w, i }))
-        .filter((x) => x.w > 0)
-        .slice(-1)[0]?.i;
-      if (idx !== undefined) {
-        quantW[idx] += delta;
-        usedFloor += delta;
-      }
-    }
-    for (let i = 0; i < quantW.length; i++) {
-      if (quantW[i] > 0 && quantW[i] <= 1) {
-        const giveTo = i < quantW.length - 1 ? i + 1 : i - 1;
-        if (giveTo >= 0) {
-          quantW[giveTo] += quantW[i];
-          quantW[i] = 0;
-        }
-      }
-    }
-
-    const used = quantW.reduce((a, b) => a + b, 0);
-    const edgesRaw: number[] = [];
-    let acc = 0;
-    for (let i = 0; i < quantW.length; i++) {
-      acc += quantW[i];
-      edgesRaw.push(acc);
-    }
-    return { used, edgesRaw, totalYears, rawW: quantW };
-  }, [segments, innerW]);
-}
-
-function PensionSegmentsBar({ segments, geometry }: { segments: Segment[]; geometry: Geometry }) {
-  return (
-    <div className="relative" style={{ width: geometry.used }}>
-      <div
-        className="relative flex overflow-hidden rounded-2xl border border-white/15"
-        style={{ width: geometry.used, height: BAR_HEIGHT }}
-      >
-        {segments.map((s, i) => {
-          const w = geometry.rawW[i];
-          if (w <= 1) return null;
-          const showText = w >= MIN_SEG_PX;
-          const amountText = s.amountYear !== undefined ? `${(s.amountYear / 10000).toFixed(0)}万円` : '';
-          const monthlyText = s.amountYear !== undefined ? `月${(s.amountYear / 120000).toFixed(1)}万` : '';
-          const titleText = `${s.label} ${s.years}年`;
-
-          return (
-            <div key={i} className="relative" style={{ width: w }}>
-              <div
-                className={`${s.className} ring-1 ring-white/15 relative flex flex-col justify-center items-stretch px-1 overflow-hidden`}
-                style={{ width: w, height: BAR_HEIGHT, ...s.style }}
-                title={titleText}
-              >
-                {showText && (
-                  <>
-                    {monthlyText && (
-                      <AutoFitLine text={monthlyText} maxRem={1.5} minScale={0.6} className="text-white font-bold" align="left" />
-                    )}
-                    <AutoFitLine text={amountText} maxRem={1.1} minScale={0.6} className="text-white/80 mt-1" align="left" />
-                    <AutoFitLine
-                      text={titleText}
-                      maxRem={1.0}
-                      minScale={0.5}
-                      className="text-white/70 mt-1"
-                      align="left"
-                    />
-                  </>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div className="relative flex mt-2" style={{ width: geometry.used }}>
-        {segments.map((s, i) => {
-          const w = geometry.rawW[i];
-          if (w <= 1) return null;
-          const isLast = i === segments.length - 1;
-          return (
-            <div key={`ages-${i}`} className="relative" style={{ width: w }}>
-              <div className="min-h-[60px] flex items-start justify-between px-0.5">
-                {s.startAges && s.startAges.length > 0 && (
-                  <div className="text-[11px] sm:text-xs md:text-sm text-slate-300 leading-tight">
-                    {s.startAges.map((ageLabel, idx) => (
-                      <div key={idx} className="whitespace-nowrap">
-                        {ageLabel}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {isLast && s.endAges && s.endAges.length > 0 && (
-                  <div className="text-[11px] sm:text-xs md:text-sm text-slate-300 leading-tight text-right">
-                    {s.endAges.map((ageLabel, idx) => (
-                      <div key={idx} className="whitespace-nowrap">
-                        {ageLabel}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function AgeTicksBar({ ticks, geometry }: { ticks: Tick[]; geometry: Geometry }) {
-  return (
-    <div className="relative h-32" style={{ width: geometry.used }}>
-      <div className="absolute left-0 right-0 top-5 h-[2px] bg-white/25 rounded" />
-      {ticks.map((t, i) => {
-        const leftPx =
-          t.posPx !== undefined ? t.posPx : Math.round(((t.posYears || 0) / geometry.totalYears) * geometry.used);
-        return (
-          <div key={i} className="absolute -translate-x-1/2" style={{ left: `${leftPx}px` }}>
-            <div className="h-6 w-px bg-white/70 mx-auto" />
-            <div className="mt-1 text-xs md:text-sm opacity-90 text-center leading-[1.2]">
-              {t.labelLines.map((ln, j) => (
-                <div key={j} className="whitespace-nowrap">
-                  {ln}
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
+function Label({ children }: { children: React.ReactNode }) {
+  return <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">{children}</label>;
 }
 
 function Accordion({ title, children, defaultOpen = false, onClear, headerContent }: { title: string; children: React.ReactNode; defaultOpen?: boolean; onClear?: () => void; headerContent?: React.ReactNode }) {
@@ -416,27 +54,22 @@ function Accordion({ title, children, defaultOpen = false, onClear, headerConten
           onClick={() => setOpen((v) => !v)}
           className="flex-1 text-left text-sm flex items-center justify-between px-4 py-3 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800 transition-all"
         >
-          <span className="flex items-center gap-2 flex-wrap">
-            <span className="font-bold text-slate-200">{title}</span>
-            {headerContent && <span className="text-xs opacity-70 font-normal border-l border-slate-600 pl-2">{headerContent}</span>}
-          </span>
-          <span className={`text-slate-400 transition-transform duration-300 ${open ? 'rotate-180' : ''}`}>
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+          <span className="font-bold text-slate-200">{title}</span>
+          <div className="flex items-center gap-3">
+            {headerContent && <span className="text-xs text-slate-400 font-normal hidden sm:block">{headerContent}</span>}
+            <svg className={`w-4 h-4 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
-          </span>
+          </div>
         </button>
         {onClear && (
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onClear();
-            }}
-            className="p-3 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-rose-900/20 hover:border-rose-900/50 hover:text-rose-400 text-slate-400 transition-all"
-            title="Clear"
+            onClick={onClear}
+            className="p-3 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-rose-900/20 hover:border-rose-800 hover:text-rose-400 text-slate-500 transition-all"
+            title="リセット"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
           </button>
         )}
@@ -450,107 +83,18 @@ function Accordion({ title, children, defaultOpen = false, onClear, headerConten
   );
 }
 
-function TimelineBlock({
-  title,
-  color,
-  segments,
-  ticks,
-  blockNumber,
-  hasLogic = false,
-}: {
-  title: string;
-  color: 'emerald' | 'sky';
-  segments: Segment[];
-  ticks: Tick[];
-  blockNumber?: 1 | 2;
-  hasLogic?: boolean;
-}) {
-
-  // ①は緑系、②は青系に統一
-  let border = '';
-  let bg = '';
-  if (blockNumber === 1) {
-    border = 'border-emerald-500/40';
-    bg = 'bg-emerald-900/20';
-  } else if (blockNumber === 2) {
-    border = 'border-sky-500/40';
-    bg = 'bg-sky-900/20';
-  } else {
-    border = color === 'emerald' ? 'border-emerald-500/40' : 'border-sky-500/40';
-    bg = color === 'emerald' ? 'bg-emerald-900/20' : 'bg-sky-900/20';
-  }
-  const measureRef = useRef<HTMLDivElement>(null);
-  const geometry = useSharedGeometry(measureRef, segments);
-
-  const ticksResolved: Tick[] = useMemo(() => {
-    const edgesPx = [0, ...geometry.edgesRaw];
-    return ticks.map((t) => {
-      if (t.edgeIndex !== undefined) {
-        const idx = Math.max(0, Math.min(edgesPx.length - 1, t.edgeIndex));
-        return { ...t, posPx: edgesPx[idx] };
-      }
-      return t;
-    });
-  }, [ticks, geometry.edgesRaw]);
-
-  const roundedClass = hasLogic ? 'rounded-t-2xl rounded-b-none border-b-0' : 'rounded-2xl';
-  const mbClass = hasLogic ? 'mb-0' : 'mb-8';
-
-  return (
-    <div className={`${roundedClass} ${border} ${bg} p-8 md:p-10 ${mbClass}`}>
-      <div className="text-base font-semibold mb-3">{title}</div>
-      <div ref={measureRef} className="w-full h-0 overflow-hidden" />
-      <PensionSegmentsBar segments={segments} geometry={geometry} />
-    </div>
-  );
-}
-
-function PeriodCard({ title, amount, period, colorClass, icon, pensionTypes }: {
-  title: string;
-  amount: number;
-  period: string;
-  colorClass: string;
-  icon: string;
-  pensionTypes?: string[];
-}) {
-  return (
-    <div className={`p-8 rounded-2xl border-2 ${colorClass} bg-slate-900/40 backdrop-blur-sm`}>
-      <div className="flex items-center gap-3 mb-4">
-        <span className="text-3xl">{icon}</span>
-        <div className="text-lg font-bold text-slate-300">{title}</div>
-      </div>
-      <div className="text-4xl font-bold text-slate-100 mb-3">
-        {amount > 0 ? `月額 ${(amount / 12 / 10000).toFixed(1)}万円` : '---'}
-      </div>
-      {amount > 0 && (
-        <div className="text-xl font-normal text-slate-400 mb-4">
-          年額 {(amount / 10000).toFixed(0)}万円
-        </div>
-      )}
-      {pensionTypes && pensionTypes.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          {pensionTypes.map((type, idx) => (
-            <span key={idx} className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-slate-700/50 text-slate-300 border border-slate-600/50">
-              {type}
-            </span>
-          ))}
-        </div>
-      )}
-      <div className="text-base text-slate-500">{period}</div>
-    </div>
-  );
-}
+// --- Main Component ---
 
 export default function SurvivorPensionPage() {
   const [mode, setMode] = useState<PolicyMode>('current');
-  const [showWifeSection, setShowWifeSection] = useState(true);
-  const [showHusbandSection, setShowHusbandSection] = useState(true);
   const [spouseType, setSpouseType] = useState<'couple' | 'single'>('couple');
 
   const [childrenCount, setChildrenCount] = useState<number | null>(null);
   const [childrenAges, setChildrenAges] = useState<number[]>([]);
 
   const [ageWife, setAgeWife] = useState<number>(35);
+  const [sliderRatio, setSliderRatio] = useState(0.9);
+
   const [avgStdMonthlyWife, setAvgStdMonthlyWife] = useState<number>(300000);
   const [monthsWife, setMonthsWife] = useState<number>(120);
   const [useMinashi300Wife, setUseMinashi300Wife] = useState<boolean>(true);
@@ -561,6 +105,11 @@ export default function SurvivorPensionPage() {
   const [monthsHusband, setMonthsHusband] = useState<number>(180);
   const [useMinashi300Husband, setUseMinashi300Husband] = useState<boolean>(true);
   const [oldAgeStartHusband, setOldAgeStartHusband] = useState<number>(65);
+
+  const [currentSavingsTotal, setCurrentSavingsTotal] = useState<number>(0);
+  const [existingInsuranceTotal, setExistingInsuranceTotal] = useState<number>(0);
+  const [educationCourse, setEducationCourse] = useState<string>('private_hs');
+  const [cramSchoolOptions, setCramSchoolOptions] = useState<any>({ elementary: true, juniorHigh: true, highSchool: true });
 
   const [showNotes, setShowNotes] = useState(false);
 
@@ -588,6 +137,11 @@ export default function SurvivorPensionPage() {
 
           if (basicInfo.spouseType) setSpouseType(basicInfo.spouseType);
 
+          if (basicInfo.currentSavingsTotal !== undefined) setCurrentSavingsTotal(basicInfo.currentSavingsTotal);
+          if (basicInfo.existingInsuranceTotal !== undefined) setExistingInsuranceTotal(basicInfo.existingInsuranceTotal);
+          if (basicInfo.educationCourse) setEducationCourse(basicInfo.educationCourse);
+          if (basicInfo.cramSchoolOptions) setCramSchoolOptions(basicInfo.cramSchoolOptions);
+
         } catch (e) {
           console.error('Failed to load basic info', e);
         }
@@ -608,561 +162,114 @@ export default function SurvivorPensionPage() {
     }
   }, [childrenCount]);
 
-  const caseHusbandDeath = useMemo(() => {
-    return calculateSurvivorPensionAmounts({
-      ageWife,
-      ageHusband,
-      childrenAges,
-      survivorSource: {
-        avgStdMonthly: avgStdMonthlyHusband,
-        months: monthsHusband,
-        useMinashi300: useMinashi300Husband
-      },
-      ownSource: {
-        avgStdMonthly: avgStdMonthlyWife,
-        months: monthsWife
-      },
-      oldAgeStart: oldAgeStartWife,
-      isWifeDeath: false,
-      mode
-    });
-  }, [mode, childrenAges, avgStdMonthlyHusband, monthsHusband, useMinashi300Husband, ageWife, oldAgeStartWife, avgStdMonthlyWife, monthsWife]);
+  const calculateYearlyData = (
+    scenario: 'husband_death' | 'wife_death' | 'husband_disability' | 'wife_disability'
+  ) => {
+    const isWifeSurvivor = scenario === 'husband_death' || scenario === 'husband_disability';
+    const isDisability = scenario === 'husband_disability' || scenario === 'wife_disability';
 
-  const caseWifeDeath = useMemo(() => {
-    return calculateSurvivorPensionAmounts({
-      ageWife,
-      ageHusband,
-      childrenAges,
-      survivorSource: {
-        avgStdMonthly: avgStdMonthlyWife,
-        months: monthsWife,
-        useMinashi300: useMinashi300Wife
-      },
-      ownSource: {
-        avgStdMonthly: avgStdMonthlyHusband,
-        months: monthsHusband
-      },
-      oldAgeStart: oldAgeStartHusband,
-      isWifeDeath: true,
-      mode
-    });
-  }, [mode, childrenAges, avgStdMonthlyWife, monthsWife, useMinashi300Wife, ageHusband, oldAgeStartHusband, avgStdMonthlyHusband, monthsHusband]);
+    const currentAge = isWifeSurvivor ? ageWife : ageHusband;
+    const spouseAge = isWifeSurvivor ? ageHusband : ageWife;
+    const myAnnualIncome = isWifeSurvivor ? (avgStdMonthlyWife * 12) : (avgStdMonthlyHusband * 12);
 
-  const timelineDataHusband = useMemo(() => {
-    const block1 = { segments: [] as Segment[], ticks: [] as Tick[] };
-    const block2 = { segments: [] as Segment[], ticks: [] as Tick[] };
-    const widen = (y: number) => Math.max(y, 5);
+    // Asset Income (Monthly)
+    const yearsLeft = 100 - currentAge;
+    const assetMonthly = yearsLeft > 0 ? (currentSavingsTotal + existingInsuranceTotal) / (yearsLeft * 12) : 0;
 
-    // Block 1: 子がいる期間（子の年齢による変動を反映）
-    const yearsTo18List = childrenAges
-      .map(age => Math.max(0, 18 - age))
-      .filter(y => y > 0)
-      .sort((a, b) => a - b);
+    const data = [];
+    let totalShortfall = 0;
 
-    // 老齢年金開始年齢がこの期間に含まれる場合、その時点でも区切る
-    const yearsToOldAge = Math.max(0, oldAgeStartWife - ageWife);
-    const pointsArr = [0, ...yearsTo18List];
+    for (let age = currentAge; age <= 100; age++) {
+      const yearIndex = age - currentAge;
 
-    // 老齢年金開始が「現在」より後で、「子がいなくなる」より前の場合のみ追加
-    const maxYears = pointsArr[pointsArr.length - 1] || 0;
-    if (yearsToOldAge > 0 && (!maxYears || yearsToOldAge < maxYears)) {
-      pointsArr.push(yearsToOldAge);
-    }
-
-    const points = Array.from(new Set(pointsArr)).sort((a, b) => a - b);
-    const maxYearsWithChild = points[points.length - 1] || 0;
-
-    if (maxYearsWithChild > 0) {
-      const initialLines = [`妻${ageWife}`];
-      childrenAges.forEach((age) => {
-        if (age <= 18) {
-          initialLines.push(`子${age}`);
-        }
-      });
-      block1.ticks.push({
-        edgeIndex: 0,
-        labelLines: initialLines
-      });
-
-      for (let i = 0; i < points.length - 1; i++) {
-        const startY = points[i];
-        const endY = points[i + 1];
-        const duration = endY - startY;
-
-        // その期間の支給額計算
-        const agesAtStart = childrenAges.map(a => a + startY);
-        const eligibleCount = calculateEligibleChildrenCount(agesAtStart);
-        const basicPension = calculateSurvivorBasicPension(eligibleCount);
-        const amount = basicPension + caseHusbandDeath.employeePension;
-
-        const startAge = ageWife + startY;
-        const endAge = ageWife + endY;
-
-        // 開始時点の家族年齢リスト（亡くなった夫は除外）
-        const startAges: string[] = [`妻${ageWife + startY}`];
-        childrenAges.forEach((age) => {
-          const currentAge = age + startY;
-          startAges.push(`子${currentAge}`);
-        });
-
-        // 終了時点の家族年齢リスト（最後のセグメントのみ、亡くなった夫は除外）
-        const endAges: string[] | undefined = i === points.length - 2 ? [] : undefined;
-        if (endAges) {
-          endAges.push(`妻${ageWife + endY}`);
-          childrenAges.forEach((age) => {
-            const currentAge = age + endY;
-            endAges!.push(`子${currentAge}`);
-          });
-        }
-
-        block1.segments.push({
-          label: `子${eligibleCount}人`,
-          years: duration,
-          widthYears: widen(duration),
-          className: `ring-1 ring-white/20`,
-          style: { backgroundColor: getGradientColor('emerald', i) },
-          amountYear: amount,
-          startAge,
-          endAge,
-          startAges,
-          endAges
-        });
-
-        // Ticks for Block 1
-        const lines = [`妻${ageWife + endY}`];
-
-        // 老齢年金開始のタイミングならラベルを追加
-        if (ageWife + endY === oldAgeStartWife) {
-          lines.push('老齢開始');
-        }
-
-        childrenAges.forEach((age, idx) => {
-          const currentAge = age + endY;
-          lines.push(`子${currentAge}`);
-        });
-        block1.ticks.push({
-          edgeIndex: i + 1,
-          labelLines: lines
-        });
+      // Work Income
+      let workIncome = 0;
+      if (age < 65) {
+        workIncome = calculateSurvivorWorkIncome(myAnnualIncome, sliderRatio);
       }
-    }
 
-    // Block 2: 子がいなくなった後
-    const ageAfterChild = ageWife + maxYearsWithChild;
-    const startAge = Math.min(ageAfterChild, oldAgeStartWife);
-    const endAge = 100;
-    const totalDuration = endAge - startAge;
+      // Pension Income
+      let pensionIncome = 0;
+      const currentChildrenAges = childrenAges.map(a => a + yearIndex);
 
-    const chukoreiEndAge = oldAgeStartWife;
-    const period1Duration = Math.max(0, chukoreiEndAge - startAge);
-
-    let segmentCount = 0;
-
-    if (period1Duration > 0) {
-      // 30歳未満の妻に対する5年有期給付の処理
-      if (startAge < 30) {
-        // 5年間の有期給付
-        const limitedDuration = 5;
-        const limitedEndAge = startAge + limitedDuration;
-
-        // 1. 有期給付期間（5年）
-        const startAges1: string[] = [`妻${startAge}`];
-        childrenAges.forEach((age) => {
-          const currentAge = age + (startAge - ageWife);
-          startAges1.push(`子${currentAge}`);
-        });
-        const endAges1: string[] = [`妻${limitedEndAge}`];
-        childrenAges.forEach((age) => {
-          const currentAge = age + (limitedEndAge - ageWife);
-          endAges1.push(`子${currentAge}`);
-        });
-        block2.segments.push({
-          label: '遺族厚生（5年）',
-          years: limitedDuration,
-          widthYears: widen(limitedDuration),
-          className: 'ring-1 ring-white/20',
-          style: { backgroundColor: getGradientColor('blue', segmentCount) },
-          amountYear: caseHusbandDeath.afterChildrenAmount, // ここには既に計算済みの額が入っている
-          startAge,
-          endAge: limitedEndAge,
-          startAges: startAges1,
-          endAges: endAges1
-        });
-        segmentCount++;
-
-        // 2. その後の期間（支給なし）
-        const remainingDuration = period1Duration - limitedDuration;
-        if (remainingDuration > 0) {
-          const startAges2: string[] = [`妻${limitedEndAge}`];
-          childrenAges.forEach((age) => {
-            const currentAge = age + (limitedEndAge - ageWife);
-            startAges2.push(`子${currentAge}`);
-          });
-          const endAges2: string[] = [`妻${oldAgeStartWife}`];
-          childrenAges.forEach((age) => {
-            const currentAge = age + (oldAgeStartWife - ageWife);
-            endAges2.push(`子${currentAge}`);
-          });
-          block2.segments.push({
-            label: '支給なし',
-            years: remainingDuration,
-            widthYears: widen(remainingDuration),
-            className: 'ring-1 ring-white/20',
-            style: { backgroundColor: 'rgba(100, 116, 139, 0.2)' }, // Slate-500 equivalent
-            amountYear: 0,
-            startAge: limitedEndAge,
-            endAge: oldAgeStartWife,
-            startAges: startAges2,
-            endAges: endAges2
-          });
-          segmentCount++;
-        }
+      if (isDisability) {
+        const disabilityAmount = calculateDisabilityPensionAmounts({
+          level: 2,
+          hasSpouse: true,
+          ageSpouse: age,
+          childrenAges: currentChildrenAges,
+          avgStdMonthly: isWifeSurvivor ? avgStdMonthlyHusband : avgStdMonthlyWife,
+          months: isWifeSurvivor ? monthsHusband : monthsWife,
+          useMinashi300: isWifeSurvivor ? useMinashi300Husband : useMinashi300Wife,
+        }).total;
+        pensionIncome = disabilityAmount / 12;
       } else {
-        // 通常の処理（30歳以上）
-        const isChukorei = startAge >= 40 && startAge < 65;
-        const startAges: string[] = [`妻${startAge}`];
-        childrenAges.forEach((age) => {
-          const currentAge = age + (startAge - ageWife);
-          startAges.push(`子${currentAge}`);
-        });
-        const endAges: string[] = [`妻${oldAgeStartWife}`];
-        childrenAges.forEach((age) => {
-          const currentAge = age + (oldAgeStartWife - ageWife);
-          endAges.push(`子${currentAge}`);
-        });
-
-        block2.segments.push({
-          label: isChukorei ? '寡婦加算' : '遺族厚生',
-          years: period1Duration,
-          widthYears: widen(period1Duration),
-          className: 'ring-1 ring-white/20',
-          style: { backgroundColor: getGradientColor('blue', segmentCount) },
-          amountYear: caseHusbandDeath.afterChildrenAmount,
-          startAge,
-          endAge: oldAgeStartWife,
-          startAges,
-          endAges: undefined // 最後のセグメントではないので終了年齢は非表示
-        });
-        segmentCount++;
+        const survivorAmount = calculateSurvivorPensionAmounts({
+          ageWife: isWifeSurvivor ? age : (spouseAge + yearIndex),
+          ageHusband: isWifeSurvivor ? (spouseAge + yearIndex) : age,
+          childrenAges: currentChildrenAges,
+          survivorSource: {
+            avgStdMonthly: isWifeSurvivor ? avgStdMonthlyHusband : avgStdMonthlyWife,
+            months: isWifeSurvivor ? monthsHusband : monthsWife,
+            useMinashi300: isWifeSurvivor ? useMinashi300Husband : useMinashi300Wife
+          },
+          ownSource: {
+            avgStdMonthly: isWifeSurvivor ? avgStdMonthlyWife : avgStdMonthlyHusband,
+            months: isWifeSurvivor ? monthsWife : monthsHusband
+          },
+          oldAgeStart: isWifeSurvivor ? oldAgeStartWife : oldAgeStartHusband,
+          isWifeDeath: !isWifeSurvivor,
+          mode: 'current'
+        }).total;
+        pensionIncome = survivorAmount / 12;
       }
-    }
 
-    const period2Duration = endAge - oldAgeStartWife;
-    if (period2Duration > 0) {
-      const startAges: string[] = [`妻${oldAgeStartWife}`];
-      childrenAges.forEach((age) => {
-        const currentAge = age + (oldAgeStartWife - ageWife);
-        startAges.push(`子${currentAge}`);
-      });
-      const endAges: string[] = [`妻${endAge}`];
-      childrenAges.forEach((age) => {
-        const currentAge = age + (endAge - ageWife);
-        endAges.push(`子${currentAge}`);
+      // Expenses
+      const expenses = calculateRequiredExpenses({
+        age,
+        livingCostBase: 200000,
+        educationCourse: educationCourse as any,
+        childrenAges: currentChildrenAges,
+        currentAgeOfParent: age,
+        cramSchoolOptions
       });
 
-      block2.segments.push({
-        label: '老齢年金',
-        years: period2Duration,
-        widthYears: widen(period2Duration),
-        className: 'ring-1 ring-white/20',
-        style: { backgroundColor: getGradientColor('blue', segmentCount) },
-        amountYear: caseHusbandDeath.oldAgeAmount,
-        startAge: oldAgeStartWife,
-        endAge,
-        startAges,
-        endAges // 最後のセグメントなので終了年齢を表示
-      });
-      segmentCount++;
-    }
-
-    block2.ticks.push({
-      edgeIndex: 0,
-      labelLines: [`妻${startAge}`, startAge === ageWife ? '現在' : '']
-    });
-
-    if (period1Duration > 0) {
-      block2.ticks.push({
-        edgeIndex: 1,
-        labelLines: [`妻${oldAgeStartWife}`, '老齢開始']
-      });
-    }
-
-    block2.ticks.push({
-      edgeIndex: segmentCount,
-      labelLines: [`妻${endAge}`]
-    });
-
-    return { block1: maxYearsWithChild > 0 ? block1 : null, block2 };
-  }, [ageWife, childrenAges, caseHusbandDeath, oldAgeStartWife]);
-
-  const timelineDataWife = useMemo(() => {
-    const block1 = { segments: [] as Segment[], ticks: [] as Tick[] };
-    const block2 = { segments: [] as Segment[], ticks: [] as Tick[] };
-    const widen = (y: number) => Math.max(y, 5);
-
-    // Block 1: 子がいる期間
-    const yearsTo18List = childrenAges
-      .map(age => Math.max(0, 18 - age))
-      .filter(y => y > 0)
-      .sort((a, b) => a - b);
-
-    // 老齢年金開始年齢がこの期間に含まれる場合、その時点でも区切る
-    const yearsToOldAge = Math.max(0, oldAgeStartHusband - ageHusband);
-    const pointsArr = [0, ...yearsTo18List];
-
-    // 老齢年金開始が「現在」より後で、「子がいなくなる」より前の場合のみ追加
-    const maxYears = pointsArr[pointsArr.length - 1] || 0;
-    if (yearsToOldAge > 0 && (!maxYears || yearsToOldAge < maxYears)) {
-      pointsArr.push(yearsToOldAge);
-    }
-
-    const points = Array.from(new Set(pointsArr)).sort((a, b) => a - b);
-    const maxYearsWithChild = points[points.length - 1] || 0;
-
-    if (maxYearsWithChild > 0) {
-      const initialLines = [`夫${ageHusband}`];
-      childrenAges.forEach((age) => {
-        if (age <= 18) {
-          initialLines.push(`子${age}`);
-        }
-      });
-      block1.ticks.push({
-        edgeIndex: 0,
-        labelLines: initialLines
-      });
-
-      for (let i = 0; i < points.length - 1; i++) {
-        const startY = points[i];
-        const endY = points[i + 1];
-        const duration = endY - startY;
-
-        const agesAtStart = childrenAges.map(a => a + startY);
-        const eligibleCount = calculateEligibleChildrenCount(agesAtStart);
-        const basicPension = calculateSurvivorBasicPension(eligibleCount);
-        const amount = basicPension + caseWifeDeath.employeePension;
-
-        const startAge = ageHusband + startY;
-        const endAge = ageHusband + endY;
-
-        // 開始時点の家族年齢リスト（亡くなった妻は除外）
-        const startAges: string[] = [`夫${ageHusband + startY}`];
-        childrenAges.forEach((age) => {
-          const currentAge = age + startY;
-          startAges.push(`子${currentAge}`);
-        });
-
-        // 終了時点の家族年齢リスト（最後のセグメントのみ、亡くなった妻は除外）
-        const endAges: string[] | undefined = i === points.length - 2 ? [] : undefined;
-        if (endAges) {
-          endAges.push(`夫${ageHusband + endY}`);
-          childrenAges.forEach((age) => {
-            const currentAge = age + endY;
-            endAges!.push(`子${currentAge}`);
-          });
-        }
-
-        block1.segments.push({
-          label: `子${eligibleCount}人`,
-          years: duration,
-          widthYears: widen(duration),
-          className: `ring-1 ring-white/20`,
-          style: { backgroundColor: getGradientColor('emerald', i) },
-          amountYear: amount,
-          startAge,
-          endAge,
-          startAges,
-          endAges
-        });
-
-        // Ticks for Block 1
-        const lines = [`夫${ageHusband + endY}`];
-
-        // 老齢年金開始のタイミングならラベルを追加
-        if (ageHusband + endY === oldAgeStartHusband) {
-          lines.push('老齢開始');
-        }
-
-        childrenAges.forEach((age, idx) => {
-          const currentAge = age + endY;
-          lines.push(`子${currentAge}`);
-        });
-        block1.ticks.push({
-          edgeIndex: i + 1,
-          labelLines: lines
-        });
+      // Shortfall
+      const totalIncome = workIncome + pensionIncome + assetMonthly;
+      if (expenses > totalIncome) {
+        totalShortfall += (expenses - totalIncome);
       }
-    }
 
-    // Block 2
-    const ageAfterChild = ageHusband + maxYearsWithChild;
-    const startAge = Math.min(ageAfterChild, oldAgeStartHusband);
-    const endAge = 100;
-    const totalDuration = endAge - startAge;
-
-    const period1Duration = Math.max(0, oldAgeStartHusband - startAge);
-    let segmentCount = 0;
-
-    // 夫の遺族厚生年金は60歳から支給
-    // 子がいなくなった後〜60歳: 待機期間（0円）
-    // 60歳〜老齢年金開始: 遺族厚生年金
-
-    if (period1Duration > 0) {
-      // IMPORTANT: Husband must be 55 or older at wife's death to be eligible for survivor employee pension
-      if (ageHusband >= 55) {
-        // 60歳より前の期間（待機期間）
-        if (startAge < 60) {
-          const waitingEndAge = Math.min(60, oldAgeStartHusband);
-          const waitingDuration = waitingEndAge - startAge;
-
-          if (waitingDuration > 0) {
-            const startAges: string[] = [`夫${startAge}`];
-            childrenAges.forEach((age) => {
-              const currentAge = age + (startAge - ageHusband);
-              startAges.push(`子${currentAge}`);
-            });
-            const endAges: string[] | undefined = waitingEndAge === oldAgeStartHusband ? undefined : [`夫${waitingEndAge}`];
-            if (endAges) {
-              childrenAges.forEach((age) => {
-                const currentAge = age + (waitingEndAge - ageHusband);
-                endAges.push(`子${currentAge}`);
-              });
-            }
-
-            block2.segments.push({
-              label: startAge >= 55 ? '停止中' : '待機中',
-              years: waitingDuration,
-              widthYears: widen(waitingDuration),
-              className: 'ring-1 ring-white/20',
-              style: { backgroundColor: getGradientColor('blue', segmentCount) },
-              amountYear: 0,
-              startAge,
-              endAge: waitingEndAge,
-              startAges,
-              endAges
-            });
-            segmentCount++;
-          }
-        }
-
-        // 60歳以降の期間（遺族厚生年金）
-        if (oldAgeStartHusband > 60 && startAge < oldAgeStartHusband) {
-          const pensionStartAge = Math.max(60, startAge);
-          const pensionDuration = oldAgeStartHusband - pensionStartAge;
-
-          if (pensionDuration > 0) {
-            const startAges: string[] = [`夫${pensionStartAge}`];
-            childrenAges.forEach((age) => {
-              const currentAge = age + (pensionStartAge - ageHusband);
-              startAges.push(`子${currentAge}`);
-            });
-            const endAges: string[] = [`夫${oldAgeStartHusband}`];
-            childrenAges.forEach((age) => {
-              const currentAge = age + (oldAgeStartHusband - ageHusband);
-              endAges.push(`子${currentAge}`);
-            });
-
-            block2.segments.push({
-              label: '遺族厚生',
-              years: pensionDuration,
-              widthYears: widen(pensionDuration),
-              className: 'ring-1 ring-white/20',
-              style: { backgroundColor: getGradientColor('blue', segmentCount) },
-              amountYear: caseWifeDeath.employeePension,
-              startAge: pensionStartAge,
-              endAge: oldAgeStartHusband,
-              startAges,
-              endAges: undefined // 最後のセグメントではないので終了年齢は非表示
-            });
-            segmentCount++;
-          }
-        }
-      } else {
-        // Not eligible (under 55 at wife's death)
-        // Show as empty period or just skip?
-        // If we skip, there will be a gap. Let's fill it with "Not Eligible" or similar if needed, 
-        // but usually we just don't show pension segments.
-        // However, to make it clear, maybe we should show a gray segment?
-        // For now, let's just NOT add pension segments, effectively showing a gap or just connecting to old age pension.
-        // But wait, period1Duration is the gap between "After Children" and "Old Age Pension".
-        // If we don't add segments, there will be a visual gap in the timeline if the logic expects segments to fill the width.
-        // The timeline component renders segments. If total duration is fixed, we might need a filler.
-        // But looking at the code, `block2.segments` are just pushed.
-        // If we don't push anything, the timeline will just start with Old Age Pension?
-        // No, `period1Duration` is calculated based on startAge (after children) and oldAgeStartHusband.
-        // If we don't add segments for this period, the user might wonder what happens.
-        // Let's add a "支給なし" (No Payment) segment for clarity.
-
-        const startAgesNoPay: string[] = [`夫${startAge}`];
-        childrenAges.forEach((age) => {
-          const currentAge = age + (startAge - ageHusband);
-          startAgesNoPay.push(`子${currentAge}`);
-        });
-        block2.segments.push({
-          label: '支給なし',
-          years: period1Duration,
-          widthYears: widen(period1Duration),
-          className: 'ring-1 ring-white/20',
-          style: { backgroundColor: 'rgba(100, 116, 139, 0.2)' }, // Slate-500 equivalent
-          amountYear: 0,
-          startAge,
-          endAge: oldAgeStartHusband,
-          startAges: startAgesNoPay,
-          endAges: undefined
-        });
-        segmentCount++;
-      }
-    }
-
-    const period2Duration = endAge - oldAgeStartHusband;
-    if (period2Duration > 0) {
-      const startAges: string[] = [`夫${oldAgeStartHusband}`];
-      childrenAges.forEach((age) => {
-        const currentAge = age + (oldAgeStartHusband - ageHusband);
-        startAges.push(`子${currentAge}`);
-      });
-      const endAges: string[] = [`夫${endAge}`];
-      childrenAges.forEach((age) => {
-        const currentAge = age + (endAge - ageHusband);
-        endAges.push(`子${currentAge}`);
-      });
-
-      block2.segments.push({
-        label: '老齢年金',
-        years: period2Duration,
-        widthYears: widen(period2Duration),
-        className: 'ring-1 ring-white/20',
-        style: { backgroundColor: getGradientColor('blue', segmentCount) },
-        amountYear: caseWifeDeath.oldAgeAmount,
-        startAge: oldAgeStartHusband,
-        endAge,
-        startAges,
-        endAges // 最後のセグメントなので終了年齢を表示
-      });
-      segmentCount++;
-    }
-
-    block2.ticks.push({
-      edgeIndex: 0,
-      labelLines: [`夫${startAge}`, startAge === ageHusband ? '現在' : '']
-    });
-
-    if (period1Duration > 0) {
-      block2.ticks.push({
-        edgeIndex: 1,
-        labelLines: [`夫${oldAgeStartHusband}`, '老齢開始']
+      data.push({
+        age,
+        workIncome,
+        pensionIncome,
+        assetIncome: assetMonthly,
+        expenses
       });
     }
 
-    block2.ticks.push({
-      edgeIndex: segmentCount,
-      labelLines: [`夫${endAge}`]
-    });
+    const firstYear = data[0] || { workIncome: 0, pensionIncome: 0, assetIncome: 0, expenses: 0 };
 
-    return { block1: maxYearsWithChild > 0 ? block1 : null, block2 };
-  }, [ageHusband, childrenAges, caseWifeDeath, oldAgeStartHusband]);
+    return {
+      timelineData: data,
+      cupData: {
+        workIncome: firstYear.workIncome,
+        pensionAmount: firstYear.pensionIncome,
+        assetAmount: firstYear.assetIncome,
+        totalRequired: firstYear.expenses
+      },
+      totalShortfall
+    };
+  };
+
+  const scenarioHusbandDeath = useMemo(() => calculateYearlyData('husband_death'), [ageWife, ageHusband, childrenAges, avgStdMonthlyWife, avgStdMonthlyHusband, monthsWife, monthsHusband, useMinashi300Wife, useMinashi300Husband, oldAgeStartWife, oldAgeStartHusband, sliderRatio, currentSavingsTotal, existingInsuranceTotal, educationCourse, cramSchoolOptions]);
+  const scenarioHusbandDisability = useMemo(() => calculateYearlyData('husband_disability'), [ageWife, ageHusband, childrenAges, avgStdMonthlyWife, avgStdMonthlyHusband, monthsWife, monthsHusband, useMinashi300Wife, useMinashi300Husband, oldAgeStartWife, oldAgeStartHusband, sliderRatio, currentSavingsTotal, existingInsuranceTotal, educationCourse, cramSchoolOptions]);
+  const scenarioWifeDeath = useMemo(() => calculateYearlyData('wife_death'), [ageWife, ageHusband, childrenAges, avgStdMonthlyWife, avgStdMonthlyHusband, monthsWife, monthsHusband, useMinashi300Wife, useMinashi300Husband, oldAgeStartWife, oldAgeStartHusband, sliderRatio, currentSavingsTotal, existingInsuranceTotal, educationCourse, cramSchoolOptions]);
+  const scenarioWifeDisability = useMemo(() => calculateYearlyData('wife_disability'), [ageWife, ageHusband, childrenAges, avgStdMonthlyWife, avgStdMonthlyHusband, monthsWife, monthsHusband, useMinashi300Wife, useMinashi300Husband, oldAgeStartWife, oldAgeStartHusband, sliderRatio, currentSavingsTotal, existingInsuranceTotal, educationCourse, cramSchoolOptions]);
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-emerald-500/30 pb-20">
+    <main className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-sky-500/30 pb-20">
       <div className="bg-slate-900/50 border-b border-slate-800 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -1181,20 +288,6 @@ export default function SurvivorPensionPage() {
             </Link>
           </div>
           <div className="flex items-center gap-4">
-            <div className="hidden md:flex items-center gap-2 bg-slate-800/50 rounded-lg p-1 border border-slate-700">
-              <button
-                onClick={() => setMode('current')}
-                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${mode === 'current' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
-              >
-                現行制度
-              </button>
-              <button
-                onClick={() => setMode('revised2028')}
-                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${mode === 'revised2028' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
-              >
-                2028改正案
-              </button>
-            </div>
             <button onClick={() => setShowNotes(!showNotes)} className="text-sm text-slate-400 hover:text-white transition-colors">
               このシミュレータの注意点
             </button>
@@ -1373,203 +466,103 @@ export default function SurvivorPensionPage() {
             </div>
           </Accordion>
 
+          {/* Slider */}
+          <div className="bg-slate-900/40 p-6 rounded-2xl border border-slate-800">
+            <h2 className="text-lg font-bold mb-4">就労収入のリスク調整</h2>
+            <input
+              type="range"
+              min="0.5"
+              max="1.0"
+              step="0.1"
+              value={sliderRatio}
+              onChange={(e) => setSliderRatio(parseFloat(e.target.value))}
+              className="w-full"
+            />
+            <div className="text-right text-sm text-slate-400 mt-2">
+              調整率: {(sliderRatio * 100).toFixed(0)}%
+            </div>
+          </div>
+
+          {/* Scenario 1: Husband Death */}
           <section>
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/30">
-                <span className="text-2xl">👩</span>
+            <h2 className="text-xl font-bold text-rose-400 mb-4">夫が亡くなった場合 (妻: {ageWife}歳)</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <PensionCup
+                label="月額収支 (初年度)"
+                workIncome={scenarioHusbandDeath.cupData.workIncome}
+                pensionAmount={scenarioHusbandDeath.cupData.pensionAmount}
+                assetAmount={scenarioHusbandDeath.cupData.assetAmount}
+                totalRequired={scenarioHusbandDeath.cupData.totalRequired}
+              />
+              <div className="md:col-span-2 h-64 bg-slate-900/40 rounded-2xl border border-slate-800 p-4">
+                <CashFlowTimeline data={scenarioHusbandDeath.timelineData} height={200} />
               </div>
-              <div>
-                <h2 className="text-2xl font-bold text-slate-100">妻の受給額</h2>
-                <p className="text-sm text-slate-400 mt-0.5">夫が死亡した場合</p>
-              </div>
             </div>
-
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-              <PeriodCard
-                title="子がいる期間"
-                amount={caseHusbandDeath.withChildrenAmount}
-                period={`${ageWife}歳 - ${caseHusbandDeath.ageAfterChild}歳`}
-                colorClass="border-emerald-500/30"
-                icon="👶"
-                pensionTypes={caseHusbandDeath.pensionTypesWithChildren}
-              />
-              <PeriodCard
-                title="子がいなくなった後"
-                amount={caseHusbandDeath.afterChildrenAmount}
-                period={`${caseHusbandDeath.ageAfterChild}歳 - ${oldAgeStartWife}歳`}
-                colorClass="border-sky-500/30"
-                icon="💼"
-                pensionTypes={caseHusbandDeath.pensionTypesAfterChildren}
-              />
-              <PeriodCard
-                title="年金開始後"
-                amount={caseHusbandDeath.oldAgeAmount}
-                period={`${oldAgeStartWife}歳 - 100歳`}
-                colorClass="border-sky-500/30"
-                icon="🎂"
-                pensionTypes={caseHusbandDeath.pensionTypesOldAge}
-              />
+            <div className="mt-4 text-center text-rose-400 font-bold text-xl">
+              必要保障額: {(scenarioHusbandDeath.totalShortfall / 10000).toFixed(0)}万円
             </div>
-
-            {timelineDataHusband.block1 && (
-              <>
-                <TimelineBlock
-                  title="① 👶 子がいる期間（加算あり期間）"
-                  color="emerald"
-                  segments={timelineDataHusband.block1.segments}
-                  ticks={timelineDataHusband.block1.ticks}
-                  blockNumber={1}
-                  hasLogic={true}
-                />
-                <CalculationLogic
-                  color="emerald"
-                  details={[
-                    { label: '遺族基礎年金（基本額）', value: '83.2万円' },
-                    { label: '子の加算（第1子・第2子）', value: '各23.9万円' },
-                    { label: '子の加算（第3子以降）', value: '各8.0万円' },
-                    { label: '遺族厚生年金（年額）', value: `${(caseHusbandDeath.employeePension / 10000).toFixed(1)}万円` },
-                    { label: '　平均標準報酬月額 × 厚生年金加入月数 × 5.481/1000 × 3/4', value: `${(avgStdMonthlyHusband / 10000).toFixed(1)}万 × ${useMinashi300Husband ? Math.max(monthsHusband, 300) : monthsHusband}月 × 5.481/1000 × 3/4 = ${(caseHusbandDeath.employeePension / 10000).toFixed(1)}万円` },
-                  ]}
-                />
-              </>
-            )}
-
-            <div className="mt-8">
-              <TimelineBlock
-                title="② 💼 子がいなくなった後 〜 老後"
-                color="sky"
-                segments={timelineDataHusband.block2.segments}
-                ticks={timelineDataHusband.block2.ticks}
-                blockNumber={2}
-                hasLogic={true}
-              />
-            </div>
-            <CalculationLogic
-              color="sky"
-              details={[
-                { label: '遺族厚生年金（年額）', value: `${(caseHusbandDeath.employeePension / 10000).toFixed(1)}万円` },
-                { label: '　平均標準報酬月額 × 厚生年金加入月数 × 5.481/1000 × 3/4', value: `${(avgStdMonthlyHusband / 10000).toFixed(1)}万 × ${useMinashi300Husband ? Math.max(monthsHusband, 300) : monthsHusband}月 × 5.481/1000 × 3/4 = ${(caseHusbandDeath.employeePension / 10000).toFixed(1)}万円` },
-                { label: '中高齢寡婦加算（該当時）', value: '62.4万円' },
-                { label: `妻の老齢基礎年金（${oldAgeStartWife}歳〜）`, value: `${(calculateOldAgePensionAdjustment(calculateOldAgeBasicPension(), oldAgeStartWife) / 10000).toFixed(1)}万円` },
-                ...(oldAgeStartWife !== 65 ? [{
-                  label: '　繰り上げ・繰り下げ調整',
-                  value: oldAgeStartWife < 65
-                    ? `83.2万円 × (1 - ${((65 - oldAgeStartWife) * 12 * 0.4).toFixed(1)}%) = ${(calculateOldAgePensionAdjustment(calculateOldAgeBasicPension(), oldAgeStartWife) / 10000).toFixed(1)}万円`
-                    : `83.2万円 × (1 + ${((oldAgeStartWife - 65) * 12 * 0.7).toFixed(1)}%) = ${(calculateOldAgePensionAdjustment(calculateOldAgeBasicPension(), oldAgeStartWife) / 10000).toFixed(1)}万円`
-                }] : []),
-                { label: `妻の老齢厚生年金（${oldAgeStartWife}歳〜）`, value: `${(calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife), oldAgeStartWife) / 10000).toFixed(1)}万円` },
-                { label: '　平均標準報酬月額 × 厚生年金加入月数 × 5.481/1000', value: `${(avgStdMonthlyWife / 10000).toFixed(1)}万 × ${monthsWife}月 × 5.481/1000 = ${(calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife) / 10000).toFixed(1)}万円` },
-                ...(oldAgeStartWife !== 65 ? [{
-                  label: '　繰り上げ・繰り下げ調整',
-                  value: oldAgeStartWife < 65
-                    ? `${(calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife) / 10000).toFixed(1)}万円 × (1 - ${((65 - oldAgeStartWife) * 12 * 0.4).toFixed(1)}%) = ${(calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife), oldAgeStartWife) / 10000).toFixed(1)}万円`
-                    : `${(calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife) / 10000).toFixed(1)}万円 × (1 + ${((oldAgeStartWife - 65) * 12 * 0.7).toFixed(1)}%) = ${(calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife), oldAgeStartWife) / 10000).toFixed(1)}万円`
-                }] : []),
-                { label: '遺族厚生年金（差額調整後）', value: `${(Math.max(0, caseHusbandDeath.employeePension - calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife), oldAgeStartWife)) / 10000).toFixed(1)}万円` },
-                { label: '　Max(遺族厚生年金 - 妻の老齢厚生年金, 0)', value: `Max(${(caseHusbandDeath.employeePension / 10000).toFixed(1)}万 - ${(calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife), oldAgeStartWife) / 10000).toFixed(1)}万, 0) = ${(Math.max(0, caseHusbandDeath.employeePension - calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife), oldAgeStartWife)) / 10000).toFixed(1)}万円` },
-                { label: '65歳以降の合計（年額）', value: `${(caseHusbandDeath.oldAgeAmount / 10000).toFixed(1)}万円` },
-                { label: '　老齢基礎 + 老齢厚生 + 遺族厚生（差額）', value: `${(calculateOldAgePensionAdjustment(calculateOldAgeBasicPension(), oldAgeStartWife) / 10000).toFixed(1)}万 + ${(calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife), oldAgeStartWife) / 10000).toFixed(1)}万 + ${(Math.max(0, caseHusbandDeath.employeePension - calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife), oldAgeStartWife)) / 10000).toFixed(1)}万 = ${(caseHusbandDeath.oldAgeAmount / 10000).toFixed(1)}万円` },
-              ]}
-            />
           </section>
 
-          <section className="pt-12 border-t border-slate-800">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 rounded-xl bg-rose-500/10 flex items-center justify-center border border-rose-500/30">
-                <span className="text-2xl">👨</span>
+          {/* Scenario 2: Husband Disability */}
+          <section>
+            <h2 className="text-xl font-bold text-orange-400 mb-4">夫が障害状態になった場合</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <PensionCup
+                label="月額収支 (初年度)"
+                workIncome={scenarioHusbandDisability.cupData.workIncome}
+                pensionAmount={scenarioHusbandDisability.cupData.pensionAmount}
+                assetAmount={scenarioHusbandDisability.cupData.assetAmount}
+                totalRequired={scenarioHusbandDisability.cupData.totalRequired}
+              />
+              <div className="md:col-span-2 h-64 bg-slate-900/40 rounded-2xl border border-slate-800 p-4">
+                <CashFlowTimeline data={scenarioHusbandDisability.timelineData} height={200} />
               </div>
-              <div>
-                <h2 className="text-2xl font-bold text-slate-100">夫の受給額</h2>
-                <p className="text-sm text-slate-400 mt-0.5">妻が死亡した場合</p>
-              </div>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-              <PeriodCard
-                title="子がいる期間"
-                amount={caseWifeDeath.withChildrenAmount}
-                period={`${ageHusband}歳 - ${caseWifeDeath.ageAfterChild}歳`}
-                colorClass="border-emerald-500/30"
-                icon="👶"
-                pensionTypes={caseWifeDeath.pensionTypesWithChildren}
-              />
-              <PeriodCard
-                title="子がいなくなった後"
-                amount={caseWifeDeath.afterChildrenAmount}
-                period={`${caseWifeDeath.ageAfterChild}歳 - ${oldAgeStartHusband}歳`}
-                colorClass="border-sky-500/30"
-                icon="💼"
-                pensionTypes={caseWifeDeath.pensionTypesAfterChildren}
-              />
-              <PeriodCard
-                title="年金開始後"
-                amount={caseWifeDeath.oldAgeAmount}
-                period={`${oldAgeStartHusband}歳 - 100歳`}
-                colorClass="border-sky-500/30"
-                icon="🎂"
-                pensionTypes={caseWifeDeath.pensionTypesOldAge}
-              />
+            <div className="mt-4 text-center text-orange-400 font-bold text-xl">
+              必要保障額: {(scenarioHusbandDisability.totalShortfall / 10000).toFixed(0)}万円
             </div>
-
-            {timelineDataWife.block1 && (
-              <>
-                <TimelineBlock
-                  title="① 👶 子がいる期間（加算あり期間）"
-                  color="emerald"
-                  segments={timelineDataWife.block1.segments}
-                  ticks={timelineDataWife.block1.ticks}
-                  blockNumber={1}
-                  hasLogic={true}
-                />
-                <CalculationLogic
-                  color="emerald"
-                  details={[
-                    { label: '遺族基礎年金（基本額）', value: '83.2万円' },
-                    { label: '子の加算（第1子・第2子）', value: '各23.9万円' },
-                    { label: '子の加算（第3子以降）', value: '各8.0万円' },
-                    { label: '遺族厚生年金（年額）', value: `${(caseWifeDeath.employeePension / 10000).toFixed(1)}万円` },
-                    { label: '　平均標準報酬月額 × 厚生年金加入月数 × 5.481/1000 × 3/4', value: `${(avgStdMonthlyWife / 10000).toFixed(1)}万 × ${useMinashi300Wife ? Math.max(monthsWife, 300) : monthsWife}月 × 5.481/1000 × 3/4 = ${(caseWifeDeath.employeePension / 10000).toFixed(1)}万円` },
-                  ]}
-                />
-              </>
-            )}
-
-            <div className="mt-8">
-              <TimelineBlock
-                title="② 💼 子がいなくなった後 〜 老後"
-                color="sky"
-                segments={timelineDataWife.block2.segments}
-                ticks={timelineDataWife.block2.ticks}
-                blockNumber={2}
-                hasLogic={true}
-              />
-            </div>
-            <CalculationLogic
-              color="sky"
-              details={[
-                { label: `夫の老齢基礎年金（${oldAgeStartHusband}歳〜）`, value: `${(calculateOldAgePensionAdjustment(calculateOldAgeBasicPension(), oldAgeStartHusband) / 10000).toFixed(1)}万円` },
-                ...(oldAgeStartHusband !== 65 ? [{
-                  label: '　繰り上げ・繰り下げ調整',
-                  value: oldAgeStartHusband < 65
-                    ? `83.2万円 × (1 - ${((65 - oldAgeStartHusband) * 12 * 0.4).toFixed(1)}%) = ${(calculateOldAgePensionAdjustmentUtil(calculateOldAgeBasicPension(), oldAgeStartHusband) / 10000).toFixed(1)}万円`
-                    : `83.2万円 × (1 + ${((oldAgeStartHusband - 65) * 12 * 0.7).toFixed(1)}%) = ${(calculateOldAgePensionAdjustmentUtil(calculateOldAgeBasicPension(), oldAgeStartHusband) / 10000).toFixed(1)}万円`
-                }] : []),
-                { label: `夫の老齢厚生年金（${oldAgeStartHusband}歳〜）`, value: `${(calculateOldAgePensionAdjustmentUtil(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband) / 10000).toFixed(1)}万円` },
-                { label: '　平均標準報酬月額 × 厚生年金加入月数 × 5.481/1000', value: `${(avgStdMonthlyHusband / 10000).toFixed(1)}万 × ${monthsHusband}月 × 5.481/1000 = ${(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband) / 10000).toFixed(1)}万円` },
-                ...(oldAgeStartHusband !== 65 ? [{
-                  label: '　繰り上げ・繰り下げ調整',
-                  value: oldAgeStartHusband < 65
-                    ? `${(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband) / 10000).toFixed(1)}万円 × (1 - ${((65 - oldAgeStartHusband) * 12 * 0.4).toFixed(1)}%) = ${(calculateOldAgePensionAdjustmentUtil(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband) / 10000).toFixed(1)}万円`
-                    : `${(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband) / 10000).toFixed(1)}万円 × (1 + ${((oldAgeStartHusband - 65) * 12 * 0.7).toFixed(1)}%) = ${(calculateOldAgePensionAdjustmentUtil(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband) / 10000).toFixed(1)}万円`
-                }] : []),
-                { label: '遺族厚生年金（差額調整後）', value: `${(Math.max(0, caseWifeDeath.employeePension - calculateOldAgePensionAdjustmentUtil(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband)) / 10000).toFixed(1)}万円` },
-                { label: '　Max(遺族厚生年金 - 夫の老齢厚生年金, 0)', value: `Max(${(caseWifeDeath.employeePension / 10000).toFixed(1)}万 - ${(calculateOldAgePensionAdjustmentUtil(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband) / 10000).toFixed(1)}万, 0) = ${(Math.max(0, caseWifeDeath.employeePension - calculateOldAgePensionAdjustmentUtil(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband)) / 10000).toFixed(1)}万円` },
-                { label: '65歳以降の合計（年額）', value: `${(caseWifeDeath.oldAgeAmount / 10000).toFixed(1)}万円` },
-                { label: '　老齢基礎 + 老齢厚生 + 遺族厚生（差額）', value: `${(calculateOldAgePensionAdjustmentUtil(calculateOldAgeBasicPension(), oldAgeStartHusband) / 10000).toFixed(1)}万 + ${(calculateOldAgePensionAdjustmentUtil(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband) / 10000).toFixed(1)}万 + ${(Math.max(0, caseWifeDeath.employeePension - calculateOldAgePensionAdjustmentUtil(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband)) / 10000).toFixed(1)}万 = ${(caseWifeDeath.oldAgeAmount / 10000).toFixed(1)}万円` },
-              ]}
-            />
           </section>
+
+          {/* Scenario 3: Wife Death */}
+          <section>
+            <h2 className="text-xl font-bold text-sky-400 mb-4">妻が亡くなった場合 (夫: {ageHusband}歳)</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <PensionCup
+                label="月額収支 (初年度)"
+                workIncome={scenarioWifeDeath.cupData.workIncome}
+                pensionAmount={scenarioWifeDeath.cupData.pensionAmount}
+                assetAmount={scenarioWifeDeath.cupData.assetAmount}
+                totalRequired={scenarioWifeDeath.cupData.totalRequired}
+              />
+              <div className="md:col-span-2 h-64 bg-slate-900/40 rounded-2xl border border-slate-800 p-4">
+                <CashFlowTimeline data={scenarioWifeDeath.timelineData} height={200} />
+              </div>
+            </div>
+            <div className="mt-4 text-center text-sky-400 font-bold text-xl">
+              必要保障額: {(scenarioWifeDeath.totalShortfall / 10000).toFixed(0)}万円
+            </div>
+          </section>
+
+          {/* Scenario 4: Wife Disability */}
+          <section>
+            <h2 className="text-xl font-bold text-emerald-400 mb-4">妻が障害状態になった場合</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <PensionCup
+                label="月額収支 (初年度)"
+                workIncome={scenarioWifeDisability.cupData.workIncome}
+                pensionAmount={scenarioWifeDisability.cupData.pensionAmount}
+                assetAmount={scenarioWifeDisability.cupData.assetAmount}
+                totalRequired={scenarioWifeDisability.cupData.totalRequired}
+              />
+              <div className="md:col-span-2 h-64 bg-slate-900/40 rounded-2xl border border-slate-800 p-4">
+                <CashFlowTimeline data={scenarioWifeDisability.timelineData} height={200} />
+              </div>
+            </div>
+            <div className="mt-4 text-center text-emerald-400 font-bold text-xl">
+              必要保障額: {(scenarioWifeDisability.totalShortfall / 10000).toFixed(0)}万円
+            </div>
+          </section>
+
         </div>
       </div>
     </main>

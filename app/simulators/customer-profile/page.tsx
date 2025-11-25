@@ -64,6 +64,8 @@ type CustomerProfile = {
   basicInfo: CustomerProfileBasicInfo; // 基本情報
   danshinHolder: ('husband' | 'wife')[]; // 団信加入者（デフォルトは['husband']）
   isLivingExpenseDetailed: boolean; // 生活費の内訳入力モードかどうか
+  currentSavingsTotal: number; // 現在の貯蓄総額
+  existingInsuranceTotal: number; // 既存の死亡保険総額
 };
 
 type SavedPlan = {
@@ -115,6 +117,7 @@ const AVERAGE_EXPENSES_BY_SIZE: Record<number, Record<keyof LivingExpenseDetail,
     entertainment: 20000,
     savings: 30000,
   },
+
   2: { // 2人
     food: 65000,
     dailyGoods: 12000,
@@ -127,6 +130,7 @@ const AVERAGE_EXPENSES_BY_SIZE: Record<number, Record<keyof LivingExpenseDetail,
     entertainment: 30000,
     savings: 50000,
   },
+
   3: { // 3人
     food: 75000,
     dailyGoods: 15000,
@@ -139,6 +143,7 @@ const AVERAGE_EXPENSES_BY_SIZE: Record<number, Record<keyof LivingExpenseDetail,
     entertainment: 35000,
     savings: 40000,
   },
+
   4: { // 4人以上
     food: 85000,
     dailyGoods: 18000,
@@ -384,6 +389,59 @@ function LivingExpenseSelector({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+
+
+// 資産・保険入力コンポーネント
+function AssetsInput({
+  currentSavingsTotal,
+  setCurrentSavingsTotal,
+  existingInsuranceTotal,
+  setExistingInsuranceTotal,
+}: {
+  currentSavingsTotal: number;
+  setCurrentSavingsTotal: (v: number) => void;
+  existingInsuranceTotal: number;
+  setExistingInsuranceTotal: (v: number) => void;
+}) {
+  return (
+    <div className="space-y-6 pt-6 border-t border-slate-800">
+      <h3 className="text-lg font-bold text-slate-200 flex items-center gap-2">
+        <span>💰</span> 資産・保険
+      </h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-2">
+          <label className="block text-sm font-semibold text-slate-300">現在の貯蓄総額</label>
+          <div className="relative">
+            <input
+              type="number"
+              className="w-full rounded-xl px-4 py-3 bg-slate-800/50 border border-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-slate-100 font-mono text-lg text-right pr-10"
+              value={currentSavingsTotal || 0}
+              onChange={(e) => setCurrentSavingsTotal(parseInt(e.target.value) || 0)}
+              step={10000}
+            />
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500">円</span>
+          </div>
+          <p className="text-xs text-slate-500">※預貯金、有価証券などの合計額</p>
+        </div>
+        <div className="space-y-2">
+          <label className="block text-sm font-semibold text-slate-300">既存の死亡保険総額</label>
+          <div className="relative">
+            <input
+              type="number"
+              className="w-full rounded-xl px-4 py-3 bg-slate-800/50 border border-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-slate-100 font-mono text-lg text-right pr-10"
+              value={existingInsuranceTotal || 0}
+              onChange={(e) => setExistingInsuranceTotal(parseInt(e.target.value) || 0)}
+              step={10000}
+            />
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500">円</span>
+          </div>
+          <p className="text-xs text-slate-500">※加入済みの生命保険等の死亡保険金合計</p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -783,6 +841,8 @@ export default function CustomerProfilePage() {
       cramSchoolOptions: { elementary: true, juniorHigh: true, highSchool: true }, // デフォルトでON
     },
     isLivingExpenseDetailed: false,
+    currentSavingsTotal: 0,
+    existingInsuranceTotal: 0,
   });
 
   const [notification, setNotification] = useState<string | null>(null);
@@ -980,6 +1040,8 @@ export default function CustomerProfilePage() {
                     educationCourse: 'private_hs' as const,
                     cramSchoolOptions: { elementary: false, juniorHigh: false, highSchool: false },
                   },
+                  currentSavingsTotal: 0,
+                  existingInsuranceTotal: 0,
                 } as CustomerProfile;
                 setProfile(clearedProfile);
                 saveProfile(clearedProfile);
@@ -1031,6 +1093,8 @@ export default function CustomerProfilePage() {
                     educationCourse: 'private_uni' as const,
                     cramSchoolOptions: { elementary: false, juniorHigh: false, highSchool: true },
                   },
+                  currentSavingsTotal: 3000000,
+                  existingInsuranceTotal: 5000000,
                 } as CustomerProfile;
                 setProfile(coupleProfile);
                 saveProfile(coupleProfile);
@@ -1082,6 +1146,8 @@ export default function CustomerProfilePage() {
                     educationCourse: 'private_hs' as const,
                     cramSchoolOptions: { elementary: false, juniorHigh: false, highSchool: false },
                   },
+                  currentSavingsTotal: 1000000,
+                  existingInsuranceTotal: 2000000,
                 } as CustomerProfile;
                 setProfile(singleProfile);
                 saveProfile(singleProfile);
@@ -1121,8 +1187,8 @@ export default function CustomerProfilePage() {
               onClick={handleDeletePlan}
               disabled={!currentPlanId}
               className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${currentPlanId
-                  ? 'border-rose-700 text-rose-400 hover:text-white hover:bg-rose-800'
-                  : 'border-slate-800 text-slate-600 cursor-not-allowed'
+                ? 'border-rose-700 text-rose-400 hover:text-white hover:bg-rose-800'
+                : 'border-slate-800 text-slate-600 cursor-not-allowed'
                 }`}
             >
               🗑 削除
@@ -1174,24 +1240,14 @@ export default function CustomerProfilePage() {
             isDetailed={profile.isLivingExpenseDetailed}
             setIsDetailed={(b) => saveProfile({ ...profile, isLivingExpenseDetailed: b })}
           />
-        </div>
-      </div>
 
-      {/* Floating Action Button */}
-      <div className="fixed bottom-8 right-8 z-40">
-        <button
-          onClick={() => {
-            saveBasicInfo(profile.basicInfo);
-            saveProfile(profile);
-            showNotification('設定を保存しました');
-          }}
-          className="group flex items-center gap-3 px-6 py-4 bg-sky-600 hover:bg-sky-500 text-white rounded-full shadow-lg hover:shadow-sky-500/30 transition-all active:scale-95"
-        >
-          <span className="font-bold">保存して完了</span>
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 group-hover:translate-x-1 transition-transform">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-          </svg>
-        </button>
+          <AssetsInput
+            currentSavingsTotal={profile.currentSavingsTotal}
+            setCurrentSavingsTotal={(v) => setProfile({ ...profile, currentSavingsTotal: v })}
+            existingInsuranceTotal={profile.existingInsuranceTotal}
+            setExistingInsuranceTotal={(v) => setProfile({ ...profile, existingInsuranceTotal: v })}
+          />
+        </div>
       </div>
 
       {/* Notification Toast */}
