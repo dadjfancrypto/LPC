@@ -34,6 +34,18 @@ type Geometry = {
 const BAR_HEIGHT = 150;
 const MIN_SEG_PX = 120;
 
+const ANNUAL_INCOME_OPTIONS = Array.from({ length: 201 }, (_, i) => i * 500_000);
+const ANNUAL_INCOME_SELECT_OPTIONS: { value: number | string; label: string }[] = [
+  { value: '', label: '--' },
+  ...ANNUAL_INCOME_OPTIONS.map((value) => ({
+    value: value === 0 ? 0 : value / 10000,
+    label: `${(value / 10000).toFixed(0)}万円`,
+  })),
+];
+
+const getAnnualDropdownValue = (avgMonthly: number): number | string =>
+  avgMonthly > 0 ? Math.round((avgMonthly * 12) / 10000) : '';
+
 function getGradientColor(baseColor: 'amber' | 'emerald' | 'sky' | 'blue', index: number) {
   const rgbMap = {
     amber: '217, 119, 6',   // amber-600
@@ -551,13 +563,13 @@ export default function SurvivorPensionPage() {
   const [childrenAges, setChildrenAges] = useState<number[]>([]);
 
   const [ageWife, setAgeWife] = useState<number>(35);
-  const [avgStdMonthlyWife, setAvgStdMonthlyWife] = useState<number>(300000);
+  const [avgStdMonthlyWife, setAvgStdMonthlyWife] = useState<number>(Math.round(3_000_000 / 12));
   const [monthsWife, setMonthsWife] = useState<number>(120);
   const [useMinashi300Wife, setUseMinashi300Wife] = useState<boolean>(true);
   const [oldAgeStartWife, setOldAgeStartWife] = useState<number>(65);
 
   const [ageHusband, setAgeHusband] = useState<number>(38);
-  const [avgStdMonthlyHusband, setAvgStdMonthlyHusband] = useState<number>(450000);
+  const [avgStdMonthlyHusband, setAvgStdMonthlyHusband] = useState<number>(Math.round(4_500_000 / 12));
   const [monthsHusband, setMonthsHusband] = useState<number>(180);
   const [useMinashi300Husband, setUseMinashi300Husband] = useState<boolean>(true);
   const [oldAgeStartHusband, setOldAgeStartHusband] = useState<number>(65);
@@ -575,13 +587,21 @@ export default function SurvivorPensionPage() {
           if (basicInfo.childrenAges) setChildrenAges(basicInfo.childrenAges);
 
           if (basicInfo.ageWife) setAgeWife(basicInfo.ageWife);
-          if (basicInfo.avgStdMonthlyWife) setAvgStdMonthlyWife(basicInfo.avgStdMonthlyWife);
+          if (basicInfo.annualIncomeWife) {
+            setAvgStdMonthlyWife(Math.round(basicInfo.annualIncomeWife / 12));
+          } else if (basicInfo.avgStdMonthlyWife) {
+            setAvgStdMonthlyWife(basicInfo.avgStdMonthlyWife);
+          }
           if (basicInfo.monthsWife) setMonthsWife(basicInfo.monthsWife);
           if (basicInfo.useMinashi300Wife !== undefined) setUseMinashi300Wife(basicInfo.useMinashi300Wife);
           if (basicInfo.oldAgeStartWife) setOldAgeStartWife(basicInfo.oldAgeStartWife);
 
           if (basicInfo.ageHusband) setAgeHusband(basicInfo.ageHusband);
-          if (basicInfo.avgStdMonthlyHusband) setAvgStdMonthlyHusband(basicInfo.avgStdMonthlyHusband);
+          if (basicInfo.annualIncomeHusband) {
+            setAvgStdMonthlyHusband(Math.round(basicInfo.annualIncomeHusband / 12));
+          } else if (basicInfo.avgStdMonthlyHusband) {
+            setAvgStdMonthlyHusband(basicInfo.avgStdMonthlyHusband);
+          }
           if (basicInfo.monthsHusband) setMonthsHusband(basicInfo.monthsHusband);
           if (basicInfo.useMinashi300Husband !== undefined) setUseMinashi300Husband(basicInfo.useMinashi300Husband);
           if (basicInfo.oldAgeStartHusband) setOldAgeStartHusband(basicInfo.oldAgeStartHusband);
@@ -1271,14 +1291,20 @@ export default function SurvivorPensionPage() {
                         />
                       </div>
                       <div>
-                        <Label>平均標準報酬月額 (万円)</Label>
-                        <div className="relative">
-                          <Select
-                            value={avgStdMonthlyWife / 10000}
-                            onChange={(e) => setAvgStdMonthlyWife(Number(e.target.value) * 10000)}
-                            options={Array.from({ length: 96 }, (_, i) => ({ value: 5 + i, label: `${5 + i}万円` }))}
-                          />
-                        </div>
+                        <Label>昨年の年収（額面）</Label>
+                        <Select
+                          value={getAnnualDropdownValue(avgStdMonthlyWife)}
+                          onChange={(e) => {
+                            if (e.target.value === '') {
+                              setAvgStdMonthlyWife(0);
+                              return;
+                            }
+                            const man = Number(e.target.value);
+                            const annualYen = man * 10000;
+                            setAvgStdMonthlyWife(Math.round(annualYen / 12));
+                          }}
+                          options={ANNUAL_INCOME_SELECT_OPTIONS}
+                        />
                       </div>
                       <div>
                         <Label>厚生年金加入月数</Label>
@@ -1320,14 +1346,20 @@ export default function SurvivorPensionPage() {
                         />
                       </div>
                       <div>
-                        <Label>平均標準報酬月額 (万円)</Label>
-                        <div className="relative">
-                          <Select
-                            value={avgStdMonthlyHusband / 10000}
-                            onChange={(e) => setAvgStdMonthlyHusband(Number(e.target.value) * 10000)}
-                            options={Array.from({ length: 96 }, (_, i) => ({ value: 5 + i, label: `${5 + i}万円` }))}
-                          />
-                        </div>
+                        <Label>昨年の年収（額面）</Label>
+                        <Select
+                          value={getAnnualDropdownValue(avgStdMonthlyHusband)}
+                          onChange={(e) => {
+                            if (e.target.value === '') {
+                              setAvgStdMonthlyHusband(0);
+                              return;
+                            }
+                            const man = Number(e.target.value);
+                            const annualYen = man * 10000;
+                            setAvgStdMonthlyHusband(Math.round(annualYen / 12));
+                          }}
+                          options={ANNUAL_INCOME_SELECT_OPTIONS}
+                        />
                       </div>
                       <div>
                         <Label>厚生年金加入月数</Label>

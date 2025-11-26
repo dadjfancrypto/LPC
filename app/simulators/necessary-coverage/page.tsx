@@ -56,19 +56,35 @@ type YearlyData = {
     workIncome: number; // 就労収入（手取り調整後・年額）
     baseExpense: number; // 基本生活費（年額）
     educationCost: number; // 教育費（年額）
-    totalIncome: number; // pension + workIncome
-    totalTarget: number; // baseExpense + educationCost
+    reserveTarget: number; // 老後・予備費積立（年額）
+    baseIncome: number; // pension + workIncome
+    totalIncome: number; // 収入合計（年金＋就労＋分配済み貯蓄/給付）
+    totalTarget: number; // baseExpense + educationCost + reserveTarget
+    baseShortfall: number;
     shortfall: number; // 不足額
+    sicknessAnnual: number;
+    savingsAnnual: number;
+    monthsActive: number; // 65歳までにカウントする月数
 };
 
 type ScenarioResult = {
     title: string;
     data: YearlyData[];
-    totalShortfall: number; // 総不足額（累積）
+    totalShortfall: number; // 貯蓄控除前の総不足額
+    netShortfall: number; // 控除後
+    sicknessDeduction: number;
+    savingsApplied: number;
     exemptedHousingLoan: number; // 団信による免除額（参考）
     monthlyShortfallMax: number; // 最大月額不足
     hasShortfall: boolean;
+    category: 'survivor' | 'disability';
+    activeMonths: number;
+    targetActiveTotal: number;
 };
+
+const SAVINGS_OPTIONS_MAN = Array.from({ length: 101 }, (_, i) => i * 50); // 0〜5000万円を50万円刻み
+const RETIREMENT_AGE = 65;
+const RESERVE_RATIO = 0.1; // 基本生活費の10%を老後・予備費として積み立てる想定
 
 /* ===================== UI Components ===================== */
 
@@ -76,105 +92,164 @@ type ScenarioResult = {
 const SVGPatterns = () => (
     <svg width="0" height="0" className="absolute">
         <defs>
-            <pattern id="diagonalHatchRed" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
-                <path d="M -1,4 H 9" stroke="rgba(244, 63, 94, 0.3)" strokeWidth="2" />
-            </pattern>
-            <pattern id="diagonalHatchOrange" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
-                <path d="M -1,4 H 9" stroke="rgba(249, 115, 22, 0.3)" strokeWidth="2" />
+            <pattern id="shortfallHatch" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+                <path d="M -1,4 H 9" stroke="rgba(248, 113, 113, 0.5)" strokeWidth="2" />
             </pattern>
         </defs>
     </svg>
 );
 
-function StackedBlockChart({
+function StackedAreaChart({
     data,
-    maxAmount,
-    colorTheme = 'emerald',
-    height = 300
+    currentSalaryMonthly,
+    retirementAge = RETIREMENT_AGE
 }: {
     data: YearlyData[];
-    maxAmount: number;
-    colorTheme?: 'emerald' | 'sky' | 'amber' | 'rose';
-    height?: number;
+    currentSalaryMonthly: number; // 事故発生前の現在の月額給料（手取り）
+    retirementAge?: number;
 }) {
-    const width = 800;
-    const padding = { top: 20, right: 50, bottom: 30, left: 50 };
+    // 月額ベースに変換してフィルタリング
+    const filtered = data
+        .filter((entry) => entry.age <= retirementAge)
+        .map((entry) => {
+            const incomeMonthly = Math.min(entry.totalIncome / 12, currentSalaryMonthly);
+            return {
+                ...entry,
+                incomeMonthly,
+                shortfallMonthly: Math.max(0, currentSalaryMonthly - incomeMonthly),
+            };
+        });
+
+    if (!filtered.length || currentSalaryMonthly <= 0) {
+        return (
+            <div className="h-48 flex items-center justify-center rounded-2xl border border-slate-800 bg-slate-950/40 text-sm text-slate-500">
+                表示できる期間がありません
+            </div>
+        );
+    }
+
+    const startAge = filtered[0].age;
+    const sicknessEndAge = startAge + 2; // 約1.5年後を年単位で近似
+    const educationEndEntry = filtered.find((entry) => entry.educationCost === 0 && entry.age > startAge);
+    const educationEndAge = educationEndEntry?.age;
+    const retirementEntry = filtered.find((entry) => entry.age >= retirementAge);
+    const retirementStartAge = retirementEntry?.age ?? Math.min(filtered[filtered.length - 1].age, retirementAge);
+
+    const keyAges = Array.from(
+        new Set(
+            [
+                startAge,
+                sicknessEndAge,
+                educationEndAge,
+                retirementStartAge,
+                filtered[filtered.length - 1].age,
+            ].filter((age): age is number => typeof age === 'number' && age <= retirementAge)
+        )
+    ).sort((a, b) => a - b);
+
+    const displayPoints = keyAges.map((age) => {
+        const matchedEntry = filtered.find((entry) => entry.age >= age) ?? filtered[filtered.length - 1];
+        return {
+            age: matchedEntry.age,
+            incomeMonthly: matchedEntry.incomeMonthly,
+            shortfallMonthly: matchedEntry.shortfallMonthly,
+        };
+    });
+
+    if (!displayPoints.length) {
+        displayPoints.push({
+            age: filtered[0].age,
+            incomeMonthly: filtered[0].incomeMonthly,
+            shortfallMonthly: filtered[0].shortfallMonthly,
+        });
+    }
+
+    const width = 820;
+    const height = 320;
+    const padding = { top: 20, right: 40, bottom: 50, left: 60 };
     const graphWidth = width - padding.left - padding.right;
     const graphHeight = height - padding.top - padding.bottom;
 
-    // X軸のスケール計算
-    const minAge = data[0]?.age || 0;
-    const maxAge = data[data.length - 1]?.age || 100;
-    const ageRange = maxAge - minAge;
+    const minAge = displayPoints[0].age;
+    const maxAge = Math.min(retirementAge, displayPoints[displayPoints.length - 1].age + 5);
+    const ageRange = Math.max(maxAge - minAge, 1);
     const getX = (age: number) => ((age - minAge) / ageRange) * graphWidth;
 
-    // Y軸のスケール計算
-    const displayMaxY = Math.max(maxAmount, 5000000); // 最低でも500万円レンジ
-    const getY = (amount: number) => graphHeight - (amount / displayMaxY) * graphHeight;
+    // Y軸は現在の月額給料に固定（満水基準）
+    const maxAmount = Math.max(currentSalaryMonthly, 1);
+    const getY = (value: number) => graphHeight - (value / maxAmount) * graphHeight;
 
-    // パスの生成
-    const createAreaPath = (getValue: (d: YearlyData) => number, baselineValue: (d: YearlyData) => number = () => 0) => {
-        let path = `M 0,${getY(baselineValue(data[0]))}`;
-        data.forEach(d => {
-            path += ` L ${getX(d.age)},${getY(getValue(d))}`;
-        });
-        data.slice().reverse().forEach(d => {
-            path += ` L ${getX(d.age)},${getY(baselineValue(d))}`;
-        });
-        path += ' Z';
-        return path;
-    };
+    const maxShortfallEntry = displayPoints.reduce((max, entry) =>
+        entry.shortfallMonthly > max.shortfallMonthly ? entry : max,
+        displayPoints[0]
+    );
+    const hasShortfall = maxShortfallEntry.shortfallMonthly > 0;
+    const shortfallLabelText = `不足 ${ (maxShortfallEntry.shortfallMonthly / 10000).toFixed(1) }万円`;
+    const maxIndex = displayPoints.findIndex((entry) => entry === maxShortfallEntry);
+    const nextPoint = displayPoints[maxIndex + 1] ?? { age: Math.min(maxShortfallEntry.age + 1, retirementAge) };
+    const labelCenterX = (getX(maxShortfallEntry.age) + getX(nextPoint.age)) / 2;
+    const labelYValue = maxShortfallEntry.incomeMonthly + (maxShortfallEntry.shortfallMonthly / 2);
+    const labelCenterY = getY(labelYValue);
+    const labelX = Math.min(Math.max(labelCenterX, 80), graphWidth - 80);
+    const labelY = Math.max(labelCenterY, 40);
 
-    // 収入エリア (Layer A: Pension + Work)
-    const incomePath = createAreaPath(d => d.totalIncome);
-    
-    // 年金のみエリア (Workを除いた部分、可視化のために薄く表示など)
-    const pensionPath = createAreaPath(d => d.pension);
-
-    // 支出ライン (Layer B & C Top Line)
-    const expenseLinePath = (() => {
-        let path = `M 0,${getY(data[0].totalTarget)}`;
-        data.forEach(d => {
-            path += ` L ${getX(d.age)},${getY(d.totalTarget)}`;
-        });
-        return path;
-    })();
-
-    // 収入カラー設定
-    const colors = {
-        emerald: { fill: '#10b981', stroke: '#059669', bg: 'bg-emerald-900/20' },
-        sky: { fill: '#0ea5e9', stroke: '#0284c7', bg: 'bg-sky-900/20' },
-        amber: { fill: '#f59e0b', stroke: '#d97706', bg: 'bg-amber-900/20' },
-        rose: { fill: '#f43f5e', stroke: '#e11d48', bg: 'bg-rose-900/20' },
-    }[colorTheme];
+    const incomeColor = '#10B981';
+    const incomeStroke = '#059669';
+    const shortfallStroke = '#EF4444';
 
     return (
-        <div className={`relative w-full overflow-hidden rounded-xl border border-slate-700 ${colors.bg}`}>
+        <div className="bg-slate-950/40 border border-slate-800 rounded-2xl p-4">
             <SVGPatterns />
             <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto">
                 <g transform={`translate(${padding.left},${padding.top})`}>
-                    {/* グリッド線 (Y軸) */}
-                    {[0, 0.25, 0.5, 0.75, 1].map(tick => {
+                    {/* Y軸のラベル（給料・満水基準） */}
+                    <text x="-50" y={graphHeight / 2} textAnchor="middle" fontSize="12" fill="#94a3b8" transform="rotate(-90, -50, 0)">
+                        給料 {(currentSalaryMonthly / 10000).toFixed(0)}万円
+                    </text>
+                    
+                    {/* Y軸のグリッド */}
+                    {[0, 0.5, 1].map((tick) => {
                         const y = graphHeight * (1 - tick);
-                        const val = displayMaxY * tick;
+                        const val = maxAmount * tick;
                         return (
                             <g key={tick}>
-                                <line x1="0" y1={y} x2={graphWidth} y2={y} stroke="#334155" strokeDasharray="4 4" strokeWidth="1" />
+                                <line x1="0" y1={y} x2={graphWidth} y2={y} stroke="#475569" strokeDasharray="6 4" strokeWidth="1.2" />
                                 <text x="-10" y={y + 4} textAnchor="end" fontSize="10" fill="#94a3b8">
-                                    {(val / 10000).toFixed(0)}万
+                                    {(val / 10000).toFixed(1)}万円
                                 </text>
                             </g>
                         );
                     })}
 
-                    {/* グリッド線 (X軸 - 10年ごと) */}
-                    {Array.from({ length: Math.ceil(ageRange / 10) + 1 }).map((_, i) => {
-                        const age = minAge + i * 10;
+                    {/* 満水基準ライン（給料の上限） */}
+                    <line
+                        x1={0}
+                        y1={getY(currentSalaryMonthly)}
+                        x2={graphWidth}
+                        y2={getY(currentSalaryMonthly)}
+                        stroke="#94a3b8"
+                        strokeDasharray="6 6"
+                        strokeWidth="2"
+                    />
+                    <text
+                        x={graphWidth - 10}
+                        y={getY(currentSalaryMonthly) - 5}
+                        textAnchor="end"
+                        fontSize="11"
+                        fill="#94a3b8"
+                        fontWeight="bold"
+                    >
+                        現在の月額給料（満水基準）: {(currentSalaryMonthly / 10000).toFixed(0)}万円
+                    </text>
+
+                    {/* X軸のグリッドとラベル */}
+                    {Array.from({ length: Math.ceil(ageRange / 5) + 1 }).map((_, idx) => {
+                        const age = minAge + idx * 5;
                         if (age > maxAge) return null;
                         const x = getX(age);
                         return (
                             <g key={age}>
-                                <line x1={x} y1={0} x2={x} y2={graphHeight} stroke="#334155" strokeDasharray="4 4" strokeWidth="1" />
+                                <line x1={x} y1={0} x2={x} y2={graphHeight} stroke="#1f2937" strokeDasharray="4 4" strokeWidth="1" />
                                 <text x={x} y={graphHeight + 15} textAnchor="middle" fontSize="10" fill="#94a3b8">
                                     {age}歳
                                 </text>
@@ -182,28 +257,71 @@ function StackedBlockChart({
                         );
                     })}
 
-                    {/* Layer C: 教育費エリア (Total Target) - 最背面 */}
-                    {/* 全体を「教育費不足」カラー(濃い赤/ハッチング)で描画 */}
-                    <path d={createAreaPath(d => d.totalTarget)} fill="url(#diagonalHatchRed)" opacity="0.8" />
+                    {/* ブロック状の積層描画（階段状） */}
+                    {displayPoints.map((entry, idx) => {
+                        const currentX = getX(entry.age);
+                        const nextAgeRaw = displayPoints[idx + 1]?.age ?? retirementAge;
+                        const clampedNextAge = Math.min(nextAgeRaw, retirementAge);
+                        const nextX = getX(clampedNextAge);
+                        const defaultWidth = graphWidth / Math.max(displayPoints.length, 1);
+                        const widthCandidate = nextX - currentX > 0 ? nextX - currentX : defaultWidth;
+                        const width = Math.max(Math.min(widthCandidate, graphWidth - currentX), defaultWidth * 0.5);
+                        const baseY = getY(0);
+                        const incomeY = getY(entry.incomeMonthly);
+                        const shortfallY = getY(entry.incomeMonthly + entry.shortfallMonthly);
 
-                    {/* Layer B: 生活費エリア (Base Expense) */}
-                    {/* 生活費エリアを「生活費不足」カラー(少し薄い赤/オレンジ)で上書き */}
-                    <path d={createAreaPath(d => d.baseExpense)} fill="url(#diagonalHatchOrange)" opacity="0.6" />
+                        return (
+                            <g key={`${entry.age}-${idx}`}>
+                                <rect
+                                    x={currentX}
+                                    y={incomeY}
+                                    width={width}
+                                    height={Math.max(baseY - incomeY, 0)}
+                                    fill={incomeColor}
+                                    stroke={incomeStroke}
+                                    strokeWidth="1"
+                                />
+                                {entry.shortfallMonthly > 0 && (
+                                    <rect
+                                        x={currentX}
+                                        y={shortfallY}
+                                        width={width}
+                                        height={Math.max(incomeY - shortfallY, 0)}
+                                        fill="url(#shortfallHatch)"
+                                        stroke={shortfallStroke}
+                                        strokeWidth="1"
+                                    />
+                                )}
+                            </g>
+                        );
+                    })}
 
-                    {/* Layer A: 収入エリア (Total Income) */}
-                    {/* 収入エリアを緑で上書き。これにより、収入でカバーできている部分は緑になる */}
-                    <path d={incomePath} fill={colors.fill} stroke={colors.stroke} strokeWidth="2" fillOpacity="0.9" />
-                    
-                    {/* 年金部分の境界線（オプション: 就労収入との内訳を示す） */}
-                    <path d={pensionPath} fill="none" stroke="white" strokeWidth="1" strokeDasharray="4 4" opacity="0.5" />
+                    {hasShortfall && (
+                        <text
+                            x={labelX}
+                            y={labelY}
+                            textAnchor="middle"
+                            dominantBaseline="central"
+                            fontSize="12"
+                            fontWeight="700"
+                            fill="#FDE68A"
+                            stroke="rgba(15,23,42,0.8)"
+                            strokeWidth="0.7"
+                        >
+                            {shortfallLabelText}
+                        </text>
+                    )}
 
-                    {/* 支出ライン (強調) */}
-                    <path d={expenseLinePath} fill="none" stroke="#f43f5e" strokeWidth="2" strokeLinecap="round" />
-                    <path d={createAreaPath(d => d.baseExpense)} fill="none" stroke="#f97316" strokeWidth="1" strokeDasharray="2 2" opacity="0.7" />
-
-                    {/* ラベル */}
-                    <text x={10} y={getY(data[0].totalIncome) - 10} fill={colors.fill} fontSize="12" fontWeight="bold">収入（年金+就労）</text>
-                    <text x={graphWidth - 10} y={getY(data[data.length-1].totalTarget) - 10} textAnchor="end" fill="#f43f5e" fontSize="12" fontWeight="bold">必要生活費+教育費</text>
+                    {/* 65歳以降のシェーディング */}
+                    {retirementAge > minAge && retirementAge < maxAge && (
+                        <rect
+                            x={getX(retirementAge)}
+                            y={0}
+                            width={graphWidth - getX(retirementAge)}
+                            height={graphHeight}
+                            fill="rgba(15,23,42,0.45)"
+                        />
+                    )}
                 </g>
             </svg>
         </div>
@@ -215,9 +333,11 @@ export default function NecessaryCoveragePage() {
     const [profile, setProfile] = useState<CustomerProfile | null>(null);
     // 生活費調整率
     const [expenseRatioSurvivor, setExpenseRatioSurvivor] = useState(70); // 一般的な生活費圧縮率（約70%）
-    const [expenseRatioDisability, setExpenseRatioDisability] = useState(120); // 医療・介護を考慮した一般的な増加率（約120%）
+    const [expenseRatioDisability, setExpenseRatioDisability] = useState(110); // 医療・介護を考慮した一般的な増加率（約110%）
     // 就労収入調整率（リスク調整）
     const [workIncomeRatio, setWorkIncomeRatio] = useState(90); // デフォルト90%（共働きで就労継続を想定）
+    const [currentSavingsMan, setCurrentSavingsMan] = useState(0); // 既存の貯蓄・保険（万円）
+    const [showSavingsInfo, setShowSavingsInfo] = useState(false);
     
     const [scenarios, setScenarios] = useState<{
         husbandDeath: ScenarioResult;
@@ -227,6 +347,14 @@ export default function NecessaryCoveragePage() {
         singleDeath: ScenarioResult;
         singleDisability: ScenarioResult;
     } | null>(null);
+    const currentSavingsYen = Math.max(0, Math.round(currentSavingsMan * 10000));
+
+    const sicknessAllowanceTotal = useMemo(() => {
+        if (!profile) return 0;
+        const allowanceMonths = 18; // 傷病手当金は最長1年6カ月
+        const approxTakeHome = Math.max(profile.monthlyLivingExpense, 0);
+        return Math.round(approxTakeHome * 0.67 * allowanceMonths);
+    }, [profile]);
 
     // localStorageから読み込み
     useEffect(() => {
@@ -253,6 +381,9 @@ export default function NecessaryCoveragePage() {
         const { basicInfo } = profile;
         const currentExpenseMonthly = profile.monthlyLivingExpense || 0;
         const currentExpenseAnnual = currentExpenseMonthly * 12;
+        // 住宅ローン月額（顧客プロフィールから取得）
+        const housingLoanMonthly = (profile.details?.housingLoan as number) || 0;
+        const housingLoanAnnual = housingLoanMonthly * 12;
 
         // 教育費の簡易推定 (年齢別月額)
         const getEducationCost = (age: number): number => {
@@ -289,6 +420,8 @@ export default function NecessaryCoveragePage() {
 
             let totalShortfall = 0;
             let monthlyShortfallMax = 0;
+            let activeMonthsSum = 0;
+            const reserveFundAnnual = Math.round(currentExpenseAnnual * RESERVE_RATIO);
 
             for (let i = 0; i <= years; i++) {
                 const currentAge = startAge + i;
@@ -301,17 +434,17 @@ export default function NecessaryCoveragePage() {
                 const eligibleChildrenDisability = calculateEligibleChildrenCount(childrenCurrentAges, 2);
 
                 if (type === 'survivor') {
-                    if (basicInfo.spouseType === 'couple') {
+        if (basicInfo.spouseType === 'couple') {
                         if (targetPerson === 'husband') {
                             let kiso = 0;
                             if (eligibleChildren18 > 0) {
                                 kiso = kisoAnnualByCount(eligibleChildren18);
                             }
                             const kousei = proportionAnnual(basicInfo.avgStdMonthlyHusband, basicInfo.monthsHusband, basicInfo.useMinashi300Husband) * 0.75;
-                            let chukorei = 0;
+            let chukorei = 0;
                             if (eligibleChildren18 === 0 && currentAge >= 40 && currentAge < 65) {
-                                chukorei = CHUKOREI_KASAN;
-                            }
+                chukorei = CHUKOREI_KASAN;
+            }
                             if (currentAge >= 65) {
                                 pension = kousei + KISO_BASE_ANNUAL;
                             } else {
@@ -359,19 +492,26 @@ export default function NecessaryCoveragePage() {
                 }
 
                 const expenseRatio = type === 'survivor' ? expenseRatioSurvivor : expenseRatioDisability;
-                const baseExpense = Math.round(currentExpenseAnnual * (expenseRatio / 100));
+                // 遺族シナリオでは団信により住宅ローンが免除されるため控除、障害シナリオでは控除しない
+                const expenseBase = type === 'survivor' 
+                    ? currentExpenseAnnual - housingLoanAnnual  // 遺族: 住宅ローンを控除
+                    : currentExpenseAnnual;  // 障害: 住宅ローンを含む
+                const baseExpense = Math.round(expenseBase * (expenseRatio / 100));
                 
                 let educationCost = 0;
                 if (basicInfo.childrenAges.length > 0) {
                     educationCost = childrenCurrentAges.reduce((sum, age) => sum + getEducationCost(age), 0);
                 }
 
-                const totalIncome = pension + workIncome;
-                const totalTarget = baseExpense + educationCost;
-                const shortfall = Math.max(0, totalTarget - totalIncome);
+                const baseIncome = pension + workIncome;
+                const totalTarget = baseExpense + educationCost + reserveFundAnnual;
+                const baseShortfall = Math.max(0, totalTarget - baseIncome);
 
-                totalShortfall += shortfall;
-                monthlyShortfallMax = Math.max(monthlyShortfallMax, shortfall / 12);
+                const monthsActive = Math.max(0, Math.min(12, (RETIREMENT_AGE - currentAge) * 12));
+                activeMonthsSum += monthsActive;
+                if (monthsActive > 0) {
+                    monthlyShortfallMax = Math.max(monthlyShortfallMax, baseShortfall / 12);
+                }
 
                 data.push({
                     age: currentAge,
@@ -380,21 +520,75 @@ export default function NecessaryCoveragePage() {
                     workIncome,
                     baseExpense,
                     educationCost,
-                    totalIncome,
+                    reserveTarget: reserveFundAnnual,
+                    baseIncome,
+                    totalIncome: baseIncome,
                     totalTarget,
-                    shortfall
+                    baseShortfall,
+                    shortfall: baseShortfall,
+                    sicknessAnnual: 0,
+                    savingsAnnual: 0,
+                    monthsActive
                 });
             }
 
-            return {
+            const weightedEntries = data.map((entry) => ({
+                entry,
+                weight: entry.baseShortfall * (entry.monthsActive / 12),
+            }));
+            const weightedShortfallTotal = weightedEntries.reduce((sum, item) => sum + item.weight, 0);
+
+            // 傷病手当金は収入面（グラフの緑の面）には組み込むが、最終保障総額の計算からは除外
+            const sicknessDeduction = type === 'disability'
+                ? Math.min(sicknessAllowanceTotal, weightedShortfallTotal)
+                : 0;
+            // 最終保障総額の計算から傷病手当金の控除を削除：貯蓄のみを控除
+            const savingsApplied = Math.min(currentSavingsYen, weightedShortfallTotal);
+
+            const distributeAllowance = (total: number) =>
+                weightedEntries.map((item) => (weightedShortfallTotal > 0 ? (item.weight / weightedShortfallTotal) * total : 0));
+
+            const sicknessDistribution = distributeAllowance(sicknessDeduction);
+            const savingsDistribution = distributeAllowance(savingsApplied);
+
+            weightedEntries.forEach((item, idx) => {
+                const entry = item.entry;
+                const sicknessAnnual = sicknessDistribution[idx];
+                const savingsAnnual = savingsDistribution[idx];
+                const adjustedIncome = Math.min(entry.totalTarget, entry.baseIncome + sicknessAnnual + savingsAnnual);
+                entry.totalIncome = adjustedIncome;
+                entry.shortfall = Math.max(0, entry.totalTarget - adjustedIncome);
+                entry.sicknessAnnual = sicknessAnnual;
+                entry.savingsAnnual = savingsAnnual;
+            });
+
+            const targetActiveTotal = data.reduce((sum, entry) => sum + entry.totalTarget * (entry.monthsActive / 12), 0);
+            totalShortfall = weightedShortfallTotal;
+            // 最終保障総額 = 総不足額 - 既存貯蓄・保険総額（傷病手当金の控除は削除）
+            const netShortfall = Math.max(0, weightedShortfallTotal - savingsApplied);
+            const activeShortfalls = data.filter(d => d.monthsActive > 0).map(d => d.shortfall / 12);
+            monthlyShortfallMax = activeShortfalls.length ? Math.max(...activeShortfalls) : 0;
+            
+            // 団信による住宅ローン免除額（遺族シナリオのみ、65歳までの期間）
+            const exemptedHousingLoan = type === 'survivor' 
+                ? housingLoanAnnual * (activeMonthsSum / 12)  // 遺族: 65歳までの住宅ローン免除額
+                : 0;  // 障害: 団信は適用されない
+
+        return {
                 title: type === 'survivor' ? 
                     (targetPerson === 'husband' ? '夫死亡時の収支' : (targetPerson === 'wife' ? '妻死亡時の収支' : '本人死亡時の収支')) :
                     (targetPerson === 'husband' ? '夫障害時の収支' : (targetPerson === 'wife' ? '妻障害時の収支' : '本人障害時の収支')),
                 data,
                 totalShortfall,
-                exemptedHousingLoan: 0,
+                netShortfall,
+                sicknessDeduction,
+                savingsApplied,
+                exemptedHousingLoan,
                 monthlyShortfallMax,
-                hasShortfall: totalShortfall > 10000
+                hasShortfall: netShortfall > 10000,
+                category: type,
+                activeMonths: activeMonthsSum,
+                targetActiveTotal
             };
         };
 
@@ -407,7 +601,7 @@ export default function NecessaryCoveragePage() {
             singleDisability: calculateScenario('disability', 'single'),
         });
 
-    }, [profile, expenseRatioSurvivor, expenseRatioDisability, workIncomeRatio]);
+    }, [profile, expenseRatioSurvivor, expenseRatioDisability, workIncomeRatio, currentSavingsYen, sicknessAllowanceTotal]);
 
     if (!profile) {
         return (
@@ -437,38 +631,150 @@ export default function NecessaryCoveragePage() {
                         <span>⚙️</span> シミュレーション条件設定
                     </h2>
                     
+                    {/* 現在の生活費を表示 */}
+                    <div className="mb-6 p-4 bg-slate-950/60 border border-slate-800 rounded-xl">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-xs text-slate-400 mb-1">現在の生活費（顧客プロフィールより）</p>
+                                <p className="text-2xl font-bold text-white">
+                                    {profile.monthlyLivingExpense ? `${(profile.monthlyLivingExpense / 10000).toFixed(1)}万円/月` : '未設定'}
+                                </p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-xs text-slate-400 mb-1">年額換算</p>
+                                <p className="text-lg font-semibold text-slate-300">
+                                    {profile.monthlyLivingExpense ? `${(profile.monthlyLivingExpense * 12 / 10000).toFixed(0)}万円/年` : '未設定'}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                         <div>
-                            <label className="block text-sm font-medium text-slate-400 mb-2">遺族生活費率: <span className="text-emerald-400 font-bold">{expenseRatioSurvivor}%</span></label>
+                            <label className="block text-sm font-medium text-slate-400 mb-2">
+                                遺族生活費率: <span className="text-emerald-400 font-bold">{expenseRatioSurvivor}%</span>
+                            </label>
                             <input
                                 type="range" min="50" max="100" step="5"
                                 value={expenseRatioSurvivor}
                                 onChange={(e) => setExpenseRatioSurvivor(Number(e.target.value))}
                                 className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
                             />
-                            <p className="text-xs text-slate-500 mt-1">一般的には60〜80%で設定されることが多く、共働き世帯の平均は約70%です。</p>
+                            <div className="mt-3 p-3 bg-slate-950/60 border border-slate-800 rounded-lg">
+                                <p className="text-xs text-slate-400 mb-1">調整後の遺族生活費（月額）</p>
+                                <p className="text-xl font-bold text-emerald-400">
+                                    {profile.monthlyLivingExpense 
+                                        ? `${(profile.monthlyLivingExpense * (expenseRatioSurvivor / 100) / 10000).toFixed(1)}万円/月` 
+                                        : '未設定'}
+                                </p>
+                                <p className="text-xs text-slate-500 mt-1">
+                                    {profile.monthlyLivingExpense 
+                                        ? `現在の生活費から ${expenseRatioSurvivor >= 100 ? '+' : ''}${((expenseRatioSurvivor / 100 - 1) * 100).toFixed(0)}%` 
+                                        : ''}
+                                </p>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-2">一般的には60〜80%で設定されることが多く、共働き世帯の平均は約70%です。</p>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-slate-400 mb-2">障害生活費率: <span className="text-amber-400 font-bold">{expenseRatioDisability}%</span></label>
+                            <label className="block text-sm font-medium text-slate-400 mb-2">
+                                障害生活費率: <span className="text-amber-400 font-bold">{expenseRatioDisability}%</span>
+                            </label>
                             <input
                                 type="range" min="80" max="150" step="5"
                                 value={expenseRatioDisability}
                                 onChange={(e) => setExpenseRatioDisability(Number(e.target.value))}
                                 className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
                             />
-                            <p className="text-xs text-slate-500 mt-1">治療・介護費を含めると110〜130%程度が一般値で、介護が長期化するケースではさらに上振れします。</p>
+                            <div className="mt-3 p-3 bg-slate-950/60 border border-slate-800 rounded-lg">
+                                <p className="text-xs text-slate-400 mb-1">調整後の障害生活費（月額）</p>
+                                <p className="text-xl font-bold text-amber-400">
+                                    {profile.monthlyLivingExpense 
+                                        ? `${(profile.monthlyLivingExpense * (expenseRatioDisability / 100) / 10000).toFixed(1)}万円/月` 
+                                        : '未設定'}
+                                </p>
+                                <p className="text-xs text-slate-500 mt-1">
+                                    {profile.monthlyLivingExpense 
+                                        ? `現在の生活費から ${expenseRatioDisability >= 100 ? '+' : ''}${((expenseRatioDisability / 100 - 1) * 100).toFixed(0)}%` 
+                                        : ''}
+                                </p>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-2">治療・介護費を含めると110〜130%程度が一般値で、介護が長期化するケースではさらに上振れします。</p>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-slate-400 mb-2">遺族/配偶者の就労率: <span className="text-sky-400 font-bold">{workIncomeRatio}%</span></label>
+                            <label className="block text-sm font-medium text-slate-400 mb-2">
+                                遺族/配偶者の就労率: <span className="text-sky-400 font-bold">{workIncomeRatio}%</span>
+                            </label>
                             <input
                                 type="range" min="0" max="100" step="10"
                                 value={workIncomeRatio}
                                 onChange={(e) => setWorkIncomeRatio(Number(e.target.value))}
                                 className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
                             />
-                            <p className="text-xs text-slate-500 mt-1">共働き世帯では40〜60%が現実的なラインとされ、デフォルトの50%は育児・介護を踏まえた平均値です。</p>
+                            <div className="mt-3 p-3 bg-slate-950/60 border border-slate-800 rounded-lg">
+                                <p className="text-xs text-slate-400 mb-1">調整後の配偶者就労収入（月額）</p>
+                                {profile?.basicInfo?.spouseType === 'couple' ? (
+                                    <p className="text-base font-bold text-sky-400 whitespace-nowrap overflow-x-auto">
+                                        夫死亡時（妻）: {profile.basicInfo.annualIncomeWife || profile.basicInfo.avgStdMonthlyWife * 12
+                                            ? `${((profile.basicInfo.annualIncomeWife || profile.basicInfo.avgStdMonthlyWife * 12) * (workIncomeRatio / 100) / 12 / 10000).toFixed(1)}万円/月`
+                                            : '未設定'} | 妻死亡時（夫）: {profile.basicInfo.annualIncomeHusband || profile.basicInfo.avgStdMonthlyHusband * 12
+                                            ? `${((profile.basicInfo.annualIncomeHusband || profile.basicInfo.avgStdMonthlyHusband * 12) * (workIncomeRatio / 100) / 12 / 10000).toFixed(1)}万円/月`
+                                            : '未設定'}
+                                    </p>
+                                ) : (
+                                    <p className="text-xl font-bold text-sky-400">
+                                        {profile?.basicInfo?.annualIncome || profile?.basicInfo?.avgStdMonthly * 12
+                                            ? `${((profile.basicInfo.annualIncome || profile.basicInfo.avgStdMonthly * 12) * (workIncomeRatio / 100) / 12 / 10000).toFixed(1)}万円/月`
+                                            : '未設定'}
+                                    </p>
+                                )}
+                                <p className="text-xs text-slate-500 mt-1">
+                                    就労率 {workIncomeRatio}% を適用
+                                </p>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-2">共働き世帯では40〜60%が現実的なラインとされ、デフォルトの90%は「現状維持に近い働き方」を想定しています。</p>
+                        </div>
+                        <div className="md:col-span-3 space-y-3">
+                            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                                <label className="block text-sm font-medium text-slate-400">現在の貯蓄・既存保険総額</label>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSavingsInfo((prev) => !prev)}
+                                    className="inline-flex items-center gap-2 text-sm font-semibold text-amber-300 hover:text-amber-200 transition-colors"
+                                >
+                                    <span role="img" aria-label="hint">💡</span>
+                                    入力しなくても問題ありません。
+                                    <span className={`text-xs transition-transform ${showSavingsInfo ? 'rotate-180' : ''}`}>⌃</span>
+                                </button>
+                            </div>
+                            <div className="relative">
+                                <select
+                                    value={currentSavingsMan}
+                                    onChange={(e) => setCurrentSavingsMan(Number(e.target.value))}
+                                    className="w-full rounded-xl px-4 py-3 bg-slate-800/50 border border-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-slate-100 font-mono text-lg appearance-none"
+                                >
+                                    {SAVINGS_OPTIONS_MAN.map((option) => (
+                                        <option key={option} value={option}>
+                                            {option.toLocaleString()}万円
+                                        </option>
+                                    ))}
+                                </select>
+                                <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-slate-500">
+                                    ▼
+                                </span>
+                            </div>
+                            {showSavingsInfo && (
+                                <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 text-xs leading-relaxed space-y-2 animate-fade-in">
+                                    <p className="text-slate-300 font-semibold">【現在の貯蓄・既存保険総額】について</p>
+                                    <p className="text-slate-400">この項目は、お客様の<strong className="text-white font-semibold">「今の備え（貯金や学資保険、既存の死亡保険など）」</strong>をシミュレーションに反映させ、<strong className="text-emerald-300">本当に必要な保険額</strong>を正確に計算するためにあります。</p>
+                                    <p className="text-slate-400"><strong className="text-white">入力しなくても問題ありません。</strong></p>
+                                    <ul className="text-slate-400 space-y-1 pl-4 list-disc">
+                                        <li>入力しない場合（0万円のまま）は、「貯蓄が全くない状態で、公的年金とご家族の収入だけで生活した場合の<strong className="text-rose-300">最大の不足額</strong>」として算出します。</li>
+                                        <li>FPとしての責任として、お客様が<strong className="text-white">「保険で確保したい」</strong>金額を優先し、あえて貯蓄を入れずに計算することも可能です。後ほどFPにご相談の際に、貯蓄の使い道を一緒に検討します。</li>
+                                    </ul>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -479,24 +785,28 @@ export default function NecessaryCoveragePage() {
                             <>
                                 <ScenarioSection
                                     result={scenarios.husbandDeath}
+                                    profile={profile}
                                     color="emerald"
                                     icon="💀"
                                     description="夫が死亡した場合、残された妻と子の生活費不足額"
                                 />
                                 <ScenarioSection
                                     result={scenarios.husbandDisability}
+                                    profile={profile}
                                     color="amber"
                                     icon="🏥"
                                     description="夫が障害状態になった場合、収入減と支出増による不足額"
                                 />
                                 <ScenarioSection
                                     result={scenarios.wifeDeath}
+                                    profile={profile}
                                     color="emerald"
                                     icon="💀"
                                     description="妻が死亡した場合、残された夫と子の生活費不足額"
                                 />
                                 <ScenarioSection
                                     result={scenarios.wifeDisability}
+                                    profile={profile}
                                     color="amber"
                                     icon="🏥"
                                     description="妻が障害状態になった場合、家事代行費等の支出増も考慮が必要"
@@ -506,12 +816,14 @@ export default function NecessaryCoveragePage() {
                             <>
                                 <ScenarioSection
                                     result={scenarios.singleDeath}
+                                    profile={profile}
                                     color="emerald"
                                     icon="💀"
                                     description="死亡時の整理資金や、親族への遺族年金"
                                 />
                                 <ScenarioSection
                                     result={scenarios.singleDisability}
+                                    profile={profile}
                                     color="amber"
                                     icon="🏥"
                                     description="障害状態での就労不能リスクと生活費不足"
@@ -521,7 +833,7 @@ export default function NecessaryCoveragePage() {
                     </div>
                 )}
 
-                 <div className="mt-16 flex justify-center gap-4">
+                <div className="mt-16 flex justify-center gap-4">
                     <Link
                         href="/simulators/customer-profile"
                         className="px-8 py-3 rounded-full bg-slate-900 border border-slate-800 hover:border-sky-500/50 hover:bg-slate-800 transition-all text-sky-400 font-bold flex items-center gap-2"
@@ -534,15 +846,124 @@ export default function NecessaryCoveragePage() {
     );
 }
 
-function ScenarioSection({ result, color, icon, description }: { result: ScenarioResult; color: 'emerald' | 'sky' | 'amber' | 'rose'; icon: string; description: string }) {
-    const maxAmount = Math.max(
-        ...result.data.map(d => Math.max(d.totalIncome, d.totalTarget))
-    );
+function ScenarioSection({
+    result,
+    profile,
+    color,
+    icon,
+    description,
+}: {
+    result: ScenarioResult;
+    profile: CustomerProfile;
+    color: 'emerald' | 'sky' | 'amber' | 'rose';
+    icon: string;
+    description: string;
+}) {
+    const headline = result.category === 'survivor' ? 'あなたに必要な死亡保障総額' : 'あなたに必要な所得補償総額';
+    const activeMonths = Math.max(result.activeMonths, 0);
+    
+    // 事故発生前の現在の月額給料（手取り）を計算
+    // 生き残った配偶者の給料を満水基準とする
+    // 手取りは年収の約80%と仮定
+    let currentSalaryMonthly = 0;
+    const husbandAnnual =
+        profile.basicInfo.annualIncomeHusband ||
+        (profile.basicInfo.avgStdMonthlyHusband ? profile.basicInfo.avgStdMonthlyHusband * 12 : 0) ||
+        0;
+    const wifeAnnual =
+        profile.basicInfo.annualIncomeWife ||
+        (profile.basicInfo.avgStdMonthlyWife ? profile.basicInfo.avgStdMonthlyWife * 12 : 0) ||
+        0;
+    const singleAnnual =
+        profile.basicInfo.annualIncome ||
+        (profile.basicInfo.avgStdMonthly ? profile.basicInfo.avgStdMonthly * 12 : 0) ||
+        0;
 
-    const shortfallText = (result.totalShortfall / 10000).toFixed(0);
+    const isHusbandScenario = result.title.includes('夫死亡') || result.title.includes('夫障害');
+    const isWifeScenario = result.title.includes('妻死亡') || result.title.includes('妻障害');
+
+    if (isHusbandScenario) {
+        currentSalaryMonthly = (husbandAnnual * 0.8) / 12;
+    } else if (isWifeScenario) {
+        currentSalaryMonthly = (wifeAnnual * 0.8) / 12;
+    } else {
+        currentSalaryMonthly = (singleAnnual * 0.8) / 12;
+    }
+    
+    // 給料からの不足額を計算（月額ベース）
+    const salaryShortfallData = result.data.map((entry) => {
+        const incomeMonthly = entry.totalIncome / 12;
+        const shortfallMonthly = Math.max(0, currentSalaryMonthly - incomeMonthly);
+        return {
+            ...entry,
+            incomeMonthly,
+            shortfallMonthly,
+        };
+    });
+    
+    const maxMonthlyShortfall = Math.max(...salaryShortfallData.map(d => d.shortfallMonthly), 0);
+    
+    // 総保障不足額 = 時系列グラフの赤字総面積 - 既存貯蓄・保険総額（右下ボックスと同じ計算式）
+    const totalShortfall = result.netShortfall;
+    const netShortfall = result.netShortfall;
+    const shortfallText = (netShortfall / 10000).toFixed(0);
+    const sicknessDeduction = result.sicknessDeduction;
+    const savingsApplied = result.savingsApplied;
+    const deductionMessages: string[] = [];
+    if (sicknessDeduction > 0) {
+        deductionMessages.push(`傷病手当金 ${ (sicknessDeduction / 10000).toFixed(0) }万円`);
+    }
+    if (savingsApplied > 0) {
+        deductionMessages.push(`貯蓄から ${(savingsApplied / 10000).toFixed(0)}万円 控除`);
+    }
+    const activeYears = (activeMonths / 12).toFixed(1).replace(/\.0$/, '');
 
     return (
         <section className="bg-slate-900/40 border border-slate-800 rounded-3xl p-6 md:p-8 backdrop-blur-sm">
+            {/* 失われる月額給料と総保障不足額のサマリーボックス */}
+            <div className="bg-gradient-to-r from-rose-950/60 to-rose-900/40 border-2 border-rose-500/50 rounded-2xl p-6 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h4 className="text-lg font-bold text-rose-200 mb-2 flex items-center gap-2">
+                            <span>⚠️</span>
+                            失われる月額給料（不足額）
+                        </h4>
+                        <p className="text-sm text-rose-300/80 mb-3">
+                            最も不足する月の金額（事故発生前の給料からの不足）
+                        </p>
+                        <p className={`text-5xl font-bold ${maxMonthlyShortfall > 0 ? 'text-rose-300' : 'text-emerald-400'}`}>
+                            {maxMonthlyShortfall > 0 ? `${(maxMonthlyShortfall / 10000).toFixed(1)}万円/月` : '不足なし'}
+                        </p>
+                    </div>
+                    <div>
+                        <h4 className="text-lg font-bold text-rose-200 mb-2 flex items-center gap-2">
+                            <span>💰</span>
+                            総保障不足額
+                        </h4>
+                        <p className="text-sm text-rose-300/80 mb-3">
+                            シミュレーション期間全体の不足合計額（65歳まで）
+                        </p>
+                        <p className={`text-5xl font-bold ${totalShortfall > 0 ? 'text-rose-300' : 'text-emerald-400'}`}>
+                            {totalShortfall > 0 ? `${(totalShortfall / 10000).toFixed(0)}万円` : '不足なし'}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div className="bg-slate-950/40 border border-slate-800 rounded-2xl p-4">
+                    <p className="text-xs text-slate-400 mb-1">計算対象期間</p>
+                    <p className="text-2xl font-bold text-white">{activeMonths > 0 ? `${activeYears}年 (${activeMonths}カ月)` : '0カ月'}</p>
+                    <p className="text-[10px] text-slate-500 mt-1">事故発生〜65歳到達までを対象</p>
+                </div>
+                <div className="bg-slate-950/40 border border-slate-800 rounded-2xl p-4">
+                    <p className="text-xs text-slate-400 mb-1">現在の月額給料（手取り）</p>
+                    <p className="text-2xl font-bold text-white">
+                        {currentSalaryMonthly > 0 ? `${(currentSalaryMonthly / 10000).toFixed(1)}万円/月` : '未設定'}
+                    </p>
+                    <p className="text-[10px] text-slate-500 mt-1">事故発生前の給料（グラフの満水高さ）</p>
+                </div>
+            </div>
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                 <div>
                     <h3 className="text-xl font-bold text-slate-100 flex items-center gap-3">
@@ -552,44 +973,43 @@ function ScenarioSection({ result, color, icon, description }: { result: Scenari
                     <p className="text-slate-400 text-sm mt-1">{description}</p>
                 </div>
                 <div className="text-right bg-slate-950/50 px-6 py-3 rounded-xl border border-slate-800">
-                    <div className="text-xs text-slate-400 mb-1">生涯の必要保障額目安</div>
-                    <div className={`text-3xl font-bold ${result.hasShortfall ? 'text-rose-500' : 'text-emerald-500'}`}>
-                        {result.hasShortfall ? `${shortfallText}万円` : '不足なし'}
+                    <div className="text-xs text-slate-400 mb-1">{headline}</div>
+                    <div className={`text-3xl font-bold ${netShortfall > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                        {netShortfall > 0 ? `${shortfallText}万円` : '不足なし'}
                     </div>
-                    {result.hasShortfall && (
+                    {netShortfall > 0 && (
                         <div className="text-xs text-rose-400/70 mt-1">
                             月あたり最大不足: {(result.monthlyShortfallMax / 10000).toFixed(1)}万円
+                        </div>
+                    )}
+                    {deductionMessages.length > 0 && (
+                        <div className="text-[11px] text-slate-500 mt-2">
+                            {deductionMessages.join(' / ')} を控除済み
                         </div>
                     )}
                 </div>
             </div>
 
             <div className="mb-6">
-                <div className="flex items-center gap-6 mb-2 text-xs font-medium justify-end px-4">
+                <div className="flex flex-wrap items-center gap-4 mb-2 text-xs font-medium justify-end px-4">
                     <div className="flex items-center gap-1.5">
-                        <span className="w-3 h-3 rounded-full bg-rose-500/50 border border-rose-500 relative overflow-hidden">
-                            <svg viewBox="0 0 10 10" className="absolute inset-0 w-full h-full"><path d="M-2,12 L12,-2" stroke="white" strokeWidth="2" opacity="0.5" /></svg>
-                        </span>
-                        <span className="text-rose-400">教育費不足</span>
+                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#10B981' }}></span>
+                        <span className="text-emerald-300">確保済み収入（年金・就労）</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                        <span className="w-3 h-3 rounded-full bg-orange-500/50 border border-orange-500 relative overflow-hidden">
-                             <svg viewBox="0 0 10 10" className="absolute inset-0 w-full h-full"><path d="M-2,12 L12,-2" stroke="white" strokeWidth="2" opacity="0.5" /></svg>
-                        </span>
-                        <span className="text-orange-400">生活費不足</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                        <span className={`w-3 h-3 rounded-full bg-${color}-500`}></span>
-                        <span className={`text-${color}-400`}>公的年金 + 就労収入</span>
+                        <span className="w-3 h-3 rounded-full bg-rose-500/80 border border-rose-400"></span>
+                        <span className="text-rose-200">不足額（給料との差）</span>
                     </div>
                 </div>
-                <StackedBlockChart
+                <StackedAreaChart
                     data={result.data}
-                    maxAmount={maxAmount}
-                    colorTheme={color}
-                    height={300}
+                    currentSalaryMonthly={currentSalaryMonthly}
+                    retirementAge={RETIREMENT_AGE}
                 />
             </div>
+            {savingsApplied > 0 && (
+                <p className="text-[11px] text-slate-500 text-right">※貯蓄・保険 ({(savingsApplied / 10000).toFixed(0)}万円) を必要保障額から控除済み</p>
+            )}
         </section>
     );
 }

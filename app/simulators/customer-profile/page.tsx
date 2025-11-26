@@ -34,6 +34,7 @@ type CustomerProfileBasicInfo = {
   // 妻の情報（遺族年金シミュレーター用）
   ageWife: number; // 妻の年齢
   oldAgeStartWife: number; // 妻の老齢開始年齢（デフォルト65歳）
+  annualIncomeWife?: number; // 妻の昨年の年収（額面）
   avgStdMonthlyWife: number; // 妻の平均標準報酬月額
   monthsWife: number; // 妻の加入月数（0、1〜299、300以上）
   useMinashi300Wife: boolean; // 妻のみなし300月チェックボックス
@@ -41,6 +42,7 @@ type CustomerProfileBasicInfo = {
   // 夫の情報（遺族年金シミュレーター用）
   ageHusband: number; // 夫の年齢
   oldAgeStartHusband: number; // 夫の老齢開始年齢（デフォルト65歳）
+  annualIncomeHusband?: number; // 夫の昨年の年収（額面）
   avgStdMonthlyHusband: number; // 夫の平均標準報酬月額
   monthsHusband: number; // 夫の加入月数（0、1〜299、300以上）
   useMinashi300Husband: boolean; // 夫のみなし300月チェックボックス
@@ -50,6 +52,7 @@ type CustomerProfileBasicInfo = {
   oldAgeStart: number; // 老齢開始年齢（デフォルト65歳）
   hasEmployeePension: boolean; // 厚生年金に加入していた
   employeePensionMonths: number; // 加入月数（0、1〜299、300以上）
+  annualIncome?: number; // 本人の昨年の年収（額面）
   avgStdMonthly: number; // 平均標準報酬月額（2003年4月以降の値として扱う）
   useMinashi300: boolean; // 本人のみなし300月チェックボックス
 
@@ -86,6 +89,9 @@ const TEN_THOUSAND_OPTIONS = Array.from({ length: 91 }, (_, i) => (i + 10) * 10_
 
 // +1,000円〜+9,000円の調整選択肢
 const ADJUSTMENT_OPTIONS = Array.from({ length: 9 }, (_, i) => (i + 1) * 1_000);
+
+// 年収選択（50万円刻み、0〜1億円想定）
+const ANNUAL_INCOME_OPTIONS = Array.from({ length: 201 }, (_, i) => i * 500_000);
 
 // 費目のラベル定義
 const EXPENSE_LABELS: Record<keyof LivingExpenseDetail, string> = {
@@ -396,6 +402,19 @@ function BasicInfoInput({
   basicInfo: CustomerProfileBasicInfo;
   setBasicInfo: (info: CustomerProfileBasicInfo) => void;
 }) {
+  const getAnnualManValue = (annual?: number, avgMonthly?: number) => {
+    if (annual && annual > 0) return Math.round(annual / 10000);
+    if (avgMonthly && avgMonthly > 0) return Math.round((avgMonthly * 12) / 10000);
+    return '';
+  };
+
+  const renderAnnualIncomeOptions = () =>
+    ANNUAL_INCOME_OPTIONS.map((value) => (
+      <option key={value} value={value / 10000}>
+        {(value / 10000).toFixed(0)}万円
+      </option>
+    ));
+
   // 子の人数が変更されたときに年齢配列を更新
   useEffect(() => {
     if (basicInfo.childrenCount === undefined || basicInfo.childrenCount === 0) {
@@ -547,15 +566,27 @@ function BasicInfoInput({
               />
             </InputGroup>
 
-            <InputGroup label="平均標準報酬月額">
+            <InputGroup label="昨年の年収（額面）">
               <Select
-                value={basicInfo.avgStdMonthlyWife || 0}
-                onChange={(e: any) => setBasicInfo({ ...basicInfo, avgStdMonthlyWife: parseInt(e.target.value, 10) || 0 })}
-                options={Array.from({ length: 196 }, (_, i) => {
-                  const value = 50_000 + i * 10_000;
-                  return <option key={value} value={value}>{(value / 10_000).toFixed(0)}万円</option>;
-                })}
+                value={getAnnualManValue(basicInfo.annualIncomeWife, basicInfo.avgStdMonthlyWife)}
+                onChange={(e: any) => {
+                  const man = parseInt(e.target.value, 10);
+                  const annualYen = !isNaN(man) && man > 0 ? man * 10000 : 0;
+                  const avgMonthly = annualYen > 0 ? Math.round(annualYen / 12) : 0;
+                  setBasicInfo({
+                    ...basicInfo,
+                    annualIncomeWife: annualYen > 0 ? annualYen : undefined,
+                    avgStdMonthlyWife: avgMonthly,
+                  });
+                }}
+                options={
+                  <>
+                    <option value="">--</option>
+                    {renderAnnualIncomeOptions()}
+                  </>
+                }
               />
+              <p className="text-[10px] text-slate-500">年収を入力すると標準報酬月額へ自動変換されます</p>
             </InputGroup>
 
             <InputGroup label={
@@ -614,15 +645,27 @@ function BasicInfoInput({
               />
             </InputGroup>
 
-            <InputGroup label="平均標準報酬月額">
+            <InputGroup label="昨年の年収（額面）">
               <Select
-                value={basicInfo.avgStdMonthlyHusband || 0}
-                onChange={(e: any) => setBasicInfo({ ...basicInfo, avgStdMonthlyHusband: parseInt(e.target.value, 10) || 0 })}
-                options={Array.from({ length: 196 }, (_, i) => {
-                  const value = 50_000 + i * 10_000;
-                  return <option key={value} value={value}>{(value / 10_000).toFixed(0)}万円</option>;
-                })}
+                value={getAnnualManValue(basicInfo.annualIncomeHusband, basicInfo.avgStdMonthlyHusband)}
+                onChange={(e: any) => {
+                  const man = parseInt(e.target.value, 10);
+                  const annualYen = !isNaN(man) && man > 0 ? man * 10000 : 0;
+                  const avgMonthly = annualYen > 0 ? Math.round(annualYen / 12) : 0;
+                  setBasicInfo({
+                    ...basicInfo,
+                    annualIncomeHusband: annualYen > 0 ? annualYen : undefined,
+                    avgStdMonthlyHusband: avgMonthly,
+                  });
+                }}
+                options={
+                  <>
+                    <option value="">--</option>
+                    {renderAnnualIncomeOptions()}
+                  </>
+                }
               />
+              <p className="text-[10px] text-slate-500">年収を入力すると標準報酬月額へ自動変換されます</p>
             </InputGroup>
 
             <InputGroup label={
@@ -685,15 +728,27 @@ function BasicInfoInput({
                   ))}
                 />
               </InputGroup>
-              <InputGroup label="平均標準報酬月額">
+              <InputGroup label="昨年の年収（額面）">
                 <Select
-                  value={basicInfo.avgStdMonthly || 0}
-                  onChange={(e: any) => setBasicInfo({ ...basicInfo, avgStdMonthly: parseInt(e.target.value) || 0 })}
-                  options={Array.from({ length: 196 }, (_, i) => {
-                    const val = 50000 + i * 10000;
-                    return <option key={val} value={val}>{(val / 10000).toFixed(0)}万円</option>
-                  })}
+                  value={getAnnualManValue(basicInfo.annualIncome, basicInfo.avgStdMonthly)}
+                  onChange={(e: any) => {
+                    const man = parseInt(e.target.value, 10);
+                    const annualYen = !isNaN(man) && man > 0 ? man * 10000 : 0;
+                    const avgMonthly = annualYen > 0 ? Math.round(annualYen / 12) : 0;
+                    setBasicInfo({
+                      ...basicInfo,
+                      annualIncome: annualYen > 0 ? annualYen : undefined,
+                      avgStdMonthly: avgMonthly,
+                    });
+                  }}
+                  options={
+                    <>
+                      <option value="">--</option>
+                      {renderAnnualIncomeOptions()}
+                    </>
+                  }
                 />
+                <p className="text-[10px] text-slate-500">年収を入力すると標準報酬月額へ自動変換されます</p>
               </InputGroup>
               <InputGroup label={
                 <div className="flex items-end gap-2">
@@ -753,19 +808,22 @@ export default function CustomerProfilePage() {
       spouseType: undefined, // デフォルトは未選択（--）
       ageWife: 0, // 0は未入力として扱う（--を表示）
       oldAgeStartWife: 0, // 0は未入力として扱う（--を表示）
-      avgStdMonthlyWife: 0, // 0は未入力として扱う（--を表示）
+      annualIncomeWife: 3_000_000,
+      avgStdMonthlyWife: Math.round(3_000_000 / 12), // 0は未入力として扱う（--を表示）
       monthsWife: 300, // デフォルトは300月
       useMinashi300Wife: false,
       ageHusband: 0, // 0は未入力として扱う（--を表示）
       oldAgeStartHusband: 0, // 0は未入力として扱う（--を表示）
-      avgStdMonthlyHusband: 0, // 0は未入力として扱う（--を表示）
+      annualIncomeHusband: 4_500_000,
+      avgStdMonthlyHusband: Math.round(4_500_000 / 12), // 0は未入力として扱う（--を表示）
       monthsHusband: 300, // デフォルトは300月
       useMinashi300Husband: false,
       age: 0, // 0は未入力として扱う（--を表示）
       oldAgeStart: 0, // 0は未入力として扱う（--を表示）
       hasEmployeePension: false,
       employeePensionMonths: 300, // デフォルトは300月
-      avgStdMonthly: 0, // 0は未入力として扱う（--を表示）
+      annualIncome: 4_500_000,
+      avgStdMonthly: Math.round(4_500_000 / 12), // 0は未入力として扱う（--を表示）
       useMinashi300: false,
       educationCourse: 'private_hs', // デフォルト
       cramSchoolOptions: { elementary: true, juniorHigh: true, highSchool: true }, // デフォルトでON
