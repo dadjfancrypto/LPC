@@ -108,11 +108,13 @@ function StackedAreaChart({
     currentSalaryMonthly: number; // 事故発生前の現在の月額給料（手取り）
     retirementAge?: number;
 }) {
-    // 月額ベースに変換してフィルタリング
+    // 65歳未満（現役期間）のみに限定
     const filtered = data
-        .filter((entry) => entry.age <= retirementAge)
+        .filter((entry) => entry.age < retirementAge)
         .map((entry) => {
-            const incomeMonthly = Math.min(entry.totalIncome / 12, currentSalaryMonthly);
+            // グラフ表示用には「基本収入（年金＋就労）」のみを使用する
+            // ※貯蓄や傷病手当金の充当分を含めると、教育費（不足額）の変動に合わせて収入が増えているように見えてしまうため
+            const incomeMonthly = Math.min(entry.baseIncome / 12, currentSalaryMonthly);
             return {
                 ...entry,
                 incomeMonthly,
@@ -129,49 +131,53 @@ function StackedAreaChart({
     }
 
     const startAge = filtered[0].age;
-    const sicknessEndAge = startAge + 2; // 約1.5年後を年単位で近似
-    const educationEndEntry = filtered.find((entry) => entry.educationCost === 0 && entry.age > startAge);
-    const educationEndAge = educationEndEntry?.age;
-    const retirementEntry = filtered.find((entry) => entry.age >= retirementAge);
-    const retirementStartAge = retirementEntry?.age ?? Math.min(filtered[filtered.length - 1].age, retirementAge);
+    const maxAgeInFiltered = filtered[filtered.length - 1].age;
 
-    const keyAges = Array.from(
-        new Set(
-            [
-                startAge,
-                sicknessEndAge,
-                educationEndAge,
-                retirementStartAge,
-                filtered[filtered.length - 1].age,
-            ].filter((age): age is number => typeof age === 'number' && age <= retirementAge)
-        )
-    ).sort((a, b) => a - b);
+    // 変化点を抽出してステップチャートの「段差」を作る
+    const keyAges = new Set<number>();
+    keyAges.add(startAge);
+    // データの変化点を検出して追加
+    for (let i = 1; i < filtered.length; i++) {
+        const prev = filtered[i - 1];
+        const curr = filtered[i];
+        // 収入、支出、教育費などが大きく変わる年をキーとする
+        // 1万円以上の変化があればキーとする
+        if (
+            Math.abs(prev.totalIncome - curr.totalIncome) > 10000 ||
+            Math.abs(prev.totalTarget - curr.totalTarget) > 10000
+        ) {
+            keyAges.add(curr.age);
+        }
+    }
+    // 最後の年齢の翌年（終了点）も追加したいが、データ範囲内での描画にするため
+    // 最後のデータの年齢 + 1 を「終了」として扱う
+    const endAge = maxAgeInFiltered + 1;
+    keyAges.add(endAge);
 
-    const displayPoints = keyAges.map((age) => {
-        const matchedEntry = filtered.find((entry) => entry.age >= age) ?? filtered[filtered.length - 1];
+    const sortedKeyAges = Array.from(keyAges).sort((a, b) => a - b);
+
+    // 表示用データポイント作成
+    // 各区間の開始年齢とその時点のデータを持つ
+    const displayPoints = sortedKeyAges.slice(0, -1).map((age) => {
+        const matchedEntry = filtered.find((entry) => entry.age === age) ?? filtered[filtered.length - 1];
+        const nextAge = sortedKeyAges.find(a => a > age) ?? endAge;
         return {
             age: matchedEntry.age,
+            endAge: nextAge,
             incomeMonthly: matchedEntry.incomeMonthly,
             shortfallMonthly: matchedEntry.shortfallMonthly,
         };
     });
 
-    if (!displayPoints.length) {
-        displayPoints.push({
-            age: filtered[0].age,
-            incomeMonthly: filtered[0].incomeMonthly,
-            shortfallMonthly: filtered[0].shortfallMonthly,
-        });
-    }
-
+    // 描画エリア設定
     const width = 820;
     const height = 320;
-    const padding = { top: 20, right: 40, bottom: 50, left: 60 };
+    const padding = { top: 40, right: 40, bottom: 40, left: 60 };
     const graphWidth = width - padding.left - padding.right;
     const graphHeight = height - padding.top - padding.bottom;
 
-    const minAge = displayPoints[0].age;
-    const maxAge = Math.min(retirementAge, displayPoints[displayPoints.length - 1].age + 5);
+    const minAge = startAge;
+    const maxAge = endAge;
     const ageRange = Math.max(maxAge - minAge, 1);
     const getX = (age: number) => ((age - minAge) / ageRange) * graphWidth;
 
@@ -179,80 +185,93 @@ function StackedAreaChart({
     const maxAmount = Math.max(currentSalaryMonthly, 1);
     const getY = (value: number) => graphHeight - (value / maxAmount) * graphHeight;
 
+    // 最大不足額のブロックを探す（ラベル表示用）
     const maxShortfallEntry = displayPoints.reduce((max, entry) =>
         entry.shortfallMonthly > max.shortfallMonthly ? entry : max,
         displayPoints[0]
     );
-    const hasShortfall = maxShortfallEntry.shortfallMonthly > 0;
-    const shortfallLabelText = `不足 ${ (maxShortfallEntry.shortfallMonthly / 10000).toFixed(1) }万円`;
-    const maxIndex = displayPoints.findIndex((entry) => entry === maxShortfallEntry);
-    const nextPoint = displayPoints[maxIndex + 1] ?? { age: Math.min(maxShortfallEntry.age + 1, retirementAge) };
-    const labelCenterX = (getX(maxShortfallEntry.age) + getX(nextPoint.age)) / 2;
-    const labelYValue = maxShortfallEntry.incomeMonthly + (maxShortfallEntry.shortfallMonthly / 2);
-    const labelCenterY = getY(labelYValue);
-    const labelX = Math.min(Math.max(labelCenterX, 80), graphWidth - 80);
-    const labelY = Math.max(labelCenterY, 40);
+    const hasShortfall = maxShortfallEntry.shortfallMonthly > 1000;
+    const shortfallLabelText = `不足 ${(maxShortfallEntry.shortfallMonthly / 10000).toFixed(1)}万円`;
 
-    const incomeColor = '#10B981';
-    const incomeStroke = '#059669';
-    const shortfallStroke = '#EF4444';
+    // 不足ラベル位置
+    const maxShortfallBlockWidth = getX(maxShortfallEntry.endAge) - getX(maxShortfallEntry.age);
+    const labelX = getX(maxShortfallEntry.age) + maxShortfallBlockWidth / 2;
+    const incomeY_max = getY(maxShortfallEntry.incomeMonthly);
+    const shortfallTopY_max = getY(maxShortfallEntry.incomeMonthly + maxShortfallEntry.shortfallMonthly);
+    const labelY = (incomeY_max + shortfallTopY_max) / 2;
+
+    const incomeColor = '#10B981'; // Emerald-500
+    const incomeStroke = '#059669'; // Emerald-600
+    const shortfallColor = '#EF4444'; // Red-500
+    const shortfallStroke = '#B91C1C'; // Red-700
 
     return (
         <div className="bg-slate-950/40 border border-slate-800 rounded-2xl p-4">
             <SVGPatterns />
             <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto">
                 <g transform={`translate(${padding.left},${padding.top})`}>
-                    {/* Y軸のラベル（給料・満水基準） */}
-                    <text x="-50" y={graphHeight / 2} textAnchor="middle" fontSize="12" fill="#94a3b8" transform="rotate(-90, -50, 0)">
-                        給料 {(currentSalaryMonthly / 10000).toFixed(0)}万円
-                    </text>
-                    
+
                     {/* Y軸のグリッド */}
-                    {[0, 0.5, 1].map((tick) => {
+                    {[0, 0.5].map((tick) => {
                         const y = graphHeight * (1 - tick);
                         const val = maxAmount * tick;
                         return (
                             <g key={tick}>
-                                <line x1="0" y1={y} x2={graphWidth} y2={y} stroke="#475569" strokeDasharray="6 4" strokeWidth="1.2" />
-                                <text x="-10" y={y + 4} textAnchor="end" fontSize="10" fill="#94a3b8">
+                                <line x1="0" y1={y} x2={graphWidth} y2={y} stroke="#334155" strokeDasharray="4 4" strokeWidth="1" />
+                                <text x="-10" y={y + 4} textAnchor="end" fontSize="10" fill="#64748b">
                                     {(val / 10000).toFixed(1)}万円
                                 </text>
                             </g>
                         );
                     })}
 
-                    {/* 満水基準ライン（給料の上限） */}
+                    {/* 満水基準ライン（給料の上限） - 強調表示 */}
                     <line
                         x1={0}
-                        y1={getY(currentSalaryMonthly)}
+                        y1={0} // maxAmount (top)
                         x2={graphWidth}
-                        y2={getY(currentSalaryMonthly)}
-                        stroke="#94a3b8"
-                        strokeDasharray="6 6"
+                        y2={0}
+                        stroke="#3B82F6" // Blue-500
                         strokeWidth="2"
                     />
                     <text
-                        x={graphWidth - 10}
-                        y={getY(currentSalaryMonthly) - 5}
-                        textAnchor="end"
-                        fontSize="11"
-                        fill="#94a3b8"
+                        x={graphWidth / 2}
+                        y={-15}
+                        textAnchor="middle"
+                        fontSize="12"
+                        fill="#60A5FA" // Blue-400
                         fontWeight="bold"
                     >
                         現在の月額給料（満水基準）: {(currentSalaryMonthly / 10000).toFixed(0)}万円
                     </text>
 
-                    {/* X軸のグリッドとラベル */}
-                    {Array.from({ length: Math.ceil(ageRange / 5) + 1 }).map((_, idx) => {
-                        const age = minAge + idx * 5;
-                        if (age > maxAge) return null;
+                    {/* X軸のグリッドとラベル（変化点のみ） */}
+                    {sortedKeyAges.map((age, idx) => {
                         const x = getX(age);
+
+                        // 表示判定：最初、最後、または「収入（緑）」が変化したタイミングのみ表示
+                        let showLabel = false;
+                        if (idx === 0) showLabel = true;
+                        else if (idx === sortedKeyAges.length - 1) showLabel = true;
+                        else {
+                            const currentBlock = displayPoints[idx];
+                            const prevBlock = displayPoints[idx - 1];
+                            // 1万円以上の収入変化がある場合のみラベルを表示
+                            if (currentBlock && prevBlock) {
+                                if (Math.abs(currentBlock.incomeMonthly - prevBlock.incomeMonthly) > 10000) {
+                                    showLabel = true;
+                                }
+                            }
+                        }
+
                         return (
                             <g key={age}>
-                                <line x1={x} y1={0} x2={x} y2={graphHeight} stroke="#1f2937" strokeDasharray="4 4" strokeWidth="1" />
-                                <text x={x} y={graphHeight + 15} textAnchor="middle" fontSize="10" fill="#94a3b8">
-                                    {age}歳
-                                </text>
+                                <line x1={x} y1={0} x2={x} y2={graphHeight} stroke="#1e293b" strokeDasharray="2 2" strokeWidth="1" />
+                                {showLabel && (
+                                    <text x={x} y={graphHeight + 20} textAnchor="middle" fontSize="10" fill="#94a3b8">
+                                        {age}歳
+                                    </text>
+                                )}
                             </g>
                         );
                     })}
@@ -260,18 +279,21 @@ function StackedAreaChart({
                     {/* ブロック状の積層描画（階段状） */}
                     {displayPoints.map((entry, idx) => {
                         const currentX = getX(entry.age);
-                        const nextAgeRaw = displayPoints[idx + 1]?.age ?? retirementAge;
-                        const clampedNextAge = Math.min(nextAgeRaw, retirementAge);
-                        const nextX = getX(clampedNextAge);
-                        const defaultWidth = graphWidth / Math.max(displayPoints.length, 1);
-                        const widthCandidate = nextX - currentX > 0 ? nextX - currentX : defaultWidth;
-                        const width = Math.max(Math.min(widthCandidate, graphWidth - currentX), defaultWidth * 0.5);
+                        const nextX = getX(entry.endAge);
+                        const width = Math.max(nextX - currentX, 0);
+
+                        if (width <= 0) return null;
+
                         const baseY = getY(0);
                         const incomeY = getY(entry.incomeMonthly);
                         const shortfallY = getY(entry.incomeMonthly + entry.shortfallMonthly);
 
+                        // 収入ラベル表示判定（幅が十分ある場合のみ）
+                        const showIncomeLabel = width > 40 && entry.incomeMonthly > 10000;
+
                         return (
                             <g key={`${entry.age}-${idx}`}>
+                                {/* 収入（緑） */}
                                 <rect
                                     x={currentX}
                                     y={incomeY}
@@ -281,13 +303,30 @@ function StackedAreaChart({
                                     stroke={incomeStroke}
                                     strokeWidth="1"
                                 />
+                                {/* 収入ラベル */}
+                                {showIncomeLabel && (
+                                    <text
+                                        x={currentX + width / 2}
+                                        y={incomeY + (baseY - incomeY) / 2}
+                                        textAnchor="middle"
+                                        dominantBaseline="central"
+                                        fontSize="11"
+                                        fill="white"
+                                        fontWeight="bold"
+                                        style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
+                                    >
+                                        {(entry.incomeMonthly / 10000).toFixed(1)}万円
+                                    </text>
+                                )}
+
+                                {/* 不足（赤） */}
                                 {entry.shortfallMonthly > 0 && (
                                     <rect
                                         x={currentX}
                                         y={shortfallY}
                                         width={width}
                                         height={Math.max(incomeY - shortfallY, 0)}
-                                        fill="url(#shortfallHatch)"
+                                        fill={shortfallColor}
                                         stroke={shortfallStroke}
                                         strokeWidth="1"
                                     />
@@ -296,31 +335,22 @@ function StackedAreaChart({
                         );
                     })}
 
+                    {/* 不足額ラベル（赤いブロックの中に配置） */}
                     {hasShortfall && (
-                        <text
-                            x={labelX}
-                            y={labelY}
-                            textAnchor="middle"
-                            dominantBaseline="central"
-                            fontSize="12"
-                            fontWeight="700"
-                            fill="#FDE68A"
-                            stroke="rgba(15,23,42,0.8)"
-                            strokeWidth="0.7"
-                        >
-                            {shortfallLabelText}
-                        </text>
-                    )}
-
-                    {/* 65歳以降のシェーディング */}
-                    {retirementAge > minAge && retirementAge < maxAge && (
-                        <rect
-                            x={getX(retirementAge)}
-                            y={0}
-                            width={graphWidth - getX(retirementAge)}
-                            height={graphHeight}
-                            fill="rgba(15,23,42,0.45)"
-                        />
+                        <g>
+                            <text
+                                x={labelX}
+                                y={labelY}
+                                textAnchor="middle"
+                                dominantBaseline="central"
+                                fontSize="12"
+                                fontWeight="bold"
+                                fill="white"
+                                style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
+                            >
+                                {shortfallLabelText}
+                            </text>
+                        </g>
                     )}
                 </g>
             </svg>
@@ -338,7 +368,7 @@ export default function NecessaryCoveragePage() {
     const [workIncomeRatio, setWorkIncomeRatio] = useState(90); // デフォルト90%（共働きで就労継続を想定）
     const [currentSavingsMan, setCurrentSavingsMan] = useState(0); // 既存の貯蓄・保険（万円）
     const [showSavingsInfo, setShowSavingsInfo] = useState(false);
-    
+
     const [scenarios, setScenarios] = useState<{
         husbandDeath: ScenarioResult;
         wifeDeath: ScenarioResult;
@@ -403,12 +433,12 @@ export default function NecessaryCoveragePage() {
             const startAge = targetPerson === 'wife' ? basicInfo.ageHusband : (targetPerson === 'husband' ? basicInfo.ageWife : basicInfo.age);
             // 配偶者（遺族）の開始年齢
             const spouseStartAge = targetPerson === 'husband' ? basicInfo.ageWife : (targetPerson === 'wife' ? basicInfo.ageHusband : 0);
-            
+
             // 遺族の年収（ターゲットが夫なら、妻の収入を使う）
             let survivorBaseIncome = 0;
             if (targetPerson === 'husband') survivorBaseIncome = (basicInfo.annualIncomeWife || (basicInfo.avgStdMonthlyWife * 12)) || 0;
             else if (targetPerson === 'wife') survivorBaseIncome = (basicInfo.annualIncomeHusband || (basicInfo.avgStdMonthlyHusband * 12)) || 0;
-            
+
             if (type === 'disability') {
                 if (targetPerson === 'husband') survivorBaseIncome = (basicInfo.annualIncomeWife || (basicInfo.avgStdMonthlyWife * 12)) || 0;
                 else if (targetPerson === 'wife') survivorBaseIncome = (basicInfo.annualIncomeHusband || (basicInfo.avgStdMonthlyHusband * 12)) || 0;
@@ -426,7 +456,7 @@ export default function NecessaryCoveragePage() {
             for (let i = 0; i <= years; i++) {
                 const currentAge = startAge + i;
                 const spouseAge = spouseStartAge > 0 ? spouseStartAge + i : 0;
-                
+
                 let pension = 0;
 
                 const childrenCurrentAges = basicInfo.childrenAges.map(age => age + i);
@@ -434,17 +464,17 @@ export default function NecessaryCoveragePage() {
                 const eligibleChildrenDisability = calculateEligibleChildrenCount(childrenCurrentAges, 2);
 
                 if (type === 'survivor') {
-        if (basicInfo.spouseType === 'couple') {
+                    if (basicInfo.spouseType === 'couple') {
                         if (targetPerson === 'husband') {
                             let kiso = 0;
                             if (eligibleChildren18 > 0) {
                                 kiso = kisoAnnualByCount(eligibleChildren18);
                             }
                             const kousei = proportionAnnual(basicInfo.avgStdMonthlyHusband, basicInfo.monthsHusband, basicInfo.useMinashi300Husband) * 0.75;
-            let chukorei = 0;
+                            let chukorei = 0;
                             if (eligibleChildren18 === 0 && currentAge >= 40 && currentAge < 65) {
-                chukorei = CHUKOREI_KASAN;
-            }
+                                chukorei = CHUKOREI_KASAN;
+                            }
                             if (currentAge >= 65) {
                                 pension = kousei + KISO_BASE_ANNUAL;
                             } else {
@@ -460,15 +490,15 @@ export default function NecessaryCoveragePage() {
                             pension = kiso + kousei;
                         }
                     } else {
-                         const kousei = proportionAnnual(basicInfo.avgStdMonthly, basicInfo.employeePensionMonths, basicInfo.useMinashi300) * 0.75;
-                         pension = kousei;
+                        const kousei = proportionAnnual(basicInfo.avgStdMonthly, basicInfo.employeePensionMonths, basicInfo.useMinashi300) * 0.75;
+                        pension = kousei;
                     }
 
                 } else {
                     const level = 2;
                     const kiso = calculateDisabilityBasicPension(level, eligibleChildrenDisability);
                     const spouseBonus = (spouseAge > 0 && spouseAge < 65) ? SPOUSE_BONUS : 0;
-                    
+
                     let kousei = 0;
                     if (targetPerson === 'husband') {
                         kousei = calculateDisabilityEmployeePension(level, spouseBonus, 0, basicInfo.avgStdMonthlyHusband, basicInfo.monthsHusband, true);
@@ -481,6 +511,7 @@ export default function NecessaryCoveragePage() {
                 }
 
                 let workIncome = 0;
+                // 就労収入：昇給率は考慮せず、現在の給料ベースで一定（フラット）に推移させる
                 if (type === 'survivor') {
                     if (currentAge < 65) {
                         workIncome = survivorBaseIncome * (workIncomeRatio / 100);
@@ -493,11 +524,11 @@ export default function NecessaryCoveragePage() {
 
                 const expenseRatio = type === 'survivor' ? expenseRatioSurvivor : expenseRatioDisability;
                 // 遺族シナリオでは団信により住宅ローンが免除されるため控除、障害シナリオでは控除しない
-                const expenseBase = type === 'survivor' 
+                const expenseBase = type === 'survivor'
                     ? currentExpenseAnnual - housingLoanAnnual  // 遺族: 住宅ローンを控除
                     : currentExpenseAnnual;  // 障害: 住宅ローンを含む
                 const baseExpense = Math.round(expenseBase * (expenseRatio / 100));
-                
+
                 let educationCost = 0;
                 if (basicInfo.childrenAges.length > 0) {
                     educationCost = childrenCurrentAges.reduce((sum, age) => sum + getEducationCost(age), 0);
@@ -568,14 +599,14 @@ export default function NecessaryCoveragePage() {
             const netShortfall = Math.max(0, weightedShortfallTotal - savingsApplied);
             const activeShortfalls = data.filter(d => d.monthsActive > 0).map(d => d.shortfall / 12);
             monthlyShortfallMax = activeShortfalls.length ? Math.max(...activeShortfalls) : 0;
-            
+
             // 団信による住宅ローン免除額（遺族シナリオのみ、65歳までの期間）
-            const exemptedHousingLoan = type === 'survivor' 
+            const exemptedHousingLoan = type === 'survivor'
                 ? housingLoanAnnual * (activeMonthsSum / 12)  // 遺族: 65歳までの住宅ローン免除額
                 : 0;  // 障害: 団信は適用されない
 
-        return {
-                title: type === 'survivor' ? 
+            return {
+                title: type === 'survivor' ?
                     (targetPerson === 'husband' ? '夫死亡時の収支' : (targetPerson === 'wife' ? '妻死亡時の収支' : '本人死亡時の収支')) :
                     (targetPerson === 'husband' ? '夫障害時の収支' : (targetPerson === 'wife' ? '妻障害時の収支' : '本人障害時の収支')),
                 data,
@@ -630,7 +661,7 @@ export default function NecessaryCoveragePage() {
                     <h2 className="text-lg font-bold mb-6 flex items-center gap-2">
                         <span>⚙️</span> シミュレーション条件設定
                     </h2>
-                    
+
                     {/* 現在の生活費を表示 */}
                     <div className="mb-6 p-4 bg-slate-950/60 border border-slate-800 rounded-xl">
                         <div className="flex items-center justify-between">
@@ -663,13 +694,13 @@ export default function NecessaryCoveragePage() {
                             <div className="mt-3 p-3 bg-slate-950/60 border border-slate-800 rounded-lg">
                                 <p className="text-xs text-slate-400 mb-1">調整後の遺族生活費（月額）</p>
                                 <p className="text-xl font-bold text-emerald-400">
-                                    {profile.monthlyLivingExpense 
-                                        ? `${(profile.monthlyLivingExpense * (expenseRatioSurvivor / 100) / 10000).toFixed(1)}万円/月` 
+                                    {profile.monthlyLivingExpense
+                                        ? `${(profile.monthlyLivingExpense * (expenseRatioSurvivor / 100) / 10000).toFixed(1)}万円/月`
                                         : '未設定'}
                                 </p>
                                 <p className="text-xs text-slate-500 mt-1">
-                                    {profile.monthlyLivingExpense 
-                                        ? `現在の生活費から ${expenseRatioSurvivor >= 100 ? '+' : ''}${((expenseRatioSurvivor / 100 - 1) * 100).toFixed(0)}%` 
+                                    {profile.monthlyLivingExpense
+                                        ? `現在の生活費から ${expenseRatioSurvivor >= 100 ? '+' : ''}${((expenseRatioSurvivor / 100 - 1) * 100).toFixed(0)}%`
                                         : ''}
                                 </p>
                             </div>
@@ -689,13 +720,13 @@ export default function NecessaryCoveragePage() {
                             <div className="mt-3 p-3 bg-slate-950/60 border border-slate-800 rounded-lg">
                                 <p className="text-xs text-slate-400 mb-1">調整後の障害生活費（月額）</p>
                                 <p className="text-xl font-bold text-amber-400">
-                                    {profile.monthlyLivingExpense 
-                                        ? `${(profile.monthlyLivingExpense * (expenseRatioDisability / 100) / 10000).toFixed(1)}万円/月` 
+                                    {profile.monthlyLivingExpense
+                                        ? `${(profile.monthlyLivingExpense * (expenseRatioDisability / 100) / 10000).toFixed(1)}万円/月`
                                         : '未設定'}
                                 </p>
                                 <p className="text-xs text-slate-500 mt-1">
-                                    {profile.monthlyLivingExpense 
-                                        ? `現在の生活費から ${expenseRatioDisability >= 100 ? '+' : ''}${((expenseRatioDisability / 100 - 1) * 100).toFixed(0)}%` 
+                                    {profile.monthlyLivingExpense
+                                        ? `現在の生活費から ${expenseRatioDisability >= 100 ? '+' : ''}${((expenseRatioDisability / 100 - 1) * 100).toFixed(0)}%`
                                         : ''}
                                 </p>
                             </div>
@@ -719,8 +750,8 @@ export default function NecessaryCoveragePage() {
                                         夫死亡時（妻）: {profile.basicInfo.annualIncomeWife || profile.basicInfo.avgStdMonthlyWife * 12
                                             ? `${((profile.basicInfo.annualIncomeWife || profile.basicInfo.avgStdMonthlyWife * 12) * (workIncomeRatio / 100) / 12 / 10000).toFixed(1)}万円/月`
                                             : '未設定'} | 妻死亡時（夫）: {profile.basicInfo.annualIncomeHusband || profile.basicInfo.avgStdMonthlyHusband * 12
-                                            ? `${((profile.basicInfo.annualIncomeHusband || profile.basicInfo.avgStdMonthlyHusband * 12) * (workIncomeRatio / 100) / 12 / 10000).toFixed(1)}万円/月`
-                                            : '未設定'}
+                                                ? `${((profile.basicInfo.annualIncomeHusband || profile.basicInfo.avgStdMonthlyHusband * 12) * (workIncomeRatio / 100) / 12 / 10000).toFixed(1)}万円/月`
+                                                : '未設定'}
                                     </p>
                                 ) : (
                                     <p className="text-xl font-bold text-sky-400">
@@ -861,7 +892,7 @@ function ScenarioSection({
 }) {
     const headline = result.category === 'survivor' ? 'あなたに必要な死亡保障総額' : 'あなたに必要な所得補償総額';
     const activeMonths = Math.max(result.activeMonths, 0);
-    
+
     // 事故発生前の現在の月額給料（手取り）を計算
     // 生き残った配偶者の給料を満水基準とする
     // 手取りは年収の約80%と仮定
@@ -889,81 +920,22 @@ function ScenarioSection({
     } else {
         currentSalaryMonthly = (singleAnnual * 0.8) / 12;
     }
-    
-    // 給料からの不足額を計算（月額ベース）
-    const salaryShortfallData = result.data.map((entry) => {
-        const incomeMonthly = entry.totalIncome / 12;
-        const shortfallMonthly = Math.max(0, currentSalaryMonthly - incomeMonthly);
-        return {
-            ...entry,
-            incomeMonthly,
-            shortfallMonthly,
-        };
-    });
-    
-    const maxMonthlyShortfall = Math.max(...salaryShortfallData.map(d => d.shortfallMonthly), 0);
-    
+
     // 総保障不足額 = 時系列グラフの赤字総面積 - 既存貯蓄・保険総額（右下ボックスと同じ計算式）
-    const totalShortfall = result.netShortfall;
     const netShortfall = result.netShortfall;
     const shortfallText = (netShortfall / 10000).toFixed(0);
     const sicknessDeduction = result.sicknessDeduction;
     const savingsApplied = result.savingsApplied;
     const deductionMessages: string[] = [];
     if (sicknessDeduction > 0) {
-        deductionMessages.push(`傷病手当金 ${ (sicknessDeduction / 10000).toFixed(0) }万円`);
+        deductionMessages.push(`傷病手当金 ${(sicknessDeduction / 10000).toFixed(0)}万円`);
     }
     if (savingsApplied > 0) {
         deductionMessages.push(`貯蓄から ${(savingsApplied / 10000).toFixed(0)}万円 控除`);
     }
-    const activeYears = (activeMonths / 12).toFixed(1).replace(/\.0$/, '');
 
     return (
         <section className="bg-slate-900/40 border border-slate-800 rounded-3xl p-6 md:p-8 backdrop-blur-sm">
-            {/* 失われる月額給料と総保障不足額のサマリーボックス */}
-            <div className="bg-gradient-to-r from-rose-950/60 to-rose-900/40 border-2 border-rose-500/50 rounded-2xl p-6 mb-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <h4 className="text-lg font-bold text-rose-200 mb-2 flex items-center gap-2">
-                            <span>⚠️</span>
-                            失われる月額給料（不足額）
-                        </h4>
-                        <p className="text-sm text-rose-300/80 mb-3">
-                            最も不足する月の金額（事故発生前の給料からの不足）
-                        </p>
-                        <p className={`text-5xl font-bold ${maxMonthlyShortfall > 0 ? 'text-rose-300' : 'text-emerald-400'}`}>
-                            {maxMonthlyShortfall > 0 ? `${(maxMonthlyShortfall / 10000).toFixed(1)}万円/月` : '不足なし'}
-                        </p>
-                    </div>
-                    <div>
-                        <h4 className="text-lg font-bold text-rose-200 mb-2 flex items-center gap-2">
-                            <span>💰</span>
-                            総保障不足額
-                        </h4>
-                        <p className="text-sm text-rose-300/80 mb-3">
-                            シミュレーション期間全体の不足合計額（65歳まで）
-                        </p>
-                        <p className={`text-5xl font-bold ${totalShortfall > 0 ? 'text-rose-300' : 'text-emerald-400'}`}>
-                            {totalShortfall > 0 ? `${(totalShortfall / 10000).toFixed(0)}万円` : '不足なし'}
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div className="bg-slate-950/40 border border-slate-800 rounded-2xl p-4">
-                    <p className="text-xs text-slate-400 mb-1">計算対象期間</p>
-                    <p className="text-2xl font-bold text-white">{activeMonths > 0 ? `${activeYears}年 (${activeMonths}カ月)` : '0カ月'}</p>
-                    <p className="text-[10px] text-slate-500 mt-1">事故発生〜65歳到達までを対象</p>
-                </div>
-                <div className="bg-slate-950/40 border border-slate-800 rounded-2xl p-4">
-                    <p className="text-xs text-slate-400 mb-1">現在の月額給料（手取り）</p>
-                    <p className="text-2xl font-bold text-white">
-                        {currentSalaryMonthly > 0 ? `${(currentSalaryMonthly / 10000).toFixed(1)}万円/月` : '未設定'}
-                    </p>
-                    <p className="text-[10px] text-slate-500 mt-1">事故発生前の給料（グラフの満水高さ）</p>
-                </div>
-            </div>
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                 <div>
                     <h3 className="text-xl font-bold text-slate-100 flex items-center gap-3">
