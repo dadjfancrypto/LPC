@@ -1065,7 +1065,7 @@ export default function CustomerProfilePage() {
                     useMinashi300Wife: true,
                     ageHusband: 32,
                     oldAgeStartHusband: 65,
-                    avgStdMonthlyHusband: 300_000,
+                    avgStdMonthlyHusband: 375_000,
                     monthsHusband: 300,
                     useMinashi300Husband: true,
                     age: 0,
@@ -1167,8 +1167,8 @@ export default function CustomerProfilePage() {
               onClick={handleDeletePlan}
               disabled={!currentPlanId}
               className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${currentPlanId
-                  ? 'border-rose-700 text-rose-400 hover:text-white hover:bg-rose-800'
-                  : 'border-slate-800 text-slate-600 cursor-not-allowed'
+                ? 'border-rose-700 text-rose-400 hover:text-white hover:bg-rose-800'
+                : 'border-slate-800 text-slate-600 cursor-not-allowed'
                 }`}
             >
               🗑 削除

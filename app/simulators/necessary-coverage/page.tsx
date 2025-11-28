@@ -295,15 +295,37 @@ function StackedAreaChart({
                         if (width <= 0) return null;
 
                         const baseY = getY(0);
-                        const incomeY = getY(entry.incomeMonthly);
+                        // incomeYは後で計算するのでここでは宣言しない
 
                         // 視覚的な高さを計算（ラベル表示用に最小高さを確保）
-                        const visualGrayAmount = entry.grayAreaMonthly > 0 ? Math.max(entry.grayAreaMonthly, MIN_VISUAL_AMOUNT) : 0;
-                        const visualShortfallAmount = entry.shortfallMonthly > 0 ? Math.max(entry.shortfallMonthly, MIN_VISUAL_AMOUNT) : 0;
+                        let visualGrayAmount = entry.grayAreaMonthly > 0 ? Math.max(entry.grayAreaMonthly, MIN_VISUAL_AMOUNT) : 0;
+                        let visualShortfallAmount = entry.shortfallMonthly > 0 ? Math.max(entry.shortfallMonthly, MIN_VISUAL_AMOUNT) : 0;
+                        let visualIncomeAmount = entry.incomeMonthly;
 
-                        // 積み上げ座標の計算（視覚的な高さを使用）
-                        const grayY = getY(entry.incomeMonthly + visualGrayAmount);
-                        const shortfallY = getY(entry.incomeMonthly + visualGrayAmount + visualShortfallAmount);
+                        // 合計が満水基準（maxAmount）を超えないように調整
+                        // 優先順位: 不足（赤） > 不要（グレー） > 収入（緑）
+                        // つまり、あふれた分はまず「収入」から削り、それでも足りなければ「不要」から削る
+                        const totalVisual = visualIncomeAmount + visualGrayAmount + visualShortfallAmount;
+                        const overflow = totalVisual - maxAmount;
+
+                        if (overflow > 0) {
+                            // まず収入を削る
+                            const reduceIncome = Math.min(visualIncomeAmount, overflow);
+                            visualIncomeAmount -= reduceIncome;
+                            let remainingOverflow = overflow - reduceIncome;
+
+                            // まだあふれているなら不要を削る
+                            if (remainingOverflow > 0) {
+                                const reduceGray = Math.min(visualGrayAmount, remainingOverflow);
+                                visualGrayAmount -= reduceGray;
+                                // 理論上、不足（赤）は削らない（ユーザー要望の最小サイズ優先）
+                            }
+                        }
+
+                        // 積み上げ座標の計算（調整後の視覚的な高さを使用）
+                        const incomeY = getY(visualIncomeAmount);
+                        const grayY = getY(visualIncomeAmount + visualGrayAmount);
+                        const shortfallY = getY(visualIncomeAmount + visualGrayAmount + visualShortfallAmount);
 
                         // 収入ラベル表示判定（幅が十分ある場合のみ）
                         const showIncomeLabel = width > 40 && entry.incomeMonthly > 10000;
@@ -362,7 +384,7 @@ function StackedAreaChart({
                                                 fontWeight="bold"
                                                 style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
                                             >
-                                                <tspan x={currentX + width / 2} dy="-0.6em">不要</tspan>
+                                                <tspan x={currentX + width / 2} dy="-0.6em">不要額</tspan>
                                                 <tspan x={currentX + width / 2} dy="1.2em">{(entry.grayAreaMonthly / 10000).toFixed(1)}万円</tspan>
                                             </text>
                                         )}
@@ -393,7 +415,7 @@ function StackedAreaChart({
                                                 fontWeight="bold"
                                                 style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
                                             >
-                                                <tspan x={currentX + width / 2} dy="-0.6em">不足</tspan>
+                                                <tspan x={currentX + width / 2} dy="-0.6em">不足額</tspan>
                                                 <tspan x={currentX + width / 2} dy="1.2em">{(entry.shortfallMonthly / 10000).toFixed(1)}万円</tspan>
                                             </text>
                                         )}
@@ -522,7 +544,7 @@ export default function NecessaryCoveragePage() {
                             if (eligibleChildren18 > 0) {
                                 kiso = kisoAnnualByCount(eligibleChildren18);
                             }
-                            const kousei = proportionAnnual(basicInfo.avgStdMonthlyHusband, basicInfo.monthsHusband, basicInfo.useMinashi300Husband) * 0.75;
+                            const kousei = proportionAnnual(basicInfo.avgStdMonthlyHusband, basicInfo.monthsHusband, basicInfo.useMinashi300Husband);
                             let chukorei = 0;
                             if (eligibleChildren18 === 0 && currentAge >= 40 && currentAge < 65) {
                                 chukorei = CHUKOREI_KASAN;
@@ -538,11 +560,11 @@ export default function NecessaryCoveragePage() {
                             if (eligibleChildren18 > 0) {
                                 kiso = kisoAnnualByCount(eligibleChildren18);
                             }
-                            const kousei = proportionAnnual(basicInfo.avgStdMonthlyWife, basicInfo.monthsWife, basicInfo.useMinashi300Wife) * 0.75;
+                            const kousei = proportionAnnual(basicInfo.avgStdMonthlyWife, basicInfo.monthsWife, basicInfo.useMinashi300Wife);
                             pension = kiso + kousei;
                         }
                     } else {
-                        const kousei = proportionAnnual(basicInfo.avgStdMonthly, basicInfo.employeePensionMonths, basicInfo.useMinashi300) * 0.75;
+                        const kousei = proportionAnnual(basicInfo.avgStdMonthly, basicInfo.employeePensionMonths, basicInfo.useMinashi300);
                         pension = kousei;
                     }
 
@@ -1064,6 +1086,10 @@ function ScenarioSection({
                     <div className="flex items-center gap-1.5">
                         <span className="w-3 h-3 rounded-full bg-rose-500/80 border border-rose-400"></span>
                         <span className="text-rose-200">不足額（給料との差）</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <span className="w-3 h-3 rounded-full bg-slate-500/30 border border-slate-400/50"></span>
+                        <span className="text-slate-400">不要額（住宅ローン・故人の生活費）: {(result.data.length > 0 ? (result.data[0].grayArea || 0) / 120000 : 0).toFixed(1)}万円</span>
                     </div>
                 </div>
                 <StackedAreaChart
