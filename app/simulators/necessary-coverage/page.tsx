@@ -65,6 +65,7 @@ type YearlyData = {
     sicknessAnnual: number;
     savingsAnnual: number;
     monthsActive: number; // 65歳までにカウントする月数
+    grayArea: number; // 不要な支出（住宅ローン＋生活費削減分）
 };
 
 type ScenarioResult = {
@@ -115,10 +116,14 @@ function StackedAreaChart({
             // グラフ表示用には「基本収入（年金＋就労）」のみを使用する
             // ※貯蓄や傷病手当金の充当分を含めると、教育費（不足額）の変動に合わせて収入が増えているように見えてしまうため
             const incomeMonthly = Math.min(entry.baseIncome / 12, currentSalaryMonthly);
+            const grayAreaMonthly = Math.min(Math.max(0, (entry.grayArea || 0) / 12), Math.max(0, currentSalaryMonthly - incomeMonthly));
+            const shortfallMonthly = Math.max(0, currentSalaryMonthly - incomeMonthly - grayAreaMonthly);
+
             return {
                 ...entry,
                 incomeMonthly,
-                shortfallMonthly: Math.max(0, currentSalaryMonthly - incomeMonthly),
+                grayAreaMonthly,
+                shortfallMonthly,
             };
         });
 
@@ -165,6 +170,7 @@ function StackedAreaChart({
             age: matchedEntry.age,
             endAge: nextAge,
             incomeMonthly: matchedEntry.incomeMonthly,
+            grayAreaMonthly: matchedEntry.grayAreaMonthly,
             shortfallMonthly: matchedEntry.shortfallMonthly,
         };
     });
@@ -185,25 +191,14 @@ function StackedAreaChart({
     const maxAmount = Math.max(currentSalaryMonthly, 1);
     const getY = (value: number) => graphHeight - (value / maxAmount) * graphHeight;
 
-    // 最大不足額のブロックを探す（ラベル表示用）
-    const maxShortfallEntry = displayPoints.reduce((max, entry) =>
-        entry.shortfallMonthly > max.shortfallMonthly ? entry : max,
-        displayPoints[0]
-    );
-    const hasShortfall = maxShortfallEntry.shortfallMonthly > 1000;
-    const shortfallLabelText = `不足 ${(maxShortfallEntry.shortfallMonthly / 10000).toFixed(1)}万円`;
-
-    // 不足ラベル位置
-    const maxShortfallBlockWidth = getX(maxShortfallEntry.endAge) - getX(maxShortfallEntry.age);
-    const labelX = getX(maxShortfallEntry.age) + maxShortfallBlockWidth / 2;
-    const incomeY_max = getY(maxShortfallEntry.incomeMonthly);
-    const shortfallTopY_max = getY(maxShortfallEntry.incomeMonthly + maxShortfallEntry.shortfallMonthly);
-    const labelY = (incomeY_max + shortfallTopY_max) / 2;
-
     const incomeColor = '#10B981'; // Emerald-500
     const incomeStroke = '#059669'; // Emerald-600
+    const grayAreaColor = '#94a3b8'; // Slate-400
+    const grayAreaStroke = '#64748b'; // Slate-500
     const shortfallColor = '#EF4444'; // Red-500
     const shortfallStroke = '#B91C1C'; // Red-700
+
+
 
     return (
         <div className="bg-slate-950/40 border border-slate-800 rounded-2xl p-4">
@@ -212,7 +207,7 @@ function StackedAreaChart({
                 <g transform={`translate(${padding.left},${padding.top})`}>
 
                     {/* Y軸のグリッド */}
-                    {[0, 0.5].map((tick) => {
+                    {[0, 0.5, 1.0].map((tick) => {
                         const y = graphHeight * (1 - tick);
                         const val = maxAmount * tick;
                         return (
@@ -286,14 +281,15 @@ function StackedAreaChart({
 
                         const baseY = getY(0);
                         const incomeY = getY(entry.incomeMonthly);
-                        const shortfallY = getY(entry.incomeMonthly + entry.shortfallMonthly);
+                        const grayY = getY(entry.incomeMonthly + entry.grayAreaMonthly);
+                        const shortfallY = getY(entry.incomeMonthly + entry.grayAreaMonthly + entry.shortfallMonthly);
 
                         // 収入ラベル表示判定（幅が十分ある場合のみ）
                         const showIncomeLabel = width > 40 && entry.incomeMonthly > 10000;
 
                         return (
                             <g key={`${entry.age}-${idx}`}>
-                                {/* 収入（緑） */}
+                                {/* Layer 1: 収入（緑） */}
                                 <rect
                                     x={currentX}
                                     y={incomeY}
@@ -304,54 +300,89 @@ function StackedAreaChart({
                                     strokeWidth="1"
                                 />
                                 {/* 収入ラベル */}
+                                {/* 収入ラベル */}
                                 {showIncomeLabel && (
                                     <text
                                         x={currentX + width / 2}
                                         y={incomeY + (baseY - incomeY) / 2}
                                         textAnchor="middle"
                                         dominantBaseline="central"
-                                        fontSize="11"
+                                        fontSize="10"
                                         fill="white"
                                         fontWeight="bold"
                                         style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
                                     >
-                                        {(entry.incomeMonthly / 10000).toFixed(1)}万円
+                                        <tspan x={currentX + width / 2} dy="-0.6em">遺族年金</tspan>
+                                        <tspan x={currentX + width / 2} dy="1.2em">{(entry.incomeMonthly / 10000).toFixed(1)}万円</tspan>
                                     </text>
                                 )}
 
-                                {/* 不足（赤） */}
+                                {/* Layer 2: 不要な支出（グレー） */}
+                                {entry.grayAreaMonthly > 0 && (
+                                    <g>
+                                        <rect
+                                            x={currentX}
+                                            y={grayY}
+                                            width={width}
+                                            height={Math.max(incomeY - grayY, 0)}
+                                            fill={grayAreaColor}
+                                            stroke={grayAreaStroke}
+                                            strokeWidth="1"
+                                        />
+                                        {/* グレーエリアラベル */}
+                                        {width > 40 && (Math.max(incomeY - grayY, 0) > 25) && (
+                                            <text
+                                                x={currentX + width / 2}
+                                                y={grayY + (incomeY - grayY) / 2}
+                                                textAnchor="middle"
+                                                dominantBaseline="central"
+                                                fontSize="10"
+                                                fill="white"
+                                                fontWeight="bold"
+                                                style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
+                                            >
+                                                <tspan x={currentX + width / 2} dy="-0.6em">不要</tspan>
+                                                <tspan x={currentX + width / 2} dy="1.2em">{(entry.grayAreaMonthly / 10000).toFixed(1)}万円</tspan>
+                                            </text>
+                                        )}
+                                    </g>
+                                )}
+
+                                {/* Layer 3: 不足（赤） */}
                                 {entry.shortfallMonthly > 0 && (
-                                    <rect
-                                        x={currentX}
-                                        y={shortfallY}
-                                        width={width}
-                                        height={Math.max(incomeY - shortfallY, 0)}
-                                        fill={shortfallColor}
-                                        stroke={shortfallStroke}
-                                        strokeWidth="1"
-                                    />
+                                    <g>
+                                        <rect
+                                            x={currentX}
+                                            y={shortfallY}
+                                            width={width}
+                                            height={Math.max(grayY - shortfallY, 0)}
+                                            fill="url(#shortfallHatch)"
+                                            stroke={shortfallStroke}
+                                            strokeWidth="1"
+                                        />
+                                        {/* 不足ラベル */}
+                                        {width > 40 && (Math.max(grayY - shortfallY, 0) > 25) && (
+                                            <text
+                                                x={currentX + width / 2}
+                                                y={shortfallY + (grayY - shortfallY) / 2}
+                                                textAnchor="middle"
+                                                dominantBaseline="central"
+                                                fontSize="10"
+                                                fill="white"
+                                                fontWeight="bold"
+                                                style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
+                                            >
+                                                <tspan x={currentX + width / 2} dy="-0.6em">不足</tspan>
+                                                <tspan x={currentX + width / 2} dy="1.2em">{(entry.shortfallMonthly / 10000).toFixed(1)}万円</tspan>
+                                            </text>
+                                        )}
+                                    </g>
                                 )}
                             </g>
                         );
                     })}
 
-                    {/* 不足額ラベル（赤いブロックの中に配置） */}
-                    {hasShortfall && (
-                        <g>
-                            <text
-                                x={labelX}
-                                y={labelY}
-                                textAnchor="middle"
-                                dominantBaseline="central"
-                                fontSize="12"
-                                fontWeight="bold"
-                                fill="white"
-                                style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
-                            >
-                                {shortfallLabelText}
-                            </text>
-                        </g>
-                    )}
+
                 </g>
             </svg>
         </div>
@@ -534,8 +565,47 @@ export default function NecessaryCoveragePage() {
                     educationCost = childrenCurrentAges.reduce((sum, age) => sum + getEducationCost(age), 0);
                 }
 
+                // ターゲット（死亡/障害者）の事故前の手取り年収を計算（これが満水ターゲットになる）
+                let targetAnnualIncome = 0;
+                if (targetPerson === 'husband') {
+                    const gross = basicInfo.annualIncomeHusband || (basicInfo.avgStdMonthlyHusband * 12);
+                    targetAnnualIncome = gross * 0.8;
+                } else if (targetPerson === 'wife') {
+                    const gross = basicInfo.annualIncomeWife || (basicInfo.avgStdMonthlyWife * 12);
+                    targetAnnualIncome = gross * 0.8;
+                } else {
+                    const gross = basicInfo.annualIncome || (basicInfo.avgStdMonthly * 12);
+                    targetAnnualIncome = gross * 0.8;
+                }
+
                 const baseIncome = pension + workIncome;
-                const totalTarget = baseExpense + educationCost + reserveFundAnnual;
+                let totalTarget = 0;
+                let grayArea = 0;
+
+                if (type === 'survivor') {
+                    // 遺族シナリオ: 「収入保障（給与填補）ベース」
+                    // ターゲット = 事故前の手取り年収 - 不要な支出（グレーエリア）
+
+                    // 1. 住宅ローン（団信で消える）
+                    const housingLoan = housingLoanAnnual;
+
+                    // 2. 夫の生活費（浮くお金）
+                    // 計算式: (現在の生活費 - 住宅ローン) * (1 - 遺族生活費率)
+                    const livingExpenseBase = Math.max(0, currentExpenseAnnual - housingLoanAnnual);
+                    const survivorRatio = expenseRatioSurvivor / 100;
+                    const deceasedLivingExpense = livingExpenseBase * (1 - survivorRatio);
+
+                    grayArea = housingLoan + deceasedLivingExpense;
+
+                    // 必要保障額（ターゲット）は、手取り年収からグレーエリアを引いたもの
+                    totalTarget = Math.max(0, targetAnnualIncome - grayArea);
+                } else {
+                    // 障害シナリオ: 「生活費保障（生存保障）ベース」
+                    // ターゲット = 必要生活費 + 教育費 + 予備費
+                    totalTarget = baseExpense + educationCost + reserveFundAnnual;
+                    grayArea = 0;
+                }
+
                 const baseShortfall = Math.max(0, totalTarget - baseIncome);
 
                 const monthsActive = Math.max(0, Math.min(12, (RETIREMENT_AGE - currentAge) * 12));
@@ -559,7 +629,8 @@ export default function NecessaryCoveragePage() {
                     shortfall: baseShortfall,
                     sicknessAnnual: 0,
                     savingsAnnual: 0,
-                    monthsActive
+                    monthsActive,
+                    grayArea
                 });
             }
 
