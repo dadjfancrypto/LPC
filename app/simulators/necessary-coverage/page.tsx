@@ -145,11 +145,22 @@ function StackedAreaChart({
     for (let i = 1; i < filtered.length; i++) {
         const prev = filtered[i - 1];
         const curr = filtered[i];
-        // 収入、支出、教育費などが大きく変わる年をキーとする
-        // 1万円以上の変化があればキーとする
+
+        // 表示される数値（ラベル）が変わるタイミングを変化点とする
+        // これにより、見た目が同じブロックは結合される
+        const formatVal = (v: number) => (v / 10000).toFixed(1);
+
+        const prevIncome = formatVal(prev.incomeMonthly);
+        const currIncome = formatVal(curr.incomeMonthly);
+        const prevGray = formatVal(prev.grayAreaMonthly);
+        const currGray = formatVal(curr.grayAreaMonthly);
+        const prevShortfall = formatVal(prev.shortfallMonthly);
+        const currShortfall = formatVal(curr.shortfallMonthly);
+
         if (
-            Math.abs(prev.totalIncome - curr.totalIncome) > 10000 ||
-            Math.abs(prev.totalTarget - curr.totalTarget) > 10000
+            prevIncome !== currIncome ||
+            prevGray !== currGray ||
+            prevShortfall !== currShortfall
         ) {
             keyAges.add(curr.age);
         }
@@ -197,6 +208,10 @@ function StackedAreaChart({
     const grayAreaStroke = '#64748b'; // Slate-500
     const shortfallColor = '#EF4444'; // Red-500
     const shortfallStroke = '#B91C1C'; // Red-700
+
+    // ラベルを表示するための最小視覚的高さ（金額換算）
+    // 5万円分の高さがあれば2行ラベル（約25-30px）が収まると仮定
+    const MIN_VISUAL_AMOUNT = 50000;
 
 
 
@@ -281,8 +296,14 @@ function StackedAreaChart({
 
                         const baseY = getY(0);
                         const incomeY = getY(entry.incomeMonthly);
-                        const grayY = getY(entry.incomeMonthly + entry.grayAreaMonthly);
-                        const shortfallY = getY(entry.incomeMonthly + entry.grayAreaMonthly + entry.shortfallMonthly);
+
+                        // 視覚的な高さを計算（ラベル表示用に最小高さを確保）
+                        const visualGrayAmount = entry.grayAreaMonthly > 0 ? Math.max(entry.grayAreaMonthly, MIN_VISUAL_AMOUNT) : 0;
+                        const visualShortfallAmount = entry.shortfallMonthly > 0 ? Math.max(entry.shortfallMonthly, MIN_VISUAL_AMOUNT) : 0;
+
+                        // 積み上げ座標の計算（視覚的な高さを使用）
+                        const grayY = getY(entry.incomeMonthly + visualGrayAmount);
+                        const shortfallY = getY(entry.incomeMonthly + visualGrayAmount + visualShortfallAmount);
 
                         // 収入ラベル表示判定（幅が十分ある場合のみ）
                         const showIncomeLabel = width > 40 && entry.incomeMonthly > 10000;
@@ -330,7 +351,7 @@ function StackedAreaChart({
                                             strokeWidth="1"
                                         />
                                         {/* グレーエリアラベル */}
-                                        {width > 40 && (Math.max(incomeY - grayY, 0) > 25) && (
+                                        {width > 30 && (
                                             <text
                                                 x={currentX + width / 2}
                                                 y={grayY + (incomeY - grayY) / 2}
@@ -361,7 +382,7 @@ function StackedAreaChart({
                                             strokeWidth="1"
                                         />
                                         {/* 不足ラベル */}
-                                        {width > 40 && (Math.max(grayY - shortfallY, 0) > 25) && (
+                                        {width > 30 && (
                                             <text
                                                 x={currentX + width / 2}
                                                 y={shortfallY + (grayY - shortfallY) / 2}
@@ -578,7 +599,8 @@ export default function NecessaryCoveragePage() {
                     targetAnnualIncome = gross * 0.8;
                 }
 
-                const baseIncome = pension + workIncome;
+                // 遺族シナリオの場合、緑色のエリア（確保済み収入）は「遺族年金のみ」とする指示のため、就労収入を含めない
+                const baseIncome = type === 'survivor' ? pension : (pension + workIncome);
                 let totalTarget = 0;
                 let grayArea = 0;
 
