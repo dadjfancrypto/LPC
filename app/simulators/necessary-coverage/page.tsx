@@ -103,11 +103,13 @@ const SVGPatterns = () => (
 function StackedAreaChart({
     data,
     currentSalaryMonthly,
-    retirementAge = RETIREMENT_AGE
+    retirementAge = RETIREMENT_AGE,
+    salaryLabel
 }: {
     data: YearlyData[];
     currentSalaryMonthly: number; // 事故発生前の現在の月額給料（手取り）
     retirementAge?: number;
+    salaryLabel?: string;
 }) {
     // 65歳未満（現役期間）のみに限定
     const filtered = data
@@ -128,10 +130,10 @@ function StackedAreaChart({
         });
 
     if (!filtered.length || currentSalaryMonthly <= 0) {
-        return (
+    return (
             <div className="h-48 flex items-center justify-center rounded-2xl border border-slate-800 bg-slate-950/40 text-sm text-slate-500">
                 表示できる期間がありません
-            </div>
+                        </div>
         );
     }
 
@@ -252,7 +254,7 @@ function StackedAreaChart({
                         fill="#60A5FA" // Blue-400
                         fontWeight="bold"
                     >
-                        現在の月額給料（満水基準）: {(currentSalaryMonthly / 10000).toFixed(0)}万円
+                        {salaryLabel || `現在の月額給料（満水基準）`}: {(currentSalaryMonthly / 10000).toFixed(0)}万円
                     </text>
 
                     {/* X軸のグリッドとラベル（変化点のみ） */}
@@ -442,8 +444,23 @@ export default function NecessaryCoveragePage() {
     const [workIncomeRatio, setWorkIncomeRatio] = useState(90); // デフォルト90%（共働きで就労継続を想定）
     const [currentSavingsMan, setCurrentSavingsMan] = useState(0); // 既存の貯蓄・保険（万円）
     const [showSavingsInfo, setShowSavingsInfo] = useState(false);
-    const [displayPeriodMode, setDisplayPeriodMode] = useState<'child19' | 'child23' | 'retirement' | 'custom'>('retirement');
-    const [customEndAge, setCustomEndAge] = useState(65);
+    // 各シナリオごとのグラフ表示期間設定
+    const [displayPeriodModes, setDisplayPeriodModes] = useState<Record<string, 'child19' | 'child23' | 'retirement' | 'custom'>>({
+        husbandDeath: 'child23',
+        wifeDeath: 'child23',
+        husbandDisability: 'child23',
+        wifeDisability: 'child23',
+        singleDeath: 'child23',
+        singleDisability: 'child23',
+    });
+    const [customEndAges, setCustomEndAges] = useState<Record<string, number>>({
+        husbandDeath: 65,
+        wifeDeath: 65,
+        husbandDisability: 65,
+        wifeDisability: 65,
+        singleDeath: 65,
+        singleDisability: 65,
+    });
 
     const [scenarios, setScenarios] = useState<{
         husbandDeath: ScenarioResult;
@@ -480,8 +497,9 @@ export default function NecessaryCoveragePage() {
         }
     }, []);
 
-    const calculatedEndAge = useMemo(() => {
-        if (!profile) return 65;
+    // profileが読み込まれたときに各シナリオのcustomEndAgeを初期化
+    useEffect(() => {
+        if (!profile) return;
         const currentAge = profile.basicInfo.spouseType === 'couple'
             ? (profile.basicInfo.ageHusband || profile.basicInfo.ageWife || 0)
             : (profile.basicInfo.age || 0);
@@ -489,19 +507,26 @@ export default function NecessaryCoveragePage() {
             ? (profile.basicInfo.oldAgeStartHusband || profile.basicInfo.oldAgeStartWife || 65)
             : (profile.basicInfo.oldAgeStart || 65);
 
-        if (displayPeriodMode === 'child19' && profile.basicInfo.childrenAges.length > 0) {
-            const youngestChild = Math.min(...profile.basicInfo.childrenAges);
-            return currentAge + (19 - youngestChild);
-        } else if (displayPeriodMode === 'child23' && profile.basicInfo.childrenAges.length > 0) {
-            const youngestChild = Math.min(...profile.basicInfo.childrenAges);
-            return currentAge + (23 - youngestChild);
-        } else if (displayPeriodMode === 'retirement') {
-            return oldAgeStart;
-        } else if (displayPeriodMode === 'custom') {
-            return customEndAge;
-        }
-        return oldAgeStart;
-    }, [profile, displayPeriodMode, customEndAge]);
+        const scenarioKeys = ['husbandDeath', 'wifeDeath', 'husbandDisability', 'wifeDisability', 'singleDeath', 'singleDisability'];
+        const newCustomEndAges = { ...customEndAges };
+        
+        scenarioKeys.forEach((key) => {
+            const mode = displayPeriodModes[key];
+            if (mode !== 'custom') {
+                if (mode === 'child19' && profile.basicInfo.childrenAges.length > 0) {
+                    const youngestChild = Math.min(...profile.basicInfo.childrenAges);
+                    newCustomEndAges[key] = currentAge + (19 - youngestChild);
+                } else if (mode === 'child23' && profile.basicInfo.childrenAges.length > 0) {
+                    const youngestChild = Math.min(...profile.basicInfo.childrenAges);
+                    newCustomEndAges[key] = currentAge + (23 - youngestChild);
+                } else if (mode === 'retirement') {
+                    newCustomEndAges[key] = oldAgeStart;
+                }
+            }
+        });
+        
+        setCustomEndAges(newCustomEndAges);
+    }, [profile, displayPeriodModes]);
 
     // 時系列計算ロジック
     useEffect(() => {
@@ -526,7 +551,8 @@ export default function NecessaryCoveragePage() {
 
         const calculateScenario = (
             type: 'survivor' | 'disability',
-            targetPerson: 'husband' | 'wife' | 'single'
+            targetPerson: 'husband' | 'wife' | 'single',
+            endAge: number
         ): ScenarioResult => {
             const data: YearlyData[] = [];
             const startAge = targetPerson === 'wife' ? basicInfo.ageHusband : (targetPerson === 'husband' ? basicInfo.ageWife : basicInfo.age);
@@ -563,17 +589,17 @@ export default function NecessaryCoveragePage() {
                 const eligibleChildrenDisability = calculateEligibleChildrenCount(childrenCurrentAges, 2);
 
                 if (type === 'survivor') {
-                    if (basicInfo.spouseType === 'couple') {
+        if (basicInfo.spouseType === 'couple') {
                         if (targetPerson === 'husband') {
                             let kiso = 0;
                             if (eligibleChildren18 > 0) {
                                 kiso = kisoAnnualByCount(eligibleChildren18);
                             }
                             const kousei = proportionAnnual(basicInfo.avgStdMonthlyHusband, basicInfo.monthsHusband, basicInfo.useMinashi300Husband);
-                            let chukorei = 0;
+            let chukorei = 0;
                             if (eligibleChildren18 === 0 && currentAge >= 40 && currentAge < 65) {
-                                chukorei = CHUKOREI_KASAN;
-                            }
+                chukorei = CHUKOREI_KASAN;
+            }
                             if (currentAge >= 65) {
                                 pension = kousei + KISO_BASE_ANNUAL;
                             } else {
@@ -677,7 +703,10 @@ export default function NecessaryCoveragePage() {
 
                 const baseShortfall = Math.max(0, totalTarget - baseIncome);
 
-                const monthsActive = Math.max(0, Math.min(12, (RETIREMENT_AGE - currentAge) * 12));
+                // グラフ表示期間に合わせて、endAgeまでの期間のみをカウント
+                const monthsActive = currentAge < endAge 
+                    ? Math.max(0, Math.min(12, (endAge - currentAge) * 12))
+                    : 0;
                 activeMonthsSum += monthsActive;
                 if (monthsActive > 0) {
                     monthlyShortfallMax = Math.max(monthlyShortfallMax, baseShortfall / 12);
@@ -745,7 +774,7 @@ export default function NecessaryCoveragePage() {
                 ? housingLoanAnnual * (activeMonthsSum / 12)  // 遺族: 65歳までの住宅ローン免除額
                 : 0;  // 障害: 団信は適用されない
 
-            return {
+        return {
                 title: type === 'survivor' ?
                     (targetPerson === 'husband' ? '夫死亡時の収支' : (targetPerson === 'wife' ? '妻死亡時の収支' : '本人死亡時の収支')) :
                     (targetPerson === 'husband' ? '夫障害時の収支' : (targetPerson === 'wife' ? '妻障害時の収支' : '本人障害時の収支')),
@@ -763,16 +792,21 @@ export default function NecessaryCoveragePage() {
             };
         };
 
+        // 各シナリオごとのendAgeを計算
+        const getEndAge = (scenarioKey: string) => {
+            return customEndAges[scenarioKey] || 65;
+        };
+
         setScenarios({
-            husbandDeath: calculateScenario('survivor', 'husband'),
-            wifeDeath: calculateScenario('survivor', 'wife'),
-            husbandDisability: calculateScenario('disability', 'husband'),
-            wifeDisability: calculateScenario('disability', 'wife'),
-            singleDeath: calculateScenario('survivor', 'single'),
-            singleDisability: calculateScenario('disability', 'single'),
+            husbandDeath: calculateScenario('survivor', 'husband', getEndAge('husbandDeath')),
+            wifeDeath: calculateScenario('survivor', 'wife', getEndAge('wifeDeath')),
+            husbandDisability: calculateScenario('disability', 'husband', getEndAge('husbandDisability')),
+            wifeDisability: calculateScenario('disability', 'wife', getEndAge('wifeDisability')),
+            singleDeath: calculateScenario('survivor', 'single', getEndAge('singleDeath')),
+            singleDisability: calculateScenario('disability', 'single', getEndAge('singleDisability')),
         });
 
-    }, [profile, expenseRatioSurvivor, expenseRatioDisability, workIncomeRatio, currentSavingsYen, sicknessAllowanceTotal]);
+    }, [profile, expenseRatioSurvivor, expenseRatioDisability, workIncomeRatio, currentSavingsYen, sicknessAllowanceTotal, customEndAges]);
 
     if (!profile) {
         return (
@@ -805,7 +839,7 @@ export default function NecessaryCoveragePage() {
                     {/* 現在の生活費を表示 */}
                     <div className="mb-6 p-4 bg-slate-950/60 border border-slate-800 rounded-xl">
                         <div className="flex items-center justify-between">
-                            <div>
+                        <div>
                                 <p className="text-xs text-slate-400 mb-1">現在の生活費（顧客プロフィールより）</p>
                                 <p className="text-2xl font-bold text-white">
                                     {profile.monthlyLivingExpense ? `${(profile.monthlyLivingExpense / 10000).toFixed(1)}万円/月` : '未設定'}
@@ -843,9 +877,9 @@ export default function NecessaryCoveragePage() {
                                         ? `現在の生活費から ${expenseRatioSurvivor >= 100 ? '+' : ''}${((expenseRatioSurvivor / 100 - 1) * 100).toFixed(0)}%`
                                         : ''}
                                 </p>
-                            </div>
-                            <p className="text-xs text-slate-500 mt-2">一般的には60〜80%で設定されることが多く、共働き世帯の平均は約70%です。</p>
                         </div>
+                            <p className="text-xs text-slate-500 mt-2">一般的には60〜80%で設定されることが多く、共働き世帯の平均は約70%です。</p>
+                            </div>
 
                         <div>
                             <label className="block text-sm font-medium text-slate-400 mb-2">
@@ -869,9 +903,9 @@ export default function NecessaryCoveragePage() {
                                         ? `現在の生活費から ${expenseRatioDisability >= 100 ? '+' : ''}${((expenseRatioDisability / 100 - 1) * 100).toFixed(0)}%`
                                         : ''}
                                 </p>
-                            </div>
-                            <p className="text-xs text-slate-500 mt-2">治療・介護費を含めると110〜130%程度が一般値で、介護が長期化するケースではさらに上振れします。</p>
                         </div>
+                            <p className="text-xs text-slate-500 mt-2">治療・介護費を含めると110〜130%程度が一般値で、介護が長期化するケースではさらに上振れします。</p>
+                </div>
 
                         <div>
                             <label className="block text-sm font-medium text-slate-400 mb-2">
@@ -903,83 +937,9 @@ export default function NecessaryCoveragePage() {
                                 <p className="text-xs text-slate-500 mt-1">
                                     就労率 {workIncomeRatio}% を適用
                                 </p>
-                            </div>
+                                        </div>
                             <p className="text-xs text-slate-500 mt-2">共働き世帯では40〜60%が現実的なラインとされ、デフォルトの90%は「現状維持に近い働き方」を想定しています。</p>
-                        </div>
-
-                        {/* グラフ表示期間選択 */}
-                        <div className="md:col-span-3 mt-6 p-4 bg-slate-900/50 border border-slate-700 rounded-lg">
-                            <label className="block text-sm font-medium text-slate-300 mb-3">
-                                グラフ表示期間
-                            </label>
-                            <div className="space-y-3">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    <label className="flex items-center gap-2 p-3 bg-slate-800/50 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800 transition-colors">
-                                        <input
-                                            type="radio"
-                                            name="displayPeriod"
-                                            value="child19"
-                                            checked={displayPeriodMode === 'child19'}
-                                            onChange={() => setDisplayPeriodMode('child19')}
-                                            className="w-4 h-4 text-emerald-500 accent-emerald-500"
-                                        />
-                                        <span className="text-sm text-slate-300">一番下の子が19歳になるまで</span>
-                                    </label>
-                                    <label className="flex items-center gap-2 p-3 bg-slate-800/50 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800 transition-colors">
-                                        <input
-                                            type="radio"
-                                            name="displayPeriod"
-                                            value="child23"
-                                            checked={displayPeriodMode === 'child23'}
-                                            onChange={() => setDisplayPeriodMode('child23')}
-                                            className="w-4 h-4 text-emerald-500 accent-emerald-500"
-                                        />
-                                        <span className="text-sm text-slate-300">一番下の子が23歳になるまで</span>
-                                    </label>
-                                    <label className="flex items-center gap-2 p-3 bg-slate-800/50 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800 transition-colors">
-                                        <input
-                                            type="radio"
-                                            name="displayPeriod"
-                                            value="retirement"
-                                            checked={displayPeriodMode === 'retirement'}
-                                            onChange={() => setDisplayPeriodMode('retirement')}
-                                            className="w-4 h-4 text-emerald-500 accent-emerald-500"
-                                        />
-                                        <span className="text-sm text-slate-300">老齢年金開始年齢まで（デフォルト）</span>
-                                    </label>
-                                    <label className="flex items-center gap-2 p-3 bg-slate-800/50 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800 transition-colors">
-                                        <input
-                                            type="radio"
-                                            name="displayPeriod"
-                                            value="custom"
-                                            checked={displayPeriodMode === 'custom'}
-                                            onChange={() => setDisplayPeriodMode('custom')}
-                                            className="w-4 h-4 text-emerald-500 accent-emerald-500"
-                                        />
-                                        <span className="text-sm text-slate-300">カスタム</span>
-                                    </label>
-                                </div>
-
-                                {displayPeriodMode === 'custom' && (
-                                    <div className="mt-4 p-4 bg-slate-950/60 border border-slate-800 rounded-lg">
-                                        <label className="block text-sm font-medium text-slate-400 mb-2">
-                                            表示終了年齢: <span className="text-emerald-400 font-bold">{customEndAge}歳</span>
-                                        </label>
-                                        <input
-                                            type="range"
-                                            min={profile?.basicInfo?.spouseType === 'couple'
-                                                ? Math.max(profile.basicInfo.ageHusband || 0, profile.basicInfo.ageWife || 0)
-                                                : (profile?.basicInfo?.age || 30)}
-                                            max="75"
-                                            step="1"
-                                            value={customEndAge}
-                                            onChange={(e) => setCustomEndAge(Number(e.target.value))}
-                                            className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+                                        </div>
 
                         <div className="md:col-span-3 space-y-3">
                             <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -993,7 +953,7 @@ export default function NecessaryCoveragePage() {
                                     入力しなくても問題ありません。
                                     <span className={`text-xs transition-transform ${showSavingsInfo ? 'rotate-180' : ''}`}>⌃</span>
                                 </button>
-                            </div>
+                                        </div>
                             <div className="relative">
                                 <select
                                     value={currentSavingsMan}
@@ -1009,7 +969,7 @@ export default function NecessaryCoveragePage() {
                                 <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-slate-500">
                                     ▼
                                 </span>
-                            </div>
+                                        </div>
                             {showSavingsInfo && (
                                 <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 text-xs leading-relaxed space-y-2 animate-fade-in">
                                     <p className="text-slate-300 font-semibold">【現在の貯蓄・既存保険総額】について</p>
@@ -1019,11 +979,11 @@ export default function NecessaryCoveragePage() {
                                         <li>入力しない場合（0万円のまま）は、「貯蓄が全くない状態で、公的年金とご家族の収入だけで生活した場合の<strong className="text-rose-300">最大の不足額</strong>」として算出します。</li>
                                         <li>FPとしての責任として、お客様が<strong className="text-white">「保険で確保したい」</strong>金額を優先し、あえて貯蓄を入れずに計算することも可能です。後ほどFPにご相談の際に、貯蓄の使い道を一緒に検討します。</li>
                                     </ul>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
+                            </div>
+                        )}
+                                        </div>
+                                        </div>
+                                    </div>
 
                 {scenarios && (
                     <div className="space-y-16">
@@ -1034,8 +994,12 @@ export default function NecessaryCoveragePage() {
                                     profile={profile}
                                     color="emerald"
                                     icon="💀"
-                                    description="夫が死亡した場合、残された妻と子の生活費不足額"
-                                    calculatedEndAge={calculatedEndAge}
+                                    description="夫が死亡した場合、家庭から夫の収入がなくなる。公的保障による補填額を確認します"
+                                    scenarioKey="husbandDeath"
+                                    displayPeriodModes={displayPeriodModes}
+                                    setDisplayPeriodModes={setDisplayPeriodModes}
+                                    customEndAges={customEndAges}
+                                    setCustomEndAges={setCustomEndAges}
                                 />
                                 <ScenarioSection
                                     result={scenarios.husbandDisability}
@@ -1043,7 +1007,11 @@ export default function NecessaryCoveragePage() {
                                     color="amber"
                                     icon="🏥"
                                     description="夫が障害状態になった場合、収入減と支出増による不足額"
-                                    calculatedEndAge={calculatedEndAge}
+                                    scenarioKey="husbandDisability"
+                                    displayPeriodModes={displayPeriodModes}
+                                    setDisplayPeriodModes={setDisplayPeriodModes}
+                                    customEndAges={customEndAges}
+                                    setCustomEndAges={setCustomEndAges}
                                 />
                                 <ScenarioSection
                                     result={scenarios.wifeDeath}
@@ -1051,7 +1019,11 @@ export default function NecessaryCoveragePage() {
                                     color="emerald"
                                     icon="💀"
                                     description="妻が死亡した場合、残された夫と子の生活費不足額"
-                                    calculatedEndAge={calculatedEndAge}
+                                    scenarioKey="wifeDeath"
+                                    displayPeriodModes={displayPeriodModes}
+                                    setDisplayPeriodModes={setDisplayPeriodModes}
+                                    customEndAges={customEndAges}
+                                    setCustomEndAges={setCustomEndAges}
                                 />
                                 <ScenarioSection
                                     result={scenarios.wifeDisability}
@@ -1059,7 +1031,11 @@ export default function NecessaryCoveragePage() {
                                     color="amber"
                                     icon="🏥"
                                     description="妻が障害状態になった場合、家事代行費等の支出増も考慮が必要"
-                                    calculatedEndAge={calculatedEndAge}
+                                    scenarioKey="wifeDisability"
+                                    displayPeriodModes={displayPeriodModes}
+                                    setDisplayPeriodModes={setDisplayPeriodModes}
+                                    customEndAges={customEndAges}
+                                    setCustomEndAges={setCustomEndAges}
                                 />
                             </>
                         ) : (
@@ -1070,7 +1046,11 @@ export default function NecessaryCoveragePage() {
                                     color="emerald"
                                     icon="💀"
                                     description="死亡時の整理資金や、親族への遺族年金"
-                                    calculatedEndAge={calculatedEndAge}
+                                    scenarioKey="singleDeath"
+                                    displayPeriodModes={displayPeriodModes}
+                                    setDisplayPeriodModes={setDisplayPeriodModes}
+                                    customEndAges={customEndAges}
+                                    setCustomEndAges={setCustomEndAges}
                                 />
                                 <ScenarioSection
                                     result={scenarios.singleDisability}
@@ -1078,7 +1058,11 @@ export default function NecessaryCoveragePage() {
                                     color="amber"
                                     icon="🏥"
                                     description="障害状態での就労不能リスクと生活費不足"
-                                    calculatedEndAge={calculatedEndAge}
+                                    scenarioKey="singleDisability"
+                                    displayPeriodModes={displayPeriodModes}
+                                    setDisplayPeriodModes={setDisplayPeriodModes}
+                                    customEndAges={customEndAges}
+                                    setCustomEndAges={setCustomEndAges}
                                 />
                             </>
                         )}
@@ -1104,15 +1088,26 @@ function ScenarioSection({
     color,
     icon,
     description,
-    calculatedEndAge,
+    scenarioKey,
+    displayPeriodModes,
+    setDisplayPeriodModes,
+    customEndAges,
+    setCustomEndAges,
 }: {
     result: ScenarioResult;
     profile: CustomerProfile;
     color: 'emerald' | 'sky' | 'amber' | 'rose';
     icon: string;
     description: string;
-    calculatedEndAge: number;
+    scenarioKey: string;
+    displayPeriodModes: Record<string, 'child19' | 'child23' | 'retirement' | 'custom'>;
+    setDisplayPeriodModes: React.Dispatch<React.SetStateAction<Record<string, 'child19' | 'child23' | 'retirement' | 'custom'>>>;
+    customEndAges: Record<string, number>;
+    setCustomEndAges: React.Dispatch<React.SetStateAction<Record<string, number>>>;
 }) {
+    const displayPeriodMode = displayPeriodModes[scenarioKey] || 'child23';
+    const customEndAge = customEndAges[scenarioKey] || 65;
+    const calculatedEndAge = customEndAge;
     const headline = result.category === 'survivor' ? 'あなたに必要な死亡保障総額' : 'あなたに必要な所得補償総額';
     const activeMonths = Math.max(result.activeMonths, 0);
 
@@ -1144,6 +1139,16 @@ function ScenarioSection({
         currentSalaryMonthly = (singleAnnual * 0.8) / 12;
     }
 
+    // ラベル生成
+    let salaryLabelText = '現在の月額給料（満水基準）';
+    if (isHusbandScenario) {
+        salaryLabelText = '家庭から亡くなる夫の給料（満水基準）';
+    } else if (isWifeScenario) {
+        salaryLabelText = '家庭から亡くなる妻の給料（満水基準）';
+    } else if (result.title.includes('本人死亡') || result.title.includes('本人障害')) {
+        salaryLabelText = '家庭から亡くなる本人の給料（満水基準）';
+    }
+
     // 総保障不足額 = 時系列グラフの赤字総面積 - 既存貯蓄・保険総額（右下ボックスと同じ計算式）
     const netShortfall = result.netShortfall;
     const shortfallText = (netShortfall / 10000).toFixed(0);
@@ -1156,6 +1161,31 @@ function ScenarioSection({
     if (savingsApplied > 0) {
         deductionMessages.push(`貯蓄から ${(savingsApplied / 10000).toFixed(0)}万円 控除`);
     }
+
+    // ラジオボタン選択時にcustomEndAgeを更新する関数
+    const handlePeriodModeChange = (mode: 'child19' | 'child23' | 'retirement') => {
+        setDisplayPeriodModes(prev => ({ ...prev, [scenarioKey]: mode }));
+        if (!profile) return;
+        
+        const currentAge = profile.basicInfo.spouseType === 'couple'
+            ? (profile.basicInfo.ageHusband || profile.basicInfo.ageWife || 0)
+            : (profile.basicInfo.age || 0);
+        const oldAgeStart = profile.basicInfo.spouseType === 'couple'
+            ? (profile.basicInfo.oldAgeStartHusband || profile.basicInfo.oldAgeStartWife || 65)
+            : (profile.basicInfo.oldAgeStart || 65);
+
+        let newEndAge = 65;
+        if (mode === 'child19' && profile.basicInfo.childrenAges.length > 0) {
+            const youngestChild = Math.min(...profile.basicInfo.childrenAges);
+            newEndAge = currentAge + (19 - youngestChild);
+        } else if (mode === 'child23' && profile.basicInfo.childrenAges.length > 0) {
+            const youngestChild = Math.min(...profile.basicInfo.childrenAges);
+            newEndAge = currentAge + (23 - youngestChild);
+        } else if (mode === 'retirement') {
+            newEndAge = oldAgeStart;
+        }
+        setCustomEndAges(prev => ({ ...prev, [scenarioKey]: newEndAge }));
+    };
 
     return (
         <section className="bg-slate-900/40 border border-slate-800 rounded-3xl p-6 md:p-8 backdrop-blur-sm">
@@ -1204,10 +1234,79 @@ function ScenarioSection({
                     data={result.data}
                     currentSalaryMonthly={currentSalaryMonthly}
                     retirementAge={calculatedEndAge}
+                    salaryLabel={salaryLabelText}
                 />
             </div>
+
+            {/* グラフ表示期間選択 */}
+            <div className="mt-6 p-4 bg-slate-900/50 border border-slate-700 rounded-lg">
+                <label className="block text-sm font-medium text-slate-300 mb-3">
+                    グラフ表示期間
+                </label>
+                <div className="space-y-2">
+                    {/* 最初の3つを横並び */}
+                    <div className="flex flex-nowrap gap-2">
+                        <label className="flex items-center gap-1.5 p-2 bg-slate-800/50 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800 transition-colors">
+                            <input
+                                type="radio"
+                                name={`displayPeriod-${result.title}`}
+                                value="child19"
+                                checked={displayPeriodMode === 'child19'}
+                                onChange={() => handlePeriodModeChange('child19')}
+                                className="w-4 h-4 text-emerald-500 accent-emerald-500"
+                            />
+                            <span className="text-xs text-slate-300">最下子19歳まで</span>
+                        </label>
+                        <label className="flex items-center gap-1.5 p-2 bg-slate-800/50 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800 transition-colors">
+                            <input
+                                type="radio"
+                                name={`displayPeriod-${result.title}`}
+                                value="child23"
+                                checked={displayPeriodMode === 'child23'}
+                                onChange={() => handlePeriodModeChange('child23')}
+                                className="w-4 h-4 text-emerald-500 accent-emerald-500"
+                            />
+                            <span className="text-xs text-slate-300">最下子23歳まで</span>
+                        </label>
+                        <label className="flex items-center gap-1.5 p-2 bg-slate-800/50 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800 transition-colors">
+                            <input
+                                type="radio"
+                                name={`displayPeriod-${result.title}`}
+                                value="retirement"
+                                checked={displayPeriodMode === 'retirement'}
+                                onChange={() => handlePeriodModeChange('retirement')}
+                                className="w-4 h-4 text-emerald-500 accent-emerald-500"
+                            />
+                            <span className="text-xs text-slate-300">老齢年金開始まで</span>
+                        </label>
+                    </div>
+
+                    {/* スライドバーを常に表示 */}
+                    <div className="mt-2 p-4 bg-slate-950/60 border border-slate-800 rounded-lg">
+                        <label className="block text-sm font-medium text-slate-400 mb-2">
+                            表示終了年齢: <span className="text-emerald-400 font-bold">{customEndAge}歳</span>
+                        </label>
+                        <input
+                            type="range"
+                            min={profile?.basicInfo?.spouseType === 'couple'
+                                ? Math.max(profile.basicInfo.ageHusband || 0, profile.basicInfo.ageWife || 0)
+                                : (profile?.basicInfo?.age || 30)}
+                            max="75"
+                            step="1"
+                            value={customEndAge}
+                            onChange={(e) => {
+                                const newAge = Number(e.target.value);
+                                setCustomEndAges(prev => ({ ...prev, [scenarioKey]: newAge }));
+                                setDisplayPeriodModes(prev => ({ ...prev, [scenarioKey]: 'custom' }));
+                            }}
+                            className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                        />
+                    </div>
+                </div>
+            </div>
+
             {savingsApplied > 0 && (
-                <p className="text-[11px] text-slate-500 text-right">※貯蓄・保険 ({(savingsApplied / 10000).toFixed(0)}万円) を必要保障額から控除済み</p>
+                <p className="text-[11px] text-slate-500 text-right mt-4">※貯蓄・保険 ({(savingsApplied / 10000).toFixed(0)}万円) を必要保障額から控除済み</p>
             )}
         </section>
     );
