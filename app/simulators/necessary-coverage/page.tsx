@@ -200,8 +200,9 @@ function StackedAreaChart({
                 : 0;
             
             // Layer 3: 不要な支出（グレー）
-            const remainingAfterPensionAndAllowances = currentSalaryMonthly - pensionMonthly - allowancesMonthly;
-            const grayAreaMonthly = Math.min(Math.max(0, (entry.grayArea || 0) / 12), Math.max(0, remainingAfterPensionAndAllowances));
+            // grayAreaMonthlyの計算は表示用のallowancesMonthlyに依存せず、常に手当を含めない計算をする
+            const remainingAfterPension = currentSalaryMonthly - pensionMonthly;
+            const grayAreaMonthly = Math.min(Math.max(0, (entry.grayArea || 0) / 12), Math.max(0, remainingAfterPension));
             
             // Layer 4: 真の不足額（赤）または Layer 5: 余剰額（青）
             // 不足額計算は常に手当を含めて計算（表示/非表示は見た目のみ）
@@ -535,34 +536,42 @@ function StackedAreaChart({
                                 )}
 
                                 {/* Layer 3: 不要な支出（グレー） */}
-                                {entry.grayAreaMonthly > 0 && (
-                                    <g>
-                                        <rect
-                                            x={currentX}
-                                            y={grayY}
-                                            width={width}
-                                            height={Math.max(allowancesY - grayY, 0)}
-                                            fill={grayAreaColor}
-                                            stroke={grayAreaStroke}
-                                            strokeWidth="1"
-                                        />
-                                        {width > 30 && (
-                                            <text
-                                                x={currentX + width / 2}
-                                                y={grayY + (allowancesY - grayY) / 2}
-                                                textAnchor="middle"
-                                                dominantBaseline="central"
-                                                fontSize="10"
-                                                fill="white"
-                                                fontWeight="bold"
-                                                style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
-                                            >
-                                                <tspan x={currentX + width / 2} dy="-0.6em">不要額</tspan>
-                                                <tspan x={currentX + width / 2} dy="1.2em">{(entry.grayAreaMonthly / 10000).toFixed(1)}万円</tspan>
-                                            </text>
-                                        )}
-                                    </g>
-                                )}
+                                {entry.grayAreaMonthly > 0 && (() => {
+                                    // 不要額レイヤーの下端を正しく計算
+                                    // showAllowancesToggleがfalseの時、allowancesYはpensionYと同じ値になる可能性がある
+                                    const grayAreaBottomY = showAllowancesToggle ? allowancesY : pensionY;
+                                    const grayAreaHeight = Math.max(grayAreaBottomY - grayY, 0);
+                                    const grayAreaCenterY = grayY + grayAreaHeight / 2;
+                                    
+                                    return (
+                                        <g>
+                                            <rect
+                                                x={currentX}
+                                                y={grayY}
+                                                width={width}
+                                                height={grayAreaHeight}
+                                                fill={grayAreaColor}
+                                                stroke={grayAreaStroke}
+                                                strokeWidth="1"
+                                            />
+                                            {width > 30 && (
+                                                <text
+                                                    x={currentX + width / 2}
+                                                    y={grayAreaCenterY}
+                                                    textAnchor="middle"
+                                                    dominantBaseline="central"
+                                                    fontSize="10"
+                                                    fill="white"
+                                                    fontWeight="bold"
+                                                    style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
+                                                >
+                                                    <tspan x={currentX + width / 2} dy="-0.6em">不要額</tspan>
+                                                    <tspan x={currentX + width / 2} dy="1.2em">{(entry.grayAreaMonthly / 10000).toFixed(1)}万円</tspan>
+                                                </text>
+                                            )}
+                                        </g>
+                                    );
+                                })()}
 
                                 {/* Layer 4: 真の不足額（赤） */}
                                 {entry.shortfallMonthly > 0 && (
@@ -1361,7 +1370,7 @@ function ScenarioSection({
     const activeMonths = Math.max(result.activeMonths, 0);
     
     // トグルボタンの状態管理（各シナリオごとに独立）
-    const [showAllowancesToggle, setShowAllowancesToggle] = useState(false);
+    const [showAllowancesToggle, setShowAllowancesToggle] = useState(true);
     
     // 児童手当・児童扶養手当の合計額を計算（最初のデータから取得）
     const firstDataEntry = result.data.length > 0 ? result.data[0] : null;
