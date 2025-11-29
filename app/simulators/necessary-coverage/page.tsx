@@ -66,6 +66,8 @@ type YearlyData = {
     savingsAnnual: number;
     monthsActive: number; // 65歳までにカウントする月数
     grayArea: number; // 不要な支出（住宅ローン＋生活費削減分）
+    childAllowanceMonthly: number; // 児童手当合計額（月額）
+    childSupportAllowanceMonthly: number; // 児童扶養手当合計額（月額）
 };
 
 type ScenarioResult = {
@@ -87,6 +89,78 @@ const SAVINGS_OPTIONS_MAN = Array.from({ length: 101 }, (_, i) => i * 50); // 0�
 const RETIREMENT_AGE = 65;
 const RESERVE_RATIO = 0.1; // 基本生活費の10%を老後・予備費として積み立てる想定
 
+/* ===================== 児童手当・児童扶養手当の計算関数 ===================== */
+
+/**
+ * 児童手当の計算（月額）
+ * 0歳〜3歳未満: 第1・2子 15,000円、第3子以降 30,000円
+ * 3歳〜18歳の年度末まで: 第1・2子 10,000円、第3子以降 30,000円
+ */
+function calculateChildAllowance(childrenAges: number[]): number {
+    if (childrenAges.length === 0) return 0;
+    
+    // 年齢が上の子から数える（降順ソート）
+    const sortedAges = [...childrenAges].sort((a, b) => b - a);
+    let total = 0;
+    
+    sortedAges.forEach((age, index) => {
+        const childNumber = index + 1; // 1人目、2人目、3人目...
+        
+        if (age < 3) {
+            // 0歳〜3歳未満
+            if (childNumber <= 2) {
+                total += 15000;
+            } else {
+                total += 30000;
+            }
+        } else if (age < 19) {
+            // 3歳〜18歳の年度末まで
+            if (childNumber <= 2) {
+                total += 10000;
+            } else {
+                total += 30000;
+            }
+        }
+        // 19歳以上は支給なし
+    });
+    
+    return total;
+}
+
+/**
+ * 児童扶養手当の計算（月額）
+ * 年収 160万円未満: 全部支給（1人目 43,070円、2人目以降加算 10,170円）
+ * 年収 160万円以上 365万円未満: 一部支給の中間値（1人目 28,850円、2人目以降加算 8,275円）
+ * 年収 365万円以上: 支給停止（0円）
+ */
+function calculateChildSupportAllowance(
+    childrenAges: number[],
+    survivorAnnualIncome: number
+): number {
+    if (childrenAges.length === 0) return 0;
+    
+    // 18歳の年度末までの子をカウント
+    const eligibleChildren = childrenAges.filter(age => age < 19).length;
+    if (eligibleChildren === 0) return 0;
+    
+    const annualIncomeYen = survivorAnnualIncome; // 年収（円）
+    
+    if (annualIncomeYen < 1600000) {
+        // 全部支給
+        const firstChild = 43070;
+        const additionalChildren = (eligibleChildren - 1) * 10170;
+        return firstChild + additionalChildren;
+    } else if (annualIncomeYen < 3650000) {
+        // 一部支給（中間値）
+        const firstChild = 28850;
+        const additionalChildren = (eligibleChildren - 1) * 8275;
+        return firstChild + additionalChildren;
+    } else {
+        // 支給停止
+        return 0;
+    }
+}
+
 /* ===================== UI Components ===================== */
 
 // SVGハッチングパターン定義
@@ -104,28 +178,46 @@ function StackedAreaChart({
     data,
     currentSalaryMonthly,
     retirementAge = RETIREMENT_AGE,
-    salaryLabel
+    salaryLabel,
+    showAllowancesToggle = false
 }: {
     data: YearlyData[];
     currentSalaryMonthly: number; // 事故発生前の現在の月額給料（手取り）
     retirementAge?: number;
     salaryLabel?: string;
+    showAllowancesToggle?: boolean; // 児童手当・児童扶養手当の表示/非表示
 }) {
     // 65歳未満（現役期間）のみに限定
     const filtered = data
         .filter((entry) => entry.age < retirementAge)
         .map((entry) => {
-            // グラフ表示用には「基本収入（年金＋就労）」のみを使用する
-            // ※貯蓄や傷病手当金の充当分を含めると、教育費（不足額）の変動に合わせて収入が増えているように見えてしまうため
-            const incomeMonthly = Math.min(entry.baseIncome / 12, currentSalaryMonthly);
-            const grayAreaMonthly = Math.min(Math.max(0, (entry.grayArea || 0) / 12), Math.max(0, currentSalaryMonthly - incomeMonthly));
-            const shortfallMonthly = Math.max(0, currentSalaryMonthly - incomeMonthly - grayAreaMonthly);
+            // Layer 1: 遺族年金（濃い緑）
+            const pensionMonthly = Math.min(entry.pension / 12, currentSalaryMonthly);
+            
+            // Layer 2: 児童手当・児童扶養手当（薄緑、トグルで表示/非表示）
+            const allowancesMonthly = showAllowancesToggle 
+                ? Math.min((entry.childAllowanceMonthly || 0) + (entry.childSupportAllowanceMonthly || 0), currentSalaryMonthly - pensionMonthly)
+                : 0;
+            
+            // Layer 3: 不要な支出（グレー）
+            const remainingAfterPensionAndAllowances = currentSalaryMonthly - pensionMonthly - allowancesMonthly;
+            const grayAreaMonthly = Math.min(Math.max(0, (entry.grayArea || 0) / 12), Math.max(0, remainingAfterPensionAndAllowances));
+            
+            // Layer 4: 真の不足額（赤）または Layer 5: 余剰額（青）
+            // 不足額計算は常に手当を含めて計算（表示/非表示は見た目のみ）
+            const totalAllowancesMonthly = (entry.childAllowanceMonthly || 0) + (entry.childSupportAllowanceMonthly || 0);
+            const totalIncomeMonthly = pensionMonthly + totalAllowancesMonthly;
+            const targetMonthly = currentSalaryMonthly - grayAreaMonthly; // 給料 - 不要額
+            const shortfallMonthly = Math.max(0, targetMonthly - totalIncomeMonthly); // 不足額
+            const surplusMonthly = Math.max(0, totalIncomeMonthly - targetMonthly); // 余剰額
 
             return {
                 ...entry,
-                incomeMonthly,
+                pensionMonthly,
+                allowancesMonthly,
                 grayAreaMonthly,
                 shortfallMonthly,
+                surplusMonthly,
             };
         });
 
@@ -152,17 +244,23 @@ function StackedAreaChart({
         // これにより、見た目が同じブロックは結合される
         const formatVal = (v: number) => (v / 10000).toFixed(1);
 
-        const prevIncome = formatVal(prev.incomeMonthly);
-        const currIncome = formatVal(curr.incomeMonthly);
+        const prevPension = formatVal(prev.pensionMonthly);
+        const currPension = formatVal(curr.pensionMonthly);
+        const prevAllowances = formatVal(prev.allowancesMonthly);
+        const currAllowances = formatVal(curr.allowancesMonthly);
         const prevGray = formatVal(prev.grayAreaMonthly);
         const currGray = formatVal(curr.grayAreaMonthly);
         const prevShortfall = formatVal(prev.shortfallMonthly);
         const currShortfall = formatVal(curr.shortfallMonthly);
+        const prevSurplus = formatVal(prev.surplusMonthly || 0);
+        const currSurplus = formatVal(curr.surplusMonthly || 0);
 
         if (
-            prevIncome !== currIncome ||
+            prevPension !== currPension ||
+            prevAllowances !== currAllowances ||
             prevGray !== currGray ||
-            prevShortfall !== currShortfall
+            prevShortfall !== currShortfall ||
+            prevSurplus !== currSurplus
         ) {
             keyAges.add(curr.age);
         }
@@ -182,9 +280,11 @@ function StackedAreaChart({
         return {
             age: matchedEntry.age,
             endAge: nextAge,
-            incomeMonthly: matchedEntry.incomeMonthly,
+            pensionMonthly: matchedEntry.pensionMonthly,
+            allowancesMonthly: matchedEntry.allowancesMonthly,
             grayAreaMonthly: matchedEntry.grayAreaMonthly,
             shortfallMonthly: matchedEntry.shortfallMonthly,
+            surplusMonthly: matchedEntry.surplusMonthly || 0,
         };
     });
 
@@ -200,8 +300,8 @@ function StackedAreaChart({
     const ageRange = Math.max(maxAge - minAge, 1);
     const getX = (age: number) => ((age - minAge) / ageRange) * graphWidth;
 
-    // Y軸は現在の月額給料に固定（満水基準）
-    const maxAmount = Math.max(currentSalaryMonthly, 1);
+    // Y軸は現在の月額給料に固定（満水基準）+ 10万円の余裕
+    const maxAmount = Math.max(currentSalaryMonthly + 100000, 1);
     const getY = (value: number) => graphHeight - (value / maxAmount) * graphHeight;
 
     const incomeColor = '#10B981'; // Emerald-500
@@ -237,40 +337,48 @@ function StackedAreaChart({
                         );
                     })}
 
-                    {/* 満水基準ライン（給料の上限） - 強調表示 */}
-                    <line
-                        x1={0}
-                        y1={0} // maxAmount (top)
-                        x2={graphWidth}
-                        y2={0}
-                        stroke="#3B82F6" // Blue-500
-                        strokeWidth="2"
-                    />
-                    <text
-                        x={graphWidth / 2}
-                        y={-15}
-                        textAnchor="middle"
-                        fontSize="12"
-                        fill="#60A5FA" // Blue-400
-                        fontWeight="bold"
-                    >
-                        {salaryLabel || `現在の月額給料（満水基準）`}: {(currentSalaryMonthly / 10000).toFixed(0)}万円
-                    </text>
+                    {/* 満水基準ライン（30万円の位置） - 強調表示 */}
+                    {(() => {
+                        const fullWaterAmount = 300000; // 30万円
+                        const fullWaterY = getY(fullWaterAmount);
+                        return (
+                            <>
+                                <line
+                                    x1={0}
+                                    y1={fullWaterY}
+                                    x2={graphWidth}
+                                    y2={fullWaterY}
+                                    stroke="#EF4444" // Red-500
+                                    strokeWidth="2"
+                                />
+                                <text
+                                    x="-10"
+                                    y={fullWaterY + 4}
+                                    textAnchor="end"
+                                    fontSize="12"
+                                    fill="#EF4444" // Red-500
+                                    fontWeight="bold"
+                                >
+                                    30万円
+                                </text>
+                            </>
+                        );
+                    })()}
 
                     {/* X軸のグリッドとラベル（変化点のみ） */}
                     {sortedKeyAges.map((age, idx) => {
                         const x = getX(age);
 
-                        // 表示判定：最初、最後、または「収入（緑）」が変化したタイミングのみ表示
+                        // 表示判定：最初、最後、または「遺族年金（濃い緑）」が変化したタイミングのみ表示
                         let showLabel = false;
                         if (idx === 0) showLabel = true;
                         else if (idx === sortedKeyAges.length - 1) showLabel = true;
                         else {
                             const currentBlock = displayPoints[idx];
                             const prevBlock = displayPoints[idx - 1];
-                            // 1万円以上の収入変化がある場合のみラベルを表示
+                            // 1万円以上の遺族年金変化がある場合のみラベルを表示
                             if (currentBlock && prevBlock) {
-                                if (Math.abs(currentBlock.incomeMonthly - prevBlock.incomeMonthly) > 10000) {
+                                if (Math.abs(currentBlock.pensionMonthly - prevBlock.pensionMonthly) > 10000) {
                                     showLabel = true;
                                 }
                             }
@@ -300,21 +408,48 @@ function StackedAreaChart({
                         // incomeYは後で計算するのでここでは宣言しない
 
                         // 視覚的な高さを計算（ラベル表示用に最小高さを確保）
-                        let visualGrayAmount = entry.grayAreaMonthly > 0 ? Math.max(entry.grayAreaMonthly, MIN_VISUAL_AMOUNT) : 0;
-                        let visualShortfallAmount = entry.shortfallMonthly > 0 ? Math.max(entry.shortfallMonthly, MIN_VISUAL_AMOUNT) : 0;
-                        let visualIncomeAmount = entry.incomeMonthly;
+                        // Layer 1: 遺族年金（濃い緑）
+                        let visualPensionAmount = entry.pensionMonthly;
+                        
+                        // Layer 2: 児童手当・児童扶養手当（薄緑、トグルで表示/非表示）
+                        let visualAllowancesAmount = entry.allowancesMonthly > 0 
+                            ? Math.max(entry.allowancesMonthly, MIN_VISUAL_AMOUNT) 
+                            : 0;
+                        
+                        // Layer 3: 不要な支出（グレー）
+                        let visualGrayAmount = entry.grayAreaMonthly > 0 
+                            ? Math.max(entry.grayAreaMonthly, MIN_VISUAL_AMOUNT) 
+                            : 0;
+                        
+                        // Layer 4: 真の不足額（赤）
+                        let visualShortfallAmount = entry.shortfallMonthly > 0 
+                            ? Math.max(entry.shortfallMonthly, MIN_VISUAL_AMOUNT) 
+                            : 0;
+                        
+                        // Layer 5: 余剰額（青）- 満水基準ラインの上に表示
+                        // 余剰額が0より大きい場合は、最小視覚的高さを確保して表示
+                        let visualSurplusAmount = entry.surplusMonthly > 0 
+                            ? Math.max(entry.surplusMonthly, MIN_VISUAL_AMOUNT) 
+                            : 0;
 
                         // 合計が満水基準（maxAmount）を超えないように調整
-                        // 優先順位: 不足（赤） > 不要（グレー） > 収入（緑）
-                        // つまり、あふれた分はまず「収入」から削り、それでも足りなければ「不要」から削る
-                        const totalVisual = visualIncomeAmount + visualGrayAmount + visualShortfallAmount;
+                        // 優先順位: 不足（赤） > 不要（グレー） > 手当（薄緑） > 年金（濃い緑）
+                        // 余剰額は満水基準ラインの上に表示されるため、調整計算には含めない
+                        const totalVisual = visualPensionAmount + visualAllowancesAmount + visualGrayAmount + visualShortfallAmount;
                         const overflow = totalVisual - maxAmount;
 
                         if (overflow > 0) {
-                            // まず収入を削る
-                            const reduceIncome = Math.min(visualIncomeAmount, overflow);
-                            visualIncomeAmount -= reduceIncome;
-                            let remainingOverflow = overflow - reduceIncome;
+                            // まず年金を削る
+                            const reducePension = Math.min(visualPensionAmount, overflow);
+                            visualPensionAmount -= reducePension;
+                            let remainingOverflow = overflow - reducePension;
+
+                            // まだあふれているなら手当を削る
+                            if (remainingOverflow > 0) {
+                                const reduceAllowances = Math.min(visualAllowancesAmount, remainingOverflow);
+                                visualAllowancesAmount -= reduceAllowances;
+                                remainingOverflow -= reduceAllowances;
+                            }
 
                             // まだあふれているなら不要を削る
                             if (remainingOverflow > 0) {
@@ -325,31 +460,38 @@ function StackedAreaChart({
                         }
 
                         // 積み上げ座標の計算（調整後の視覚的な高さを使用）
-                        const incomeY = getY(visualIncomeAmount);
-                        const grayY = getY(visualIncomeAmount + visualGrayAmount);
-                        const shortfallY = getY(visualIncomeAmount + visualGrayAmount + visualShortfallAmount);
+                        const pensionY = getY(visualPensionAmount);
+                        const allowancesY = getY(visualPensionAmount + visualAllowancesAmount);
+                        const grayY = getY(visualPensionAmount + visualAllowancesAmount + visualGrayAmount);
+                        const shortfallY = getY(visualPensionAmount + visualAllowancesAmount + visualGrayAmount + visualShortfallAmount);
+                        
+                        // 余剰額のY座標（満水基準ライン30万円の上に表示）
+                        const fullWaterAmount = 300000; // 30万円
+                        const fullWaterY = getY(fullWaterAmount);
+                        // 余剰額は満水基準ラインの上に表示（Y座標が小さいほど上）
+                        const surplusY = fullWaterY - (visualSurplusAmount / maxAmount) * graphHeight;
 
-                        // 収入ラベル表示判定（幅が十分ある場合のみ）
-                        const showIncomeLabel = width > 40 && entry.incomeMonthly > 10000;
+                        // ラベル表示判定（幅が十分ある場合のみ）
+                        const showPensionLabel = width > 40 && entry.pensionMonthly > 10000;
+                        const showAllowancesLabel = width > 40 && entry.allowancesMonthly > 10000;
+                        const showSurplusLabel = width > 40 && entry.surplusMonthly > 10000;
 
                         return (
                             <g key={`${entry.age}-${idx}`}>
-                                {/* Layer 1: 収入（緑） */}
+                                {/* Layer 1: 遺族年金（濃い緑） */}
                                 <rect
                                     x={currentX}
-                                    y={incomeY}
+                                    y={pensionY}
                                     width={width}
-                                    height={Math.max(baseY - incomeY, 0)}
+                                    height={Math.max(baseY - pensionY, 0)}
                                     fill={incomeColor}
                                     stroke={incomeStroke}
                                     strokeWidth="1"
                                 />
-                                {/* 収入ラベル */}
-                                {/* 収入ラベル */}
-                                {showIncomeLabel && (
+                                {showPensionLabel && (
                                     <text
                                         x={currentX + width / 2}
-                                        y={incomeY + (baseY - incomeY) / 2}
+                                        y={pensionY + (baseY - pensionY) / 2}
                                         textAnchor="middle"
                                         dominantBaseline="central"
                                         fontSize="10"
@@ -358,27 +500,56 @@ function StackedAreaChart({
                                         style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
                                     >
                                         <tspan x={currentX + width / 2} dy="-0.6em">遺族年金</tspan>
-                                        <tspan x={currentX + width / 2} dy="1.2em">{(entry.incomeMonthly / 10000).toFixed(1)}万円</tspan>
+                                        <tspan x={currentX + width / 2} dy="1.2em">{(entry.pensionMonthly / 10000).toFixed(1)}万円</tspan>
                                     </text>
                                 )}
 
-                                {/* Layer 2: 不要な支出（グレー） */}
+                                {/* Layer 2: 児童手当・児童扶養手当（薄緑、トグルで表示/非表示） */}
+                                {visualAllowancesAmount > 0 && (
+                                    <g>
+                                        <rect
+                                            x={currentX}
+                                            y={allowancesY}
+                                            width={width}
+                                            height={Math.max(pensionY - allowancesY, 0)}
+                                            fill="#86EFAC" // emerald-300 (薄緑)
+                                            stroke="#6EE7B7" // emerald-400
+                                            strokeWidth="1"
+                                        />
+                                        {showAllowancesLabel && (
+                                            <text
+                                                x={currentX + width / 2}
+                                                y={allowancesY + (pensionY - allowancesY) / 2}
+                                                textAnchor="middle"
+                                                dominantBaseline="central"
+                                                fontSize="10"
+                                                fill="white"
+                                                fontWeight="bold"
+                                                style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
+                                            >
+                                                <tspan x={currentX + width / 2} dy="-0.6em">児童手当等</tspan>
+                                                <tspan x={currentX + width / 2} dy="1.2em">{(entry.allowancesMonthly / 10000).toFixed(1)}万円</tspan>
+                                            </text>
+                                        )}
+                                    </g>
+                                )}
+
+                                {/* Layer 3: 不要な支出（グレー） */}
                                 {entry.grayAreaMonthly > 0 && (
                                     <g>
                                         <rect
                                             x={currentX}
                                             y={grayY}
                                             width={width}
-                                            height={Math.max(incomeY - grayY, 0)}
+                                            height={Math.max(allowancesY - grayY, 0)}
                                             fill={grayAreaColor}
                                             stroke={grayAreaStroke}
                                             strokeWidth="1"
                                         />
-                                        {/* グレーエリアラベル */}
                                         {width > 30 && (
                                             <text
                                                 x={currentX + width / 2}
-                                                y={grayY + (incomeY - grayY) / 2}
+                                                y={grayY + (allowancesY - grayY) / 2}
                                                 textAnchor="middle"
                                                 dominantBaseline="central"
                                                 fontSize="10"
@@ -393,7 +564,7 @@ function StackedAreaChart({
                                     </g>
                                 )}
 
-                                {/* Layer 3: 不足（赤） */}
+                                {/* Layer 4: 真の不足額（赤） */}
                                 {entry.shortfallMonthly > 0 && (
                                     <g>
                                         <rect
@@ -405,7 +576,6 @@ function StackedAreaChart({
                                             stroke={shortfallStroke}
                                             strokeWidth="1"
                                         />
-                                        {/* 不足ラベル */}
                                         {width > 30 && (
                                             <text
                                                 x={currentX + width / 2}
@@ -421,6 +591,61 @@ function StackedAreaChart({
                                                 <tspan x={currentX + width / 2} dy="1.2em">{(entry.shortfallMonthly / 10000).toFixed(1)}万円</tspan>
                                             </text>
                                         )}
+                                    </g>
+                                )}
+
+                                {/* Layer 5: 余剰額（青）- 満水基準ライン30万円の上に表示 */}
+                                {entry.surplusMonthly > 0 && visualSurplusAmount > 0 && (
+                                    <g>
+                                        {(() => {
+                                            const fullWaterAmount = 300000; // 30万円
+                                            const fullWaterY = getY(fullWaterAmount);
+                                            // 余剰額の高さを計算（満水基準ラインから上方向）
+                                            // 実際の余剰額を基準に計算（visualSurplusAmountは最小視覚的高さに調整されているため）
+                                            const actualSurplusAmount = entry.surplusMonthly;
+                                            const surplusHeight = (actualSurplusAmount / maxAmount) * graphHeight;
+                                            // 最小視覚的高さを確保（5万円分の高さ）
+                                            const minSurplusHeight = (MIN_VISUAL_AMOUNT / maxAmount) * graphHeight;
+                                            const finalSurplusHeight = Math.max(surplusHeight, minSurplusHeight);
+                                            
+                                            // rectYが0以上になるように調整（グラフの範囲内に収める）
+                                            const rectY = Math.max(0, fullWaterY - finalSurplusHeight);
+                                            // rectHeightも調整（fullWaterYを超えないように）
+                                            const rectHeight = Math.max(0, Math.min(finalSurplusHeight, fullWaterY - rectY));
+                                            
+                                            // rectHeightが0より大きい場合のみ描画
+                                            if (rectHeight <= 0) return null;
+                                            
+    return (
+                                                <>
+                                                    <rect
+                                                        x={currentX}
+                                                        y={rectY}
+                                                        width={width}
+                                                        height={rectHeight}
+                                                        fill="#60A5FA" // blue-400
+                                                        stroke="#3B82F6" // blue-500
+                                                        strokeWidth="1"
+                                                        opacity="0.8"
+                                                    />
+                                                    {showSurplusLabel && (
+                                                        <text
+                                                            x={currentX + width / 2}
+                                                            y={rectY + rectHeight / 2}
+                                                            textAnchor="middle"
+                                                            dominantBaseline="central"
+                                                            fontSize="10"
+                                                            fill="white"
+                                                            fontWeight="bold"
+                                                            style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
+                                                        >
+                                                            <tspan x={currentX + width / 2} dy="-0.6em">余剰額</tspan>
+                                                            <tspan x={currentX + width / 2} dy="1.2em">{(entry.surplusMonthly / 10000).toFixed(1)}万円</tspan>
+                                                        </text>
+                                                    )}
+                                                </>
+                                            );
+                                        })()}
                                     </g>
                                 )}
                             </g>
@@ -659,6 +884,22 @@ export default function NecessaryCoveragePage() {
                     educationCost = childrenCurrentAges.reduce((sum, age) => sum + getEducationCost(age), 0);
                 }
 
+                // 児童手当・児童扶養手当の計算（遺族シナリオのみ）
+                let childAllowanceMonthly = 0;
+                let childSupportAllowanceMonthly = 0;
+                if (type === 'survivor') {
+                    // 児童手当（全国共通・定額）
+                    childAllowanceMonthly = calculateChildAllowance(childrenCurrentAges);
+                    
+                    // 児童扶養手当（ひとり親・所得制限あり）
+                    // 遺族となる配偶者の年収を使用
+                    const survivorAnnualIncome = survivorBaseIncome;
+                    childSupportAllowanceMonthly = calculateChildSupportAllowance(
+                        childrenCurrentAges,
+                        survivorAnnualIncome
+                    );
+                }
+
                 // ターゲット（死亡/障害者）の事故前の手取り年収を計算（これが満水ターゲットになる）
                 let targetAnnualIncome = 0;
                 if (targetPerson === 'husband') {
@@ -701,7 +942,11 @@ export default function NecessaryCoveragePage() {
                     grayArea = 0;
                 }
 
-                const baseShortfall = Math.max(0, totalTarget - baseIncome);
+                // 不足額計算：児童手当・児童扶養手当を含めた収入で計算
+                // （トグルの表示/非表示に関わらず、常に手当を含めて計算）
+                const allowancesMonthly = (childAllowanceMonthly + childSupportAllowanceMonthly) * 12; // 年額換算
+                const totalIncomeWithAllowances = baseIncome + allowancesMonthly;
+                const baseShortfall = Math.max(0, totalTarget - totalIncomeWithAllowances);
 
                 // グラフ表示期間に合わせて、endAgeまでの期間のみをカウント
                 const monthsActive = currentAge < endAge 
@@ -728,7 +973,9 @@ export default function NecessaryCoveragePage() {
                     sicknessAnnual: 0,
                     savingsAnnual: 0,
                     monthsActive,
-                    grayArea
+                    grayArea,
+                    childAllowanceMonthly,
+                    childSupportAllowanceMonthly
                 });
             }
 
@@ -755,7 +1002,9 @@ export default function NecessaryCoveragePage() {
                 const entry = item.entry;
                 const sicknessAnnual = sicknessDistribution[idx];
                 const savingsAnnual = savingsDistribution[idx];
-                const adjustedIncome = Math.min(entry.totalTarget, entry.baseIncome + sicknessAnnual + savingsAnnual);
+                // 児童手当・児童扶養手当を含めた収入で計算（常に含める）
+                const allowancesAnnual = ((entry.childAllowanceMonthly || 0) + (entry.childSupportAllowanceMonthly || 0)) * 12;
+                const adjustedIncome = Math.min(entry.totalTarget, entry.baseIncome + allowancesAnnual + sicknessAnnual + savingsAnnual);
                 entry.totalIncome = adjustedIncome;
                 entry.shortfall = Math.max(0, entry.totalTarget - adjustedIncome);
                 entry.sicknessAnnual = sicknessAnnual;
@@ -1110,6 +1359,14 @@ function ScenarioSection({
     const calculatedEndAge = customEndAge;
     const headline = result.category === 'survivor' ? 'あなたに必要な死亡保障総額' : 'あなたに必要な所得補償総額';
     const activeMonths = Math.max(result.activeMonths, 0);
+    
+    // トグルボタンの状態管理（各シナリオごとに独立）
+    const [showAllowancesToggle, setShowAllowancesToggle] = useState(false);
+    
+    // 児童手当・児童扶養手当の合計額を計算（最初のデータから取得）
+    const firstDataEntry = result.data.length > 0 ? result.data[0] : null;
+    const childAllowanceTotal = firstDataEntry ? (firstDataEntry.childAllowanceMonthly || 0) : 0;
+    const childSupportAllowanceTotal = firstDataEntry ? (firstDataEntry.childSupportAllowanceMonthly || 0) : 0;
 
     // 事故発生前の現在の月額給料（手取り）を計算
     // 生き残った配偶者の給料を満水基準とする
@@ -1219,23 +1476,72 @@ function ScenarioSection({
                 <div className="flex flex-wrap items-center gap-4 mb-2 text-xs font-medium justify-end px-4">
                     <div className="flex items-center gap-1.5">
                         <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#10B981' }}></span>
-                        <span className="text-emerald-300">確保済み収入（年金・就労）</span>
+                        <span className="text-emerald-300">遺族年金</span>
+                    </div>
+                    {showAllowancesToggle && (
+                        <div className="flex items-center gap-1.5">
+                            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#86EFAC' }}></span>
+                            <span className="text-emerald-200">児童手当・児童扶養手当</span>
+                        </div>
+                    )}
+                    <div className="flex items-center gap-1.5">
+                        <span className="w-3 h-3 rounded-full bg-slate-500/30 border border-slate-400/50"></span>
+                        <span className="text-slate-400">不要額（住宅ローン・故人の生活費）: {(result.data.length > 0 ? (result.data[0].grayArea || 0) / 120000 : 0).toFixed(1)}万円</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                         <span className="w-3 h-3 rounded-full bg-rose-500/80 border border-rose-400"></span>
                         <span className="text-rose-200">不足額（給料との差）</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                        <span className="w-3 h-3 rounded-full bg-slate-500/30 border border-slate-400/50"></span>
-                        <span className="text-slate-400">不要額（住宅ローン・故人の生活費）: {(result.data.length > 0 ? (result.data[0].grayArea || 0) / 120000 : 0).toFixed(1)}万円</span>
-                    </div>
+                    {result.data.some(d => {
+                        const totalIncomeMonthly = (d.pension || 0) / 12 + (d.childAllowanceMonthly || 0) + (d.childSupportAllowanceMonthly || 0);
+                        const targetMonthly = currentSalaryMonthly - (d.grayArea || 0) / 12;
+                        return totalIncomeMonthly > targetMonthly;
+                    }) && (
+                        <div className="flex items-center gap-1.5">
+                            <span className="w-3 h-3 rounded-full bg-blue-500/80 border border-blue-400"></span>
+                            <span className="text-blue-200">余剰額</span>
+                        </div>
+                    )}
                 </div>
                 <StackedAreaChart
                     data={result.data}
                     currentSalaryMonthly={currentSalaryMonthly}
                     retirementAge={calculatedEndAge}
                     salaryLabel={salaryLabelText}
+                    showAllowancesToggle={showAllowancesToggle}
                 />
+            </div>
+
+            {/* トグルボタンと説明文（グラフ表示期間の直上） */}
+            <div className="mb-4 flex items-center gap-4">
+                {/* トグルボタン */}
+                <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={showAllowancesToggle}
+                            onChange={(e) => setShowAllowancesToggle(e.target.checked)}
+                            className="w-5 h-5 text-emerald-500 rounded focus:ring-2 focus:ring-emerald-500"
+                        />
+                        <span className="text-sm font-medium text-slate-300">児童手当</span>
+                    </label>
+                </div>
+
+                {/* 開閉式説明文 */}
+                <div className="flex-1">
+                    <details className="group">
+                        <summary className="cursor-pointer text-sm font-medium text-slate-400 hover:text-slate-300 list-none">
+                            <span className="flex items-center gap-1">
+                                公的給付の内訳
+                                <span className="text-xs transition-transform group-open:rotate-180">▼</span>
+                            </span>
+                        </summary>
+                        <div className="mt-2 p-3 bg-slate-950/60 border border-slate-800 rounded-lg text-xs text-slate-300 space-y-1">
+                            <div>児童手当合計額: {(childAllowanceTotal / 10000).toFixed(1)}万円/月</div>
+                            <div>児童扶養手当合計額: {(childSupportAllowanceTotal / 10000).toFixed(1)}万円/月</div>
+                        </div>
+                    </details>
+                </div>
             </div>
 
             {/* グラフ表示期間選択 */}
