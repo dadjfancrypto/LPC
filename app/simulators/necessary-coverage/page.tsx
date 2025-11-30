@@ -11,8 +11,6 @@ import {
     calculateDisabilityEmployeePension,
     DisabilityLevel,
     KISO_BASE_ANNUAL,
-    CHILD_ADDITION_1_2,
-    CHILD_ADDITION_3_PLUS,
     SPOUSE_BONUS,
 } from '../../utils/pension-calc';
 
@@ -129,8 +127,9 @@ function calculateChildAllowance(childrenAges: number[]): number {
 
 /**
  * 児童扶養手当の計算（月額）
- * 年収 160万円未満: 全部支給（1人目 43,070円、2人目以降加算 10,170円）
- * 年収 160万円以上 365万円未満: 一部支給の中間値（1人目 28,850円、2人目以降加算 8,275円）
+ * 令和7年4月分から
+ * 年収 160万円未満: 全部支給（1人目 46,690円、2人目以降加算 11,030円）
+ * 年収 160万円以上 365万円未満: 一部支給の中間値（1人目 28,845円、2人目以降加算 8,270円）
  * 年収 365万円以上: 支給停止（0円）
  */
 function calculateChildSupportAllowance(
@@ -146,14 +145,16 @@ function calculateChildSupportAllowance(
     const annualIncomeYen = survivorAnnualIncome; // 年収（円）
     
     if (annualIncomeYen < 1600000) {
-        // 全部支給
-        const firstChild = 43070;
-        const additionalChildren = (eligibleChildren - 1) * 10170;
+        // 全部支給（令和7年4月分から）
+        const firstChild = 46690; // 46,690円
+        const additionalChildren = (eligibleChildren - 1) * 11030; // 11,030円
         return firstChild + additionalChildren;
     } else if (annualIncomeYen < 3650000) {
-        // 一部支給（中間値）
-        const firstChild = 28850;
-        const additionalChildren = (eligibleChildren - 1) * 8275;
+        // 一部支給（中間値：最大値と最小値の中間）
+        // 第1子：46,680円～11,010円 → 中間値 28,845円
+        // 第2子以降：11,020円～5,520円 → 中間値 8,270円
+        const firstChild = 28845; // (46680 + 11010) / 2
+        const additionalChildren = (eligibleChildren - 1) * 8270; // (11020 + 5520) / 2
         return firstChild + additionalChildren;
     } else {
         // 支給停止
@@ -169,6 +170,9 @@ const SVGPatterns = () => (
         <defs>
             <pattern id="shortfallHatch" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
                 <path d="M -1,4 H 9" stroke="rgba(248, 113, 113, 0.5)" strokeWidth="2" />
+            </pattern>
+            <pattern id="surplusHatch" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+                <path d="M -1,4 H 9" stroke="rgba(96, 165, 250, 0.6)" strokeWidth="2" />
             </pattern>
         </defs>
     </svg>
@@ -208,7 +212,7 @@ function StackedAreaChart({
             // 不足額計算は常に手当を含めて計算（表示/非表示は見た目のみ）
             const totalAllowancesMonthly = (entry.childAllowanceMonthly || 0) + (entry.childSupportAllowanceMonthly || 0);
             const totalIncomeMonthly = pensionMonthly + totalAllowancesMonthly;
-            const targetMonthly = currentSalaryMonthly - grayAreaMonthly; // 給料 - 不要額
+            const targetMonthly = currentSalaryMonthly - grayAreaMonthly; // 給料 - 浮く支出
             const shortfallMonthly = Math.max(0, targetMonthly - totalIncomeMonthly); // 不足額
             const surplusMonthly = Math.max(0, totalIncomeMonthly - targetMonthly); // 余剰額
 
@@ -528,7 +532,7 @@ function StackedAreaChart({
                                                 fontWeight="bold"
                                                 style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
                                             >
-                                                <tspan x={currentX + width / 2} dy="-0.6em">児童手当等</tspan>
+                                                <tspan x={currentX + width / 2} dy="-0.6em">児童手当</tspan>
                                                 <tspan x={currentX + width / 2} dy="1.2em">{(entry.allowancesMonthly / 10000).toFixed(1)}万円</tspan>
                                             </text>
                                         )}
@@ -537,7 +541,7 @@ function StackedAreaChart({
 
                                 {/* Layer 3: 不要な支出（グレー） */}
                                 {entry.grayAreaMonthly > 0 && (() => {
-                                    // 不要額レイヤーの下端を正しく計算
+                                    // 浮く支出レイヤーの下端を正しく計算
                                     // showAllowancesToggleがfalseの時、allowancesYはpensionYと同じ値になる可能性がある
                                     const grayAreaBottomY = showAllowancesToggle ? allowancesY : pensionY;
                                     const grayAreaHeight = Math.max(grayAreaBottomY - grayY, 0);
@@ -553,6 +557,7 @@ function StackedAreaChart({
                                                 fill={grayAreaColor}
                                                 stroke={grayAreaStroke}
                                                 strokeWidth="1"
+                                                opacity="0.5"
                                             />
                                             {width > 30 && (
                                                 <text
@@ -565,7 +570,7 @@ function StackedAreaChart({
                                                     fontWeight="bold"
                                                     style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
                                                 >
-                                                    <tspan x={currentX + width / 2} dy="-0.6em">不要額</tspan>
+                                                    <tspan x={currentX + width / 2} dy="-0.6em">浮く支出</tspan>
                                                     <tspan x={currentX + width / 2} dy="1.2em">{(entry.grayAreaMonthly / 10000).toFixed(1)}万円</tspan>
                                                 </text>
                                             )}
@@ -632,10 +637,7 @@ function StackedAreaChart({
                                                         y={rectY}
                                                         width={width}
                                                         height={rectHeight}
-                                                        fill="#60A5FA" // blue-400
-                                                        stroke="#3B82F6" // blue-500
-                                                        strokeWidth="1"
-                                                        opacity="0.8"
+                                                        fill="url(#surplusHatch)"
                                                     />
                                                     {showSurplusLabel && (
                                                         <text
@@ -1495,7 +1497,7 @@ function ScenarioSection({
                     )}
                     <div className="flex items-center gap-1.5">
                         <span className="w-3 h-3 rounded-full bg-slate-500/30 border border-slate-400/50"></span>
-                        <span className="text-slate-400">不要額（住宅ローン・故人の生活費）: {(result.data.length > 0 ? (result.data[0].grayArea || 0) / 120000 : 0).toFixed(1)}万円</span>
+                        <span className="text-slate-400">浮く支出（住宅ローン・故人の生活費）: {(result.data.length > 0 ? (result.data[0].grayArea || 0) / 120000 : 0).toFixed(1)}万円</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                         <span className="w-3 h-3 rounded-full bg-rose-500/80 border border-rose-400"></span>
@@ -1546,8 +1548,28 @@ function ScenarioSection({
                             </span>
                         </summary>
                         <div className="mt-2 p-3 bg-slate-950/60 border border-slate-800 rounded-lg text-xs text-slate-300 space-y-1">
-                            <div>児童手当合計額: {(childAllowanceTotal / 10000).toFixed(1)}万円/月</div>
-                            <div>児童扶養手当合計額: {(childSupportAllowanceTotal / 10000).toFixed(1)}万円/月</div>
+                            <div className="flex items-center justify-between gap-2">
+                                <div>児童手当合計額: {(childAllowanceTotal / 10000).toFixed(1)}万円/月</div>
+                                <a 
+                                    href="https://www.cfa.go.jp/policies/kokoseido/jidouteate/annai/" 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-blue-400 hover:text-blue-300 underline text-[10px] flex-shrink-0"
+                                >
+                                    参考
+                                </a>
+                            </div>
+                            <div className="flex items-center justify-between gap-2">
+                                <div>児童扶養手当合計額: {(childSupportAllowanceTotal / 10000).toFixed(1)}万円/月</div>
+                                <a 
+                                    href="https://www.cfa.go.jp/policies/hitori-oya/fuyou-teate" 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-blue-400 hover:text-blue-300 underline text-[10px] flex-shrink-0"
+                                >
+                                    参考
+                                </a>
+                            </div>
                         </div>
                     </details>
                 </div>
