@@ -317,8 +317,8 @@ function StackedAreaChart({
     const shortfallStroke = '#B91C1C'; // Red-700
 
     // ラベルを表示するための最小視覚的高さ（金額換算）
-    // 5万円分の高さがあれば2行ラベル（約25-30px）が収まると仮定
-    const MIN_VISUAL_AMOUNT = 50000;
+    // 4万円分の高さがあれば2行ラベル（約25-30px）が収まると仮定
+    const MIN_VISUAL_AMOUNT = 40000;
 
 
 
@@ -560,7 +560,7 @@ function StackedAreaChart({
                                         y={pensionY + (baseY - pensionY) / 2}
                                         textAnchor="middle"
                                         dominantBaseline="central"
-                                        fontSize="10"
+                                        fontSize="12"
                                         fill="white"
                                         fontWeight="bold"
                                         style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
@@ -588,7 +588,7 @@ function StackedAreaChart({
                                                 y={allowancesY + (pensionY - allowancesY) / 2}
                                                 textAnchor="middle"
                                                 dominantBaseline="central"
-                                                fontSize="10"
+                                                fontSize="12"
                                                 fill="white"
                                                 fontWeight="bold"
                                                 style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
@@ -596,7 +596,7 @@ function StackedAreaChart({
                                                 <tspan x={currentX + width / 2} dy="-0.6em">児童手当</tspan>
                                                 <tspan x={currentX + width / 2} dy="1.2em">{(entry.allowancesMonthly / 10000).toFixed(1)}万円</tspan>
                                             </text>
-                                        )}
+                    )}
                                     </g>
                                 )}
 
@@ -672,7 +672,7 @@ function StackedAreaChart({
                                                         y={grayY + grayAreaHeightToFullWater / 2}
                                                         textAnchor="middle"
                                                         dominantBaseline="central"
-                                                        fontSize="10"
+                                                        fontSize="12"
                                                         fill="white"
                                                         fontWeight="bold"
                                                         style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
@@ -680,9 +680,9 @@ function StackedAreaChart({
                                                         <tspan x={currentX + width / 2} dy="-0.6em">浮く支出</tspan>
                                                         <tspan x={currentX + width / 2} dy="1.2em">{(entry.grayAreaMonthly / 10000).toFixed(1)}万円</tspan>
                                                     </text>
-                                                )}
+            )}
                                             </g>
-                                        );
+    );
                                     } else {
                                         // 30万円以下の場合（従来通り）
                                         const grayAreaHeight = Math.max(grayAreaBottomY - grayY, 0);
@@ -706,7 +706,7 @@ function StackedAreaChart({
                                                         y={grayAreaCenterY}
                                                         textAnchor="middle"
                                                         dominantBaseline="central"
-                                                        fontSize="10"
+                                                        fontSize="12"
                                                         fill="white"
                                                         fontWeight="bold"
                                                         style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
@@ -727,7 +727,7 @@ function StackedAreaChart({
                                     const shortfallRectY = fullWaterY; // 基準ラインの位置から開始
                                     const shortfallRectHeight = shortfallHeight; // 不足額の高さ
                                     
-                                    return (
+    return (
                                         <g>
                                             <rect
                                                 x={currentX}
@@ -744,7 +744,7 @@ function StackedAreaChart({
                                                     y={shortfallRectY + shortfallRectHeight / 2}
                                                     textAnchor="middle"
                                                     dominantBaseline="central"
-                                                    fontSize="10"
+                                                    fontSize="12"
                                                     fill="white"
                                                     fontWeight="bold"
                                                     style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
@@ -791,7 +791,7 @@ function StackedAreaChart({
                                                     y={surplusRectY + surplusRectHeight / 2}
                                                     textAnchor="middle"
                                                     dominantBaseline="central"
-                                                    fontSize="10"
+                                                    fontSize="12"
                                                     fill="white"
                                                     fontWeight="bold"
                                                     style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
@@ -997,7 +997,7 @@ export default function NecessaryCoveragePage() {
                     } else {
                         const kousei = proportionAnnual(basicInfo.avgStdMonthly, basicInfo.employeePensionMonths, basicInfo.useMinashi300);
                         pension = kousei;
-                    }
+        }
 
                 } else {
                     const level = 2;
