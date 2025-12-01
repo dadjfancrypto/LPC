@@ -477,11 +477,15 @@ function StackedAreaChart({
                         const pensionY = getY(visualPensionAmount);
                         const allowancesY = getY(visualPensionAmount + visualAllowancesAmount);
                         const grayY = getY(visualPensionAmount + visualAllowancesAmount + visualGrayAmount);
-                        const shortfallY = getY(visualPensionAmount + visualAllowancesAmount + visualGrayAmount + visualShortfallAmount);
                         
                         // 余剰額のY座標（満水基準ラインの上に表示）
                         const fullWaterAmount = currentSalaryMonthly; // 満水基準（月収）
                         const fullWaterY = getY(fullWaterAmount);
+                        
+                        // 不足額は基準ライン（fullWaterY）から下に向かって表示
+                        // 不足額 = （基準ライン）-（公的年金＋児童手当＋浮く支出）
+                        // つまり、不足額は基準ラインより下に表示されるべき
+                        const shortfallY = fullWaterY; // 基準ラインの位置から開始
                         // 余剰額は満水基準ラインの上に表示（Y座標が小さいほど上）
                         const surplusY = fullWaterY - (visualSurplusAmount / maxAmount) * graphHeight;
                         
@@ -510,24 +514,24 @@ function StackedAreaChart({
                             finalGrayAreaExcessHeight = Math.max(grayAreaExcessHeight, minGrayAreaExcessHeight);
                         }
                         
-                        // 不足額（30万円超）の高さを計算
-                        // 不足額レイヤーの描画位置が30万円の線を超えているかどうか
-                        const shortfallExceedsFullWater = shortfallY < fullWaterY;
-                        let finalShortfallExcessHeight = 0;
-                        if (shortfallExceedsFullWater) {
-                            // 不足額レイヤーが30万円の線を超えている部分の高さをY座標の差分から計算
-                            const shortfallExcessHeight = (fullWaterY - shortfallY);
-                            const minShortfallExcessHeight = (MIN_VISUAL_AMOUNT / maxAmount) * graphHeight;
-                            finalShortfallExcessHeight = Math.max(shortfallExcessHeight, minShortfallExcessHeight);
+                        // 不足額の高さを計算（基準ラインから下に向かって）
+                        // 不足額 = （基準ライン）-（公的年金＋児童手当＋浮く支出）
+                        // 不足額は基準ラインより下に表示されるべき
+                        let shortfallHeight = 0;
+                        if (entry.shortfallMonthly > 0 && visualShortfallAmount > 0) {
+                            const actualShortfallAmount = entry.shortfallMonthly;
+                            const shortfallHeightCalc = (actualShortfallAmount / maxAmount) * graphHeight;
+                            const minShortfallHeight = (MIN_VISUAL_AMOUNT / maxAmount) * graphHeight;
+                            shortfallHeight = Math.max(shortfallHeightCalc, minShortfallHeight);
                         }
                         
-                        // 余剰額、浮く支出（30万円超）、不足額（30万円超）のいずれかが存在する場合、高さは最大値を使用
-                        if (finalSurplusHeight > 0 || finalGrayAreaExcessHeight > 0 || finalShortfallExcessHeight > 0) {
+                        // 余剰額、浮く支出（30万円超）のいずれかが存在する場合、高さは最大値を使用
+                        // 不足額は基準ラインより下に表示されるため、この計算には含めない
+                        if (finalSurplusHeight > 0 || finalGrayAreaExcessHeight > 0) {
                             // すべての高さの最大値を使用
                             const maxHeight = Math.max(
                                 finalSurplusHeight > 0 ? finalSurplusHeight : 0,
-                                finalGrayAreaExcessHeight > 0 ? finalGrayAreaExcessHeight : 0,
-                                finalShortfallExcessHeight > 0 ? finalShortfallExcessHeight : 0
+                                finalGrayAreaExcessHeight > 0 ? finalGrayAreaExcessHeight : 0
                             );
                             sharedRectY = Math.max(0, fullWaterY - maxHeight);
                             sharedRectHeight = Math.max(0, Math.min(maxHeight, fullWaterY - sharedRectY));
@@ -717,154 +721,88 @@ function StackedAreaChart({
                                 })()}
 
                                 {/* Layer 4: 真の不足額（赤） */}
-                                {entry.shortfallMonthly > 0 && (() => {
-                                    const fullWaterAmount = currentSalaryMonthly; // 満水基準（月収）
-                                    const fullWaterY = getY(fullWaterAmount);
+                                {entry.shortfallMonthly > 0 && shortfallHeight > 0 && (() => {
+                                    // 不足額は基準ライン（fullWaterY）から下に向かって表示
+                                    // 不足額 = （基準ライン）-（公的年金＋児童手当＋浮く支出）
+                                    const shortfallRectY = fullWaterY; // 基準ラインの位置から開始
+                                    const shortfallRectHeight = shortfallHeight; // 不足額の高さ
                                     
-                                    // 不足額レイヤーの描画位置が満水基準の線を超えているかどうか
-                                    const shortfallExceedsFullWater = shortfallY < fullWaterY;
-                                    
-                                    if (shortfallExceedsFullWater) {
-                                        // 30万円までの部分
-                                        const shortfallHeightToFullWater = Math.max(fullWaterY - shortfallY, 0);
-                                        
-                                        // 30万円を超えた部分は、余剰額レイヤーと同じ位置（sharedRectY）を使用
-                                        const shortfallExcessY = sharedRectY !== null ? sharedRectY : (() => {
-                                            // 不足額レイヤーが30万円の線を超えている部分の高さをY座標の差分から計算
-                                            const shortfallExcessHeight = (fullWaterY - shortfallY);
-                                            const minShortfallExcessHeight = (MIN_VISUAL_AMOUNT / maxAmount) * graphHeight;
-                                            const finalShortfallExcessHeight = Math.max(shortfallExcessHeight, minShortfallExcessHeight);
-                                            return Math.max(0, fullWaterY - finalShortfallExcessHeight);
-                                        })();
-                                        const shortfallExcessRectHeight = sharedRectHeight !== null ? sharedRectHeight : (() => {
-                                            // 不足額レイヤーが30万円の線を超えている部分の高さをY座標の差分から計算
-                                            const shortfallExcessHeight = (fullWaterY - shortfallY);
-                                            const minShortfallExcessHeight = (MIN_VISUAL_AMOUNT / maxAmount) * graphHeight;
-                                            const finalShortfallExcessHeight = Math.max(shortfallExcessHeight, minShortfallExcessHeight);
-                                            return Math.max(0, Math.min(finalShortfallExcessHeight, fullWaterY - shortfallExcessY));
-                                        })();
-                                        
-                                        return (
-                                            <g>
-                                                {/* 30万円までの部分 */}
-                                                {shortfallHeightToFullWater > 0 && (
-                                                    <rect
-                                                        x={currentX}
-                                                        y={shortfallY}
-                                                        width={width}
-                                                        height={shortfallHeightToFullWater}
-                                                        fill="url(#shortfallHatch)"
-                                                        stroke={shortfallStroke}
-                                                        strokeWidth="1"
-                                                    />
-                                                )}
-                                                {/* 30万円を超えた部分（余剰額レイヤーと同じ位置） */}
-                                                {shortfallExcessRectHeight > 0 && (
-                                                    <rect
-                                                        x={currentX}
-                                                        y={shortfallExcessY}
-                                                        width={width}
-                                                        height={shortfallExcessRectHeight}
-                                                        fill="url(#shortfallHatch)"
-                                                        stroke={shortfallStroke}
-                                                        strokeWidth="1"
-                                                    />
-                                                )}
-                                                {width > 30 && (
-                                                    <text
-                                                        x={currentX + width / 2}
-                                                        y={shortfallY + shortfallHeightToFullWater / 2}
-                                                        textAnchor="middle"
-                                                        dominantBaseline="central"
-                                                        fontSize="10"
-                                                        fill="white"
-                                                        fontWeight="bold"
-                                                        style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
-                                                    >
-                                                        <tspan x={currentX + width / 2} dy="-0.6em">不足額</tspan>
-                                                        <tspan x={currentX + width / 2} dy="1.2em">{(entry.shortfallMonthly / 10000).toFixed(1)}万円</tspan>
-                                                    </text>
-                                                )}
-                                            </g>
-                                        );
-                                    } else {
-                                        // 30万円以下の場合（従来通り）
-                                        return (
-                                            <g>
-                                                <rect
-                                                    x={currentX}
-                                                    y={shortfallY}
-                                                    width={width}
-                                                    height={Math.max(grayY - shortfallY, 0)}
-                                                    fill="url(#shortfallHatch)"
-                                                    stroke={shortfallStroke}
-                                                    strokeWidth="1"
-                                                />
-                                                {width > 30 && (
-                                                    <text
-                                                        x={currentX + width / 2}
-                                                        y={shortfallY + (grayY - shortfallY) / 2}
-                                                        textAnchor="middle"
-                                                        dominantBaseline="central"
-                                                        fontSize="10"
-                                                        fill="white"
-                                                        fontWeight="bold"
-                                                        style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
-                                                    >
-                                                        <tspan x={currentX + width / 2} dy="-0.6em">不足額</tspan>
-                                                        <tspan x={currentX + width / 2} dy="1.2em">{(entry.shortfallMonthly / 10000).toFixed(1)}万円</tspan>
-                                                    </text>
-                                                )}
-                                            </g>
-                                        );
-                                    }
+                                    return (
+                                        <g>
+                                            <rect
+                                                x={currentX}
+                                                y={shortfallRectY}
+                                                width={width}
+                                                height={shortfallRectHeight}
+                                                fill="url(#shortfallHatch)"
+                                                stroke={shortfallStroke}
+                                                strokeWidth="1"
+                                            />
+                                            {width > 30 && (
+                                                <text
+                                                    x={currentX + width / 2}
+                                                    y={shortfallRectY + shortfallRectHeight / 2}
+                                                    textAnchor="middle"
+                                                    dominantBaseline="central"
+                                                    fontSize="10"
+                                                    fill="white"
+                                                    fontWeight="bold"
+                                                    style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
+                                                >
+                                                    <tspan x={currentX + width / 2} dy="-0.6em">不足額</tspan>
+                                                    <tspan x={currentX + width / 2} dy="1.2em">{(entry.shortfallMonthly / 10000).toFixed(1)}万円</tspan>
+                                                </text>
+                                            )}
+                                        </g>
+                                    );
                                 })()}
 
-                                {/* Layer 5: 余剰額（青）- 満水基準ライン30万円の上に表示 */}
-                                {entry.surplusMonthly > 0 && visualSurplusAmount > 0 && sharedRectY !== null && sharedRectHeight !== null && (
-                                    <g>
-                                        {(() => {
-                                            // rectHeightが0より大きい場合のみ描画
-                                            if (sharedRectHeight <= 0) return null;
-                                            
-    return (
-                                                <>
-                                                    <rect
-                                                        x={currentX}
-                                                        y={sharedRectY}
-                                                        width={width}
-                                                        height={sharedRectHeight}
-                                                        fill="url(#surplusHatch)"
-                                                    />
-                                                    {/* 上辺のみの枠線 */}
-                                                    <line
-                                                        x1={currentX}
-                                                        y1={sharedRectY}
-                                                        x2={currentX + width}
-                                                        y2={sharedRectY}
-                                                        stroke="#3B82F6"
-                                                        strokeWidth="1"
-                                                    />
-                                                    {showSurplusLabel && (
-                                                        <text
-                                                            x={currentX + width / 2}
-                                                            y={sharedRectY + sharedRectHeight / 2}
-                                                            textAnchor="middle"
-                                                            dominantBaseline="central"
-                                                            fontSize="10"
-                                                            fill="white"
-                                                            fontWeight="bold"
-                                                            style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
-                                                        >
-                                                            <tspan x={currentX + width / 2} dy="-0.6em">余剰額</tspan>
-                                                            <tspan x={currentX + width / 2} dy="1.2em">{(entry.surplusMonthly / 10000).toFixed(1)}万円</tspan>
-                                                        </text>
-                                                    )}
-                                                </>
-                                            );
-                                        })()}
-                                    </g>
-                                )}
+                                {/* Layer 5: 余剰額（青）- 満水基準ラインの上に表示 */}
+                                {entry.surplusMonthly > 0 && finalSurplusHeight > 0 && (() => {
+                                    // 余剰額は基準ライン（fullWaterY）から上に向かって表示
+                                    // 余剰額 = （公的年金＋児童手当＋浮く支出）-（基準ライン）
+                                    // 余剰額は基準ラインより上に表示されるべき
+                                    const surplusRectY = sharedRectY !== null ? sharedRectY : Math.max(0, fullWaterY - finalSurplusHeight);
+                                    const surplusRectHeight = sharedRectHeight !== null ? sharedRectHeight : finalSurplusHeight;
+                                    
+                                    if (surplusRectHeight <= 0) return null;
+                                    
+                                    return (
+                                        <g>
+                                            <rect
+                                                x={currentX}
+                                                y={surplusRectY}
+                                                width={width}
+                                                height={surplusRectHeight}
+                                                fill="url(#surplusHatch)"
+                                            />
+                                            {/* 上辺のみの枠線 */}
+                                            <line
+                                                x1={currentX}
+                                                y1={surplusRectY}
+                                                x2={currentX + width}
+                                                y2={surplusRectY}
+                                                stroke="#3B82F6"
+                                                strokeWidth="1"
+                                            />
+                                            {showSurplusLabel && (
+                                                <text
+                                                    x={currentX + width / 2}
+                                                    y={surplusRectY + surplusRectHeight / 2}
+                                                    textAnchor="middle"
+                                                    dominantBaseline="central"
+                                                    fontSize="10"
+                                                    fill="white"
+                                                    fontWeight="bold"
+                                                    style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
+                                                >
+                                                    <tspan x={currentX + width / 2} dy="-0.6em">余剰額</tspan>
+                                                    <tspan x={currentX + width / 2} dy="1.2em">{(entry.surplusMonthly / 10000).toFixed(1)}万円</tspan>
+                                                </text>
+                                            )}
+                                        </g>
+                                    );
+                                })()}
                             </g>
                         );
                     })}

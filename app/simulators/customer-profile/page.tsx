@@ -1089,6 +1089,111 @@ export default function CustomerProfilePage() {
             </button>
             <button
               onClick={() => {
+                const couple25Profile = {
+                  monthlyLivingExpense: 250_000,
+                  details: {
+                    food: 59_000,
+                    communication: 12_000,
+                    utilities: 18_000,
+                    education: 5_000,
+                    housingLoan: 0,
+                    rent: 65_000,
+                    dailyGoods: 22_000,
+                    entertainment: 22_000,
+                    lifeInsurance: 12_000,
+                    savings: 25_000,
+                  },
+                  danshinHolder: ['husband'],
+                  isLivingExpenseDetailed: true,
+                  basicInfo: {
+                    childrenCount: 1,
+                    childrenAges: [0],
+                    spouseType: 'couple' as const,
+                    ageWife: 25,
+                    oldAgeStartWife: 65,
+                    annualIncomeWife: 3_000_000,
+                    avgStdMonthlyWife: 250_000,
+                    monthsWife: 300,
+                    useMinashi300Wife: true,
+                    ageHusband: 25,
+                    oldAgeStartHusband: 65,
+                    annualIncomeHusband: 3_500_000,
+                    avgStdMonthlyHusband: 290_000,
+                    monthsHusband: 300,
+                    useMinashi300Husband: true,
+                    age: 0,
+                    oldAgeStart: 0,
+                    hasEmployeePension: false,
+                    employeePensionMonths: 300,
+                    avgStdMonthly: 0,
+                    useMinashi300: false,
+                    educationCourse: 'private_uni' as const,
+                    cramSchoolOptions: { elementary: false, juniorHigh: false, highSchool: true },
+                  },
+                } as CustomerProfile;
+                setProfile(couple25Profile);
+                saveProfile(couple25Profile);
+                saveBasicInfo(couple25Profile.basicInfo);
+                showNotification('テストデータ（夫婦25歳）を読み込みました');
+              }}
+              className="text-xs px-3 py-1.5 rounded-full border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            >
+              例（夫婦25歳）
+            </button>
+            <button
+              onClick={() => {
+                const singleMotherProfile = {
+                  monthlyLivingExpense: 180_000,
+                  details: {
+                    food: 45_000,
+                    communication: 10_000,
+                    utilities: 15_000,
+                    education: 10_000,
+                    housingLoan: 0,
+                    rent: 60_000,
+                    dailyGoods: 15_000,
+                    entertainment: 8_000,
+                    lifeInsurance: 8_000,
+                    savings: 9_000,
+                  },
+                  danshinHolder: [],
+                  isLivingExpenseDetailed: true,
+                  basicInfo: {
+                    childrenCount: 1,
+                    childrenAges: [5],
+                    spouseType: 'none' as const,
+                    ageWife: 0,
+                    oldAgeStartWife: 0,
+                    avgStdMonthlyWife: 0,
+                    monthsWife: 300,
+                    useMinashi300Wife: false,
+                    ageHusband: 0,
+                    oldAgeStartHusband: 0,
+                    avgStdMonthlyHusband: 0,
+                    monthsHusband: 300,
+                    useMinashi300Husband: false,
+                    age: 30,
+                    oldAgeStart: 65,
+                    hasEmployeePension: true,
+                    employeePensionMonths: 120,
+                    annualIncome: 2_500_000,
+                    avgStdMonthly: 210_000,
+                    useMinashi300: true,
+                    educationCourse: 'private_hs' as const,
+                    cramSchoolOptions: { elementary: false, juniorHigh: false, highSchool: false },
+                  },
+                } as CustomerProfile;
+                setProfile(singleMotherProfile);
+                saveProfile(singleMotherProfile);
+                saveBasicInfo(singleMotherProfile.basicInfo);
+                showNotification('テストデータ（シングルマザー）を読み込みました');
+              }}
+              className="text-xs px-3 py-1.5 rounded-full border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            >
+              例（シングルマザー）
+            </button>
+            <button
+              onClick={() => {
                 const singleProfile = {
                   monthlyLivingExpense: 120_000,
                   details: {
