@@ -183,13 +183,17 @@ function StackedAreaChart({
     currentSalaryMonthly,
     retirementAge = RETIREMENT_AGE,
     salaryLabel,
-    showAllowancesToggle = false
+    showAllowancesToggle = false,
+    profile,
+    scenarioType
 }: {
     data: YearlyData[];
     currentSalaryMonthly: number; // 事故発生前の現在の月額給料（手取り）
     retirementAge?: number;
     salaryLabel?: string;
     showAllowancesToggle?: boolean; // 児童手当・児童扶養手当の表示/非表示
+    profile?: CustomerProfile; // 顧客プロフィール（家族構成表示用）
+    scenarioType?: 'husbandDeath' | 'wifeDeath' | 'singleDeath' | 'husbandDisability' | 'wifeDisability' | 'singleDisability'; // シナリオタイプ
 }) {
     // 65歳未満（現役期間）のみに限定
     const filtered = data
@@ -398,13 +402,55 @@ function StackedAreaChart({
                             }
                         }
 
+                        // 家族構成ラベルを生成
+                        const familyLabels: string[] = [];
+                        if (profile && scenarioType) {
+                            const yearsSinceStart = age - startAge;
+                            const childrenAges = profile.basicInfo.childrenAges || [];
+                            
+                            if (scenarioType === 'husbandDeath' || scenarioType === 'husbandDisability') {
+                                // 夫のシナリオ：妻と子供を表示
+                                const wifeAge = (profile.basicInfo.ageWife || 0) + yearsSinceStart;
+                                familyLabels.push(`妻${wifeAge}`);
+                                childrenAges.forEach((childAge) => {
+                                    const currentChildAge = childAge + yearsSinceStart;
+                                    familyLabels.push(`子${currentChildAge}`);
+                                });
+                            } else if (scenarioType === 'wifeDeath' || scenarioType === 'wifeDisability') {
+                                // 妻のシナリオ：夫と子供を表示
+                                const husbandAge = (profile.basicInfo.ageHusband || 0) + yearsSinceStart;
+                                familyLabels.push(`夫${husbandAge}`);
+                                childrenAges.forEach((childAge) => {
+                                    const currentChildAge = childAge + yearsSinceStart;
+                                    familyLabels.push(`子${currentChildAge}`);
+                                });
+                            } else {
+                                // 独身のシナリオ：子供のみ表示
+                                childrenAges.forEach((childAge) => {
+                                    const currentChildAge = childAge + yearsSinceStart;
+                                    familyLabels.push(`子${currentChildAge}`);
+                                });
+                            }
+                        }
+
                         return (
                             <g key={age}>
                                 <line x1={x} y1={0} x2={x} y2={graphHeight} stroke="#1e293b" strokeDasharray="2 2" strokeWidth="1" />
-                                {showLabel && (
-                                    <text x={x} y={graphHeight + 20} textAnchor="middle" fontSize="10" fill="#94a3b8">
-                                        {age}歳
-                                    </text>
+                                {showLabel && familyLabels.length > 0 && (
+                                    <>
+                                        {familyLabels.map((label, labelIdx) => (
+                                            <text 
+                                                key={labelIdx}
+                                                x={x} 
+                                                y={graphHeight + 15 + (labelIdx * 12)} 
+                                                textAnchor="middle" 
+                                                fontSize="10" 
+                                                fill="#94a3b8"
+                                            >
+                                                {label}
+                                            </text>
+                                        ))}
+                                    </>
                                 )}
                             </g>
                         );
@@ -565,12 +611,14 @@ function StackedAreaChart({
                                         fontWeight="bold"
                                         style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
                                     >
-                                        <tspan x={currentX + width / 2} dy="-0.6em">遺族年金</tspan>
+                                        <tspan x={currentX + width / 2} dy="-0.6em">
+                                            {scenarioType && (scenarioType.includes('Disability') || scenarioType.includes('disability')) ? '障害基礎年金' : '遺族年金'}
+                                        </tspan>
                                         <tspan x={currentX + width / 2} dy="1.2em">{(entry.pensionMonthly / 10000).toFixed(1)}万円</tspan>
                                     </text>
                                 )}
 
-                                {/* Layer 2: 児童手当・児童扶養手当（薄緑、トグルで表示/非表示） */}
+                                {/* Layer 2: 児童手当・児童扶養手当（薄緑、トグルで表示/非表示） / 障害厚生年金（障害シナリオでは常に表示） */}
                                 {visualAllowancesAmount > 0 && (
                                     <g>
                                         <rect
@@ -593,7 +641,9 @@ function StackedAreaChart({
                                                 fontWeight="bold"
                                                 style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
                                             >
-                                                <tspan x={currentX + width / 2} dy="-0.6em">児童手当</tspan>
+                                                <tspan x={currentX + width / 2} dy="-0.6em">
+                                                    {scenarioType && (scenarioType.includes('Disability') || scenarioType.includes('disability')) ? '障害厚生年金' : '児童手当'}
+                                                </tspan>
                                                 <tspan x={currentX + width / 2} dy="1.2em">{(entry.allowancesMonthly / 10000).toFixed(1)}万円</tspan>
                                             </text>
                     )}
@@ -1564,6 +1614,17 @@ function ScenarioSection({
         salaryLabelText = '家庭から亡くなる本人の給料（満水基準）';
     }
 
+    // 障害年金シナリオかどうかを判定
+    const isDisabilityScenario = scenarioKey.includes('Disability') || scenarioKey.includes('disability');
+    
+    // 障害年金シナリオの場合は、障害厚生年金を常に表示（showAllowancesToggleを常にtrueにする）
+    // useEffectで障害年金シナリオの場合にshowAllowancesToggleをtrueに設定
+    React.useEffect(() => {
+        if (isDisabilityScenario) {
+            setShowAllowancesToggle(true);
+        }
+    }, [isDisabilityScenario]);
+
     // 総保障不足額 = 時系列グラフの赤字総面積 - 既存貯蓄・保険総額（右下ボックスと同じ計算式）
     const netShortfall = result.netShortfall;
     const shortfallText = (netShortfall / 10000).toFixed(0);
@@ -1637,15 +1698,30 @@ function ScenarioSection({
 
             <div className="mb-6">
                 <div className="flex flex-wrap items-center gap-4 mb-2 text-xs font-medium justify-end px-4">
-                    <div className="flex items-center gap-1.5">
-                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#10B981' }}></span>
-                        <span className="text-emerald-300">遺族年金</span>
-                    </div>
-                    {showAllowancesToggle && (
-                        <div className="flex items-center gap-1.5">
-                            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#34D399' }}></span>
-                            <span className="text-emerald-200">児童手当・児童扶養手当</span>
-                        </div>
+                    {isDisabilityScenario ? (
+                        <>
+                            <div className="flex items-center gap-1.5">
+                                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#10B981' }}></span>
+                                <span className="text-emerald-300">障害基礎年金（子の加算含む）</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#34D399' }}></span>
+                                <span className="text-emerald-200">障害厚生年金</span>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="flex items-center gap-1.5">
+                                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#10B981' }}></span>
+                                <span className="text-emerald-300">遺族年金</span>
+                            </div>
+                            {showAllowancesToggle && (
+                                <div className="flex items-center gap-1.5">
+                                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#34D399' }}></span>
+                                    <span className="text-emerald-200">児童手当・児童扶養手当</span>
+                                </div>
+                            )}
+                        </>
                     )}
                     <div className="flex items-center gap-1.5">
                         <span className="w-3 h-3 rounded-full bg-slate-500/30 border border-slate-400/50"></span>
@@ -1672,23 +1748,27 @@ function ScenarioSection({
                     retirementAge={calculatedEndAge}
                     salaryLabel={salaryLabelText}
                     showAllowancesToggle={showAllowancesToggle}
+                    profile={profile}
+                    scenarioType={scenarioKey as 'husbandDeath' | 'wifeDeath' | 'singleDeath' | 'husbandDisability' | 'wifeDisability' | 'singleDisability'}
                 />
             </div>
 
             {/* トグルボタンと説明文（グラフ表示期間の直上） */}
             <div className="mb-4 flex items-center gap-4">
-                {/* チェックボタン（表示/非表示） */}
-                <div className="flex items-center gap-2">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                            type="checkbox"
-                            checked={showAllowancesToggle}
-                            onChange={(e) => setShowAllowancesToggle(e.target.checked)}
-                            className="w-4 h-4 text-emerald-500 rounded focus:ring-2 focus:ring-emerald-500"
-                        />
-                        <span className="text-sm font-medium text-slate-400">児童手当</span>
-                    </label>
-                </div>
+                {/* チェックボタン（表示/非表示） - 遺族年金シナリオのみ表示 */}
+                {!isDisabilityScenario && (
+                    <div className="flex items-center gap-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={showAllowancesToggle}
+                                onChange={(e) => setShowAllowancesToggle(e.target.checked)}
+                                className="w-4 h-4 text-emerald-500 rounded focus:ring-2 focus:ring-emerald-500"
+                            />
+                            <span className="text-sm font-medium text-slate-400">児童手当</span>
+                        </label>
+                    </div>
+                )}
 
                 {/* 開閉式説明文 */}
                 <div className="flex-1">
@@ -1699,45 +1779,77 @@ function ScenarioSection({
                                 <span className="text-xs transition-transform group-open:rotate-180">▼</span>
                             </span>
                         </summary>
-                        <div className="mt-2 p-3 bg-slate-950/60 border border-slate-800 rounded-lg text-xs text-slate-300 space-y-2">
-                            <div className="space-y-1">
-                                <div className="flex items-center justify-between gap-2">
-                                    <div>児童手当合計額: {(childAllowanceTotal / 10000).toFixed(1)}万円/月</div>
-                                    <a 
-                                        href="https://www.cfa.go.jp/policies/kokoseido/jidouteate/annai/" 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="text-blue-400 hover:text-blue-300 underline text-[10px] flex-shrink-0"
-                                    >
-                                        参考
-                                    </a>
-                                </div>
-                                <div className="pl-2 text-[10px] text-slate-400 space-y-0.5">
-                                    <div>【子加算】</div>
-                                    <div>・0歳〜3歳未満: 第1・2子 15,000円、第3子以降 30,000円</div>
-                                    <div>・3歳〜18歳の年度末まで: 第1・2子 10,000円、第3子以降 30,000円</div>
+                        {isDisabilityScenario ? (
+                            <div className="mt-2 p-3 bg-slate-950/60 border border-slate-800 rounded-lg text-xs text-slate-300 space-y-2">
+                                <div className="space-y-1">
+                                    <div className="font-semibold text-emerald-300">障害基礎年金（子の加算含む）+ 障害厚生年金</div>
+                                    <div className="pl-2 text-[10px] text-slate-400 space-y-0.5">
+                                        <div>【障害基礎年金（2級）】</div>
+                                        <div>・基本額: 月額 66,200円</div>
+                                        <div>・子の加算: 第1子・第2子 18,740円/月、第3子以降 6,250円/月</div>
+                                        <div className="text-emerald-300 mt-1">※子の加算は障害基礎年金に含まれます</div>
+                                    </div>
+                                    <div className="pl-2 text-[10px] text-slate-400 space-y-0.5 mt-2">
+                                        <div>【障害厚生年金（2級）】</div>
+                                        <div>・若年層（25歳夫婦）: 月額 50,000円（簡略化のため定額）</div>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="space-y-1">
-                                <div className="flex items-center justify-between gap-2">
-                                    <div>児童扶養手当合計額: {(childSupportAllowanceTotal / 10000).toFixed(1)}万円/月</div>
-                                    <a 
-                                        href="https://www.cfa.go.jp/policies/hitori-oya/fuyou-teate" 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="text-blue-400 hover:text-blue-300 underline text-[10px] flex-shrink-0"
-                                    >
-                                        参考
-                                    </a>
+                        ) : (
+                            <div className="mt-2 p-3 bg-slate-950/60 border border-slate-800 rounded-lg text-xs text-slate-300 space-y-2">
+                                <div className="space-y-1">
+                                    <div className="font-semibold text-emerald-300">遺族基礎年金 + 遺族厚生年金 + 児童手当・児童扶養手当</div>
+                                    <div className="pl-2 text-[10px] text-slate-400 space-y-0.5">
+                                        <div>【遺族基礎年金】</div>
+                                        <div>・基本額: 月額 68,000円（年額 816,000円）</div>
+                                        <div>・子の加算: 第1子・第2子 18,740円/月、第3子以降 6,250円/月</div>
+                                        <div className="text-emerald-300 mt-1">※18歳到達年度末までの子がいる場合に支給</div>
+                                    </div>
+                                    <div className="pl-2 text-[10px] text-slate-400 space-y-0.5 mt-2">
+                                        <div>【遺族厚生年金】</div>
+                                        <div>・報酬比例部分: 故人の厚生年金加入期間と平均標準報酬月額に基づき計算</div>
+                                        <div>・中高齢寡婦加算: 40歳以上65歳未満で子のいない妻に月額 49,200円</div>
+                                    </div>
                                 </div>
-                                <div className="pl-2 text-[10px] text-slate-400 space-y-0.5">
-                                    <div>【所得制限】</div>
-                                    <div>・年収160万円未満: 全部支給（1人目 46,690円、2人目以降加算 11,030円）</div>
-                                    <div>・年収160万円以上365万円未満: 一部支給（1人目 28,845円、2人目以降加算 8,270円）</div>
-                                    <div>・年収365万円以上: 支給停止</div>
+                                <div className="space-y-1 mt-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div>児童手当合計額: {(childAllowanceTotal / 10000).toFixed(1)}万円/月</div>
+                                        <a 
+                                            href="https://www.cfa.go.jp/policies/kokoseido/jidouteate/annai/" 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="text-blue-400 hover:text-blue-300 underline text-[10px] flex-shrink-0"
+                                        >
+                                            参考
+                                        </a>
+                                    </div>
+                                    <div className="pl-2 text-[10px] text-slate-400 space-y-0.5">
+                                        <div>【支給額】</div>
+                                        <div>・0歳〜3歳未満: 第1・2子 15,000円、第3子以降 30,000円</div>
+                                        <div>・3歳〜18歳の年度末まで: 第1・2子 10,000円、第3子以降 30,000円</div>
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div>児童扶養手当合計額: {(childSupportAllowanceTotal / 10000).toFixed(1)}万円/月</div>
+                                        <a 
+                                            href="https://www.cfa.go.jp/policies/hitori-oya/fuyou-teate" 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="text-blue-400 hover:text-blue-300 underline text-[10px] flex-shrink-0"
+                                        >
+                                            参考
+                                        </a>
+                                    </div>
+                                    <div className="pl-2 text-[10px] text-slate-400 space-y-0.5">
+                                        <div>【所得制限】</div>
+                                        <div>・年収160万円未満: 全部支給（1人目 46,690円、2人目以降加算 11,030円）</div>
+                                        <div>・年収160万円以上365万円未満: 一部支給（1人目 28,845円、2人目以降加算 8,270円）</div>
+                                        <div>・年収365万円以上: 支給停止</div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        )}
                     </details>
                 </div>
             </div>
