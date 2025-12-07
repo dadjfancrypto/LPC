@@ -313,8 +313,10 @@ function StackedAreaChart({
     const maxAmount = Math.max(currentSalaryMonthly + 100000, 1);
     const getY = (value: number) => graphHeight - (value / maxAmount) * graphHeight;
 
-    const incomeColor = '#10B981'; // Emerald-500
-    const incomeStroke = '#059669'; // Emerald-600
+    // 障害年金シナリオの場合はオレンジ、遺族年金シナリオの場合は緑
+    const isDisability = scenarioType && (scenarioType.includes('Disability') || scenarioType.includes('disability'));
+    const incomeColor = isDisability ? '#F59E0B' : '#10B981'; // Amber-500 for disability, Emerald-500 for survivor
+    const incomeStroke = isDisability ? '#D97706' : '#059669'; // Amber-600 for disability, Emerald-600 for survivor
     const grayAreaColor = '#94a3b8'; // Slate-400
     const grayAreaStroke = '#64748b'; // Slate-500
     const shortfallColor = '#EF4444'; // Red-500
@@ -626,8 +628,8 @@ function StackedAreaChart({
                                             y={allowancesY}
                                             width={width}
                                             height={Math.max(pensionY - allowancesY, 0)}
-                                            fill="#34D399" // emerald-400 (より濃い緑)
-                                            stroke="#6EE7B7" // emerald-400
+                                            fill={scenarioType && (scenarioType.includes('Disability') || scenarioType.includes('disability')) ? "#F59E0B" : "#34D399"} // amber-500 for disability, emerald-400 for survivor
+                                            stroke={scenarioType && (scenarioType.includes('Disability') || scenarioType.includes('disability')) ? "#D97706" : "#6EE7B7"} // amber-600 for disability, emerald-400 for survivor
                                             strokeWidth="1"
                                         />
                                         {showAllowancesLabel && (
@@ -1273,14 +1275,38 @@ export default function NecessaryCoveragePage() {
     return (
         <main className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-rose-500/30 pb-20">
             <div className="bg-slate-900/50 border-b border-slate-800 backdrop-blur-md sticky top-0 z-50">
-                <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-                    <h1 className="text-xl font-bold flex items-center gap-2">
-                        <span className="w-2 h-8 bg-rose-500 rounded-full"></span>
-                        必要保障額シミュレーション
-                    </h1>
-                    <Link href="/" className="text-sm text-slate-400 hover:text-white transition-colors">
-                        TOPへ戻る
-                    </Link>
+                <div className="max-w-4xl mx-auto px-6 py-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <h1 className="text-xl font-bold flex items-center gap-2">
+                            <span className="w-2 h-8 bg-rose-500 rounded-full"></span>
+                            必要保障額シミュレーション
+                        </h1>
+                        <Link href="/" className="text-sm text-slate-400 hover:text-white transition-colors">
+                            TOPへ戻る
+                        </Link>
+                    </div>
+                    
+                    {/* Navigation Links */}
+                    <nav className="flex flex-wrap gap-3 mt-3">
+                        <Link
+                            href="/simulators/customer-profile"
+                            className="px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700 text-slate-300 hover:text-sky-400 hover:border-sky-500/50 hover:bg-slate-800/80 transition-all duration-300 text-sm font-medium"
+                        >
+                            基本情報設定
+                        </Link>
+                        <Link
+                            href="/simulators/survivor-pension"
+                            className="px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700 text-slate-300 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-slate-800/80 transition-all duration-300 text-sm font-medium"
+                        >
+                            遺族年金
+                        </Link>
+                        <Link
+                            href="/simulators/disability-pension"
+                            className="px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700 text-slate-300 hover:text-amber-400 hover:border-amber-500/50 hover:bg-slate-800/80 transition-all duration-300 text-sm font-medium"
+                        >
+                            障害年金
+                        </Link>
+                    </nav>
                 </div>
             </div>
 
@@ -1701,12 +1727,12 @@ function ScenarioSection({
                     {isDisabilityScenario ? (
                         <>
                             <div className="flex items-center gap-1.5">
-                                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#10B981' }}></span>
-                                <span className="text-emerald-300">障害基礎年金（子の加算含む）</span>
+                                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#F59E0B' }}></span>
+                                <span className="text-amber-300">障害基礎年金（子の加算含む）</span>
                             </div>
                             <div className="flex items-center gap-1.5">
-                                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#34D399' }}></span>
-                                <span className="text-emerald-200">障害厚生年金</span>
+                                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#F59E0B' }}></span>
+                                <span className="text-amber-200">障害厚生年金</span>
                             </div>
                         </>
                     ) : (
@@ -1782,12 +1808,12 @@ function ScenarioSection({
                         {isDisabilityScenario ? (
                             <div className="mt-2 p-3 bg-slate-950/60 border border-slate-800 rounded-lg text-xs text-slate-300 space-y-2">
                                 <div className="space-y-1">
-                                    <div className="font-semibold text-emerald-300">障害基礎年金（子の加算含む）+ 障害厚生年金</div>
+                                    <div className="font-semibold text-amber-300">障害基礎年金（子の加算含む）+ 障害厚生年金</div>
                                     <div className="pl-2 text-[10px] text-slate-400 space-y-0.5">
                                         <div>【障害基礎年金（2級）】</div>
                                         <div>・基本額: 月額 66,200円</div>
                                         <div>・子の加算: 第1子・第2子 18,740円/月、第3子以降 6,250円/月</div>
-                                        <div className="text-emerald-300 mt-1">※子の加算は障害基礎年金に含まれます</div>
+                                        <div className="text-amber-300 mt-1">※子の加算は障害基礎年金に含まれます</div>
                                     </div>
                                     <div className="pl-2 text-[10px] text-slate-400 space-y-0.5 mt-2">
                                         <div>【障害厚生年金（2級）】</div>

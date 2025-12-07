@@ -979,12 +979,13 @@ export default function CustomerProfilePage() {
     <main className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-sky-500/30 pb-20">
       {/* ヘッダー */}
       <div className="bg-slate-900/50 border-b border-slate-800 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            <span className="w-2 h-8 bg-sky-500 rounded-full"></span>
-            Customer Profile
-          </h1>
-          <div className="flex items-center gap-2">
+        <div className="max-w-4xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between mb-3">
+            <h1 className="text-xl font-bold flex items-center gap-2">
+              <span className="w-2 h-8 bg-sky-500 rounded-full"></span>
+              Customer Profile
+            </h1>
+            <div className="flex items-center gap-2">
             <button
               onClick={() => {
                 const clearedProfile = {
@@ -1279,6 +1280,29 @@ export default function CustomerProfilePage() {
               🗑 削除
             </button>
           </div>
+          </div>
+          
+          {/* Navigation Links */}
+          <nav className="flex flex-wrap gap-3 mt-3">
+            <Link
+              href="/simulators/survivor-pension"
+              className="px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700 text-slate-300 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-slate-800/80 transition-all duration-300 text-sm font-medium"
+            >
+              遺族年金
+            </Link>
+            <Link
+              href="/simulators/disability-pension"
+              className="px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700 text-slate-300 hover:text-amber-400 hover:border-amber-500/50 hover:bg-slate-800/80 transition-all duration-300 text-sm font-medium"
+            >
+              障害年金
+            </Link>
+            <Link
+              href="/simulators/necessary-coverage"
+              className="px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700 text-slate-300 hover:text-rose-400 hover:border-rose-500/50 hover:bg-slate-800/80 transition-all duration-300 text-sm font-medium"
+            >
+              必要保障額
+            </Link>
+          </nav>
         </div>
       </div>
 

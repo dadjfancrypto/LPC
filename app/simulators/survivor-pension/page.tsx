@@ -426,10 +426,10 @@ function Accordion({ title, children, defaultOpen = false, onClear, headerConten
       <div className="flex items-center gap-2 mb-2">
         <button
           onClick={() => setOpen((v) => !v)}
-          className="flex-1 text-left text-sm flex items-center justify-between px-4 py-3 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800 transition-all"
+          className="flex-1 text-left text-base flex items-center justify-between px-4 py-3 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800 transition-all"
         >
           <span className="flex items-center gap-2 flex-wrap">
-            <span className="font-bold text-slate-200">{title}</span>
+            <span className="font-bold text-lg text-slate-200">{title}</span>
             {headerContent && <span className="text-xs opacity-70 font-normal border-l border-slate-600 pl-2">{headerContent}</span>}
           </span>
           <span className={`text-slate-400 transition-transform duration-300 ${open ? 'rotate-180' : ''}`}>
@@ -510,7 +510,7 @@ function TimelineBlock({
 
   return (
     <div className={`${roundedClass} ${border} ${bg} p-8 md:p-10 ${mbClass}`}>
-      <div className="text-base font-semibold mb-3">{title}</div>
+      {title && <div className="text-base font-semibold mb-3">{title}</div>}
       <div ref={measureRef} className="w-full h-0 overflow-hidden" />
       <PensionSegmentsBar segments={segments} geometry={geometry} />
     </div>
@@ -525,30 +525,39 @@ function PeriodCard({ title, amount, period, colorClass, icon, pensionTypes }: {
   icon: string;
   pensionTypes?: string[];
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+  
   return (
-    <div className={`p-8 rounded-2xl border-2 ${colorClass} bg-slate-900/40 backdrop-blur-sm`}>
-      <div className="flex items-center gap-3 mb-4">
-        <span className="text-3xl">{icon}</span>
-        <div className="text-lg font-bold text-slate-300">{title}</div>
-      </div>
-      <div className="text-4xl font-bold text-slate-100 mb-3">
-        {amount > 0 ? `月額 ${(amount / 12 / 10000).toFixed(1)}万円` : '---'}
-      </div>
-      {amount > 0 && (
-        <div className="text-xl font-normal text-slate-400 mb-4">
-          年額 {(amount / 10000).toFixed(0)}万円
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`rounded-lg border-2 ${colorClass} bg-slate-900/40 backdrop-blur-sm p-2 hover:bg-slate-900/60 transition-colors inline-flex items-center justify-center`}
+      >
+        <span className="text-base cursor-pointer opacity-60">{icon}</span>
+      </button>
+      {isOpen && (
+        <div className={`absolute top-full left-0 mt-2 z-50 p-4 rounded-xl border-2 ${colorClass} bg-slate-900/95 backdrop-blur-sm shadow-xl min-w-[280px] animate-slide-down`}>
+          <div className="text-lg font-bold text-slate-300 mb-2">{title}</div>
+          <div className="text-2xl font-bold text-slate-100 mb-2">
+            {amount > 0 ? `月額 ${(amount / 12 / 10000).toFixed(1)}万円` : '---'}
+          </div>
+          {amount > 0 && (
+            <div className="text-sm font-normal text-slate-400 mb-3">
+              年額 {(amount / 10000).toFixed(0)}万円
+            </div>
+          )}
+          {pensionTypes && pensionTypes.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {pensionTypes.map((type, idx) => (
+                <span key={idx} className="px-2 py-1 rounded-md text-xs font-semibold bg-slate-700/50 text-slate-300 border border-slate-600/50">
+                  {type}
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="text-xs text-slate-500">{period}</div>
         </div>
       )}
-      {pensionTypes && pensionTypes.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          {pensionTypes.map((type, idx) => (
-            <span key={idx} className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-slate-700/50 text-slate-300 border border-slate-600/50">
-              {type}
-            </span>
-          ))}
-        </div>
-      )}
-      <div className="text-base text-slate-500">{period}</div>
     </div>
   );
 }
@@ -1184,23 +1193,24 @@ export default function SurvivorPensionPage() {
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-emerald-500/30 pb-20">
       <div className="bg-slate-900/50 border-b border-slate-800 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h1 className="text-xl font-bold flex items-center gap-2">
-              <span className="w-2 h-8 bg-emerald-500 rounded-full"></span>
-              遺族年金シミュレーター
-            </h1>
-            <Link
-              href="/simulators/survivor-pension/rules"
-              className="text-base text-slate-400 hover:text-emerald-400 transition-colors flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800/50 border border-slate-700 hover:border-emerald-500/50"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-              </svg>
-              遺族年金について
-            </Link>
-          </div>
-          <div className="flex items-center gap-4">
+        <div className="max-w-6xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-4">
+              <h1 className="text-xl font-bold flex items-center gap-2">
+                <span className="w-2 h-8 bg-emerald-500 rounded-full"></span>
+                遺族年金シミュレーター
+              </h1>
+              <Link
+                href="/simulators/survivor-pension/rules"
+                className="text-base text-slate-400 hover:text-emerald-400 transition-colors flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800/50 border border-slate-700 hover:border-emerald-500/50"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                </svg>
+                遺族年金について
+              </Link>
+            </div>
+            <div className="flex items-center gap-4">
             <div className="hidden md:flex items-center gap-2 bg-slate-800/50 rounded-lg p-1 border border-slate-700">
               <button
                 onClick={() => setMode('current')}
@@ -1222,6 +1232,29 @@ export default function SurvivorPensionPage() {
               TOPへ戻る
             </Link>
           </div>
+          </div>
+          
+          {/* Navigation Links */}
+          <nav className="flex flex-wrap gap-3 mt-3">
+            <Link
+              href="/simulators/customer-profile"
+              className="px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700 text-slate-300 hover:text-sky-400 hover:border-sky-500/50 hover:bg-slate-800/80 transition-all duration-300 text-sm font-medium"
+            >
+              基本情報設定
+            </Link>
+            <Link
+              href="/simulators/disability-pension"
+              className="px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700 text-slate-300 hover:text-amber-400 hover:border-amber-500/50 hover:bg-slate-800/80 transition-all duration-300 text-sm font-medium"
+            >
+              障害年金
+            </Link>
+            <Link
+              href="/simulators/necessary-coverage"
+              className="px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700 text-slate-300 hover:text-rose-400 hover:border-rose-500/50 hover:bg-slate-800/80 transition-all duration-300 text-sm font-medium"
+            >
+              必要保障額
+            </Link>
+          </nav>
         </div>
 
         {showNotes && (
@@ -1398,44 +1431,45 @@ export default function SurvivorPensionPage() {
               <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/30">
                 <span className="text-2xl">👩</span>
               </div>
-              <div>
+              <div className="flex-1">
                 <h2 className="text-2xl font-bold text-slate-100">妻の受給額</h2>
                 <p className="text-sm text-slate-400 mt-0.5">夫が死亡した場合</p>
               </div>
-            </div>
-
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-              <PeriodCard
-                title="子がいる期間"
-                amount={caseHusbandDeath.withChildrenAmount}
-                period={`${ageWife}歳 - ${caseHusbandDeath.ageAfterChild}歳`}
-                colorClass="border-emerald-500/30"
-                icon="👶"
-                pensionTypes={caseHusbandDeath.pensionTypesWithChildren}
-              />
-              <PeriodCard
-                title="子がいなくなった後"
-                amount={caseHusbandDeath.afterChildrenAmount}
-                period={`${caseHusbandDeath.ageAfterChild}歳 - ${oldAgeStartWife}歳`}
-                colorClass="border-sky-500/30"
-                icon="💼"
-                pensionTypes={caseHusbandDeath.pensionTypesAfterChildren}
-              />
-              <PeriodCard
-                title="年金開始後"
-                amount={caseHusbandDeath.oldAgeAmount}
-                period={`${oldAgeStartWife}歳 - 100歳`}
-                colorClass="border-sky-500/30"
-                icon="🎂"
-                pensionTypes={caseHusbandDeath.pensionTypesOldAge}
-              />
+              <div className="flex items-center gap-2">
+                <PeriodCard
+                  title="子がいる期間"
+                  amount={caseHusbandDeath.withChildrenAmount}
+                  period={`${ageWife}歳 - ${caseHusbandDeath.ageAfterChild}歳`}
+                  colorClass="border-emerald-500/30"
+                  icon="👶"
+                  pensionTypes={caseHusbandDeath.pensionTypesWithChildren}
+                />
+                <PeriodCard
+                  title="子がいなくなった後"
+                  amount={caseHusbandDeath.afterChildrenAmount}
+                  period={`${caseHusbandDeath.ageAfterChild}歳 - ${oldAgeStartWife}歳`}
+                  colorClass="border-sky-500/30"
+                  icon="💼"
+                  pensionTypes={caseHusbandDeath.pensionTypesAfterChildren}
+                />
+                <PeriodCard
+                  title="年金開始後"
+                  amount={caseHusbandDeath.oldAgeAmount}
+                  period={`${oldAgeStartWife}歳 - 100歳`}
+                  colorClass="border-sky-500/30"
+                  icon="🎂"
+                  pensionTypes={caseHusbandDeath.pensionTypesOldAge}
+                />
+              </div>
             </div>
 
             {timelineDataHusband.block1 && (
-              <>
+              <Accordion
+                title="① 👶 子がいる期間（加算あり期間）"
+                defaultOpen={true}
+              >
                 <TimelineBlock
-                  title="① 👶 子がいる期間（加算あり期間）"
+                  title=""
                   color="emerald"
                   segments={timelineDataHusband.block1.segments}
                   ticks={timelineDataHusband.block1.ticks}
@@ -1452,22 +1486,26 @@ export default function SurvivorPensionPage() {
                     { label: '　平均標準報酬月額 × 厚生年金加入月数 × 5.481/1000 × 3/4', value: `${(avgStdMonthlyHusband / 10000).toFixed(1)}万 × ${useMinashi300Husband ? Math.max(monthsHusband, 300) : monthsHusband}月 × 5.481/1000 × 3/4 = ${(caseHusbandDeath.employeePension / 10000).toFixed(1)}万円` },
                   ]}
                 />
-              </>
+              </Accordion>
             )}
 
-            <div className="mt-8">
-              <TimelineBlock
-                title="② 💼 子がいなくなった後 〜 老後"
+            <Accordion
+              title="② 💼 子がいなくなった後 〜 老後"
+              defaultOpen={true}
+            >
+              <div className="mt-8">
+                <TimelineBlock
+                  title=""
+                  color="sky"
+                  segments={timelineDataHusband.block2.segments}
+                  ticks={timelineDataHusband.block2.ticks}
+                  blockNumber={2}
+                  hasLogic={true}
+                />
+              </div>
+              <CalculationLogic
                 color="sky"
-                segments={timelineDataHusband.block2.segments}
-                ticks={timelineDataHusband.block2.ticks}
-                blockNumber={2}
-                hasLogic={true}
-              />
-            </div>
-            <CalculationLogic
-              color="sky"
-              details={[
+                details={[
                 { label: '遺族厚生年金（年額）', value: `${(caseHusbandDeath.employeePension / 10000).toFixed(1)}万円` },
                 { label: '　平均標準報酬月額 × 厚生年金加入月数 × 5.481/1000 × 3/4', value: `${(avgStdMonthlyHusband / 10000).toFixed(1)}万 × ${useMinashi300Husband ? Math.max(monthsHusband, 300) : monthsHusband}月 × 5.481/1000 × 3/4 = ${(caseHusbandDeath.employeePension / 10000).toFixed(1)}万円` },
                 { label: '中高齢寡婦加算（該当時）', value: '62.4万円' },
@@ -1492,6 +1530,7 @@ export default function SurvivorPensionPage() {
                 { label: '　老齢基礎 + 老齢厚生 + 遺族厚生（差額）', value: `${(calculateOldAgePensionAdjustment(calculateOldAgeBasicPension(), oldAgeStartWife) / 10000).toFixed(1)}万 + ${(calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife), oldAgeStartWife) / 10000).toFixed(1)}万 + ${(Math.max(0, caseHusbandDeath.employeePension - calculateOldAgePensionAdjustment(calculateOldAgeEmployeePension(avgStdMonthlyWife, monthsWife), oldAgeStartWife)) / 10000).toFixed(1)}万 = ${(caseHusbandDeath.oldAgeAmount / 10000).toFixed(1)}万円` },
               ]}
             />
+            </Accordion>
           </section>
 
           <section className="pt-12 border-t border-slate-800">
@@ -1499,43 +1538,45 @@ export default function SurvivorPensionPage() {
               <div className="w-12 h-12 rounded-xl bg-rose-500/10 flex items-center justify-center border border-rose-500/30">
                 <span className="text-2xl">👨</span>
               </div>
-              <div>
+              <div className="flex-1">
                 <h2 className="text-2xl font-bold text-slate-100">夫の受給額</h2>
                 <p className="text-sm text-slate-400 mt-0.5">妻が死亡した場合</p>
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-              <PeriodCard
-                title="子がいる期間"
-                amount={caseWifeDeath.withChildrenAmount}
-                period={`${ageHusband}歳 - ${caseWifeDeath.ageAfterChild}歳`}
-                colorClass="border-emerald-500/30"
-                icon="👶"
-                pensionTypes={caseWifeDeath.pensionTypesWithChildren}
-              />
-              <PeriodCard
-                title="子がいなくなった後"
-                amount={caseWifeDeath.afterChildrenAmount}
-                period={`${caseWifeDeath.ageAfterChild}歳 - ${oldAgeStartHusband}歳`}
-                colorClass="border-sky-500/30"
-                icon="💼"
-                pensionTypes={caseWifeDeath.pensionTypesAfterChildren}
-              />
-              <PeriodCard
-                title="年金開始後"
-                amount={caseWifeDeath.oldAgeAmount}
-                period={`${oldAgeStartHusband}歳 - 100歳`}
-                colorClass="border-sky-500/30"
-                icon="🎂"
-                pensionTypes={caseWifeDeath.pensionTypesOldAge}
-              />
+              <div className="flex items-center gap-2">
+                <PeriodCard
+                  title="子がいる期間"
+                  amount={caseWifeDeath.withChildrenAmount}
+                  period={`${ageHusband}歳 - ${caseWifeDeath.ageAfterChild}歳`}
+                  colorClass="border-emerald-500/30"
+                  icon="👶"
+                  pensionTypes={caseWifeDeath.pensionTypesWithChildren}
+                />
+                <PeriodCard
+                  title="子がいなくなった後"
+                  amount={caseWifeDeath.afterChildrenAmount}
+                  period={`${caseWifeDeath.ageAfterChild}歳 - ${oldAgeStartHusband}歳`}
+                  colorClass="border-sky-500/30"
+                  icon="💼"
+                  pensionTypes={caseWifeDeath.pensionTypesAfterChildren}
+                />
+                <PeriodCard
+                  title="年金開始後"
+                  amount={caseWifeDeath.oldAgeAmount}
+                  period={`${oldAgeStartHusband}歳 - 100歳`}
+                  colorClass="border-sky-500/30"
+                  icon="🎂"
+                  pensionTypes={caseWifeDeath.pensionTypesOldAge}
+                />
+              </div>
             </div>
 
             {timelineDataWife.block1 && (
-              <>
+              <Accordion
+                title="① 👶 子がいる期間（加算あり期間）"
+                defaultOpen={true}
+              >
                 <TimelineBlock
-                  title="① 👶 子がいる期間（加算あり期間）"
+                  title=""
                   color="emerald"
                   segments={timelineDataWife.block1.segments}
                   ticks={timelineDataWife.block1.ticks}
@@ -1552,22 +1593,26 @@ export default function SurvivorPensionPage() {
                     { label: '　平均標準報酬月額 × 厚生年金加入月数 × 5.481/1000 × 3/4', value: `${(avgStdMonthlyWife / 10000).toFixed(1)}万 × ${useMinashi300Wife ? Math.max(monthsWife, 300) : monthsWife}月 × 5.481/1000 × 3/4 = ${(caseWifeDeath.employeePension / 10000).toFixed(1)}万円` },
                   ]}
                 />
-              </>
+              </Accordion>
             )}
 
-            <div className="mt-8">
-              <TimelineBlock
-                title="② 💼 子がいなくなった後 〜 老後"
+            <Accordion
+              title="② 💼 子がいなくなった後 〜 老後"
+              defaultOpen={true}
+            >
+              <div className="mt-8">
+                <TimelineBlock
+                  title=""
+                  color="sky"
+                  segments={timelineDataWife.block2.segments}
+                  ticks={timelineDataWife.block2.ticks}
+                  blockNumber={2}
+                  hasLogic={true}
+                />
+              </div>
+              <CalculationLogic
                 color="sky"
-                segments={timelineDataWife.block2.segments}
-                ticks={timelineDataWife.block2.ticks}
-                blockNumber={2}
-                hasLogic={true}
-              />
-            </div>
-            <CalculationLogic
-              color="sky"
-              details={[
+                details={[
                 { label: `夫の老齢基礎年金（${oldAgeStartHusband}歳〜）`, value: `${(calculateOldAgePensionAdjustment(calculateOldAgeBasicPension(), oldAgeStartHusband) / 10000).toFixed(1)}万円` },
                 ...(oldAgeStartHusband !== 65 ? [{
                   label: '　繰り上げ・繰り下げ調整',
@@ -1589,6 +1634,7 @@ export default function SurvivorPensionPage() {
                 { label: '　老齢基礎 + 老齢厚生 + 遺族厚生（差額）', value: `${(calculateOldAgePensionAdjustmentUtil(calculateOldAgeBasicPension(), oldAgeStartHusband) / 10000).toFixed(1)}万 + ${(calculateOldAgePensionAdjustmentUtil(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband) / 10000).toFixed(1)}万 + ${(Math.max(0, caseWifeDeath.employeePension - calculateOldAgePensionAdjustmentUtil(calculateOldAgeEmployeePension(avgStdMonthlyHusband, monthsHusband), oldAgeStartHusband)) / 10000).toFixed(1)}万 = ${(caseWifeDeath.oldAgeAmount / 10000).toFixed(1)}万円` },
               ]}
             />
+            </Accordion>
           </section>
         </div>
       </div>

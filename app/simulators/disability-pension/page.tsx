@@ -419,10 +419,10 @@ function Accordion({ title, children, defaultOpen = false, onClear, headerConten
       <div className="flex items-center gap-2 mb-2">
         <button
           onClick={() => setOpen((v) => !v)}
-          className="flex-1 text-left text-sm flex items-center justify-between px-4 py-3 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800 transition-all"
+          className="flex-1 text-left text-base flex items-center justify-between px-4 py-3 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800 transition-all"
         >
           <span className="flex items-center gap-2 flex-wrap">
-            <span className="font-bold text-slate-200">{title}</span>
+            <span className="font-bold text-lg text-slate-200">{title}</span>
             {headerContent && <span className="text-xs opacity-70 font-normal border-l border-slate-600 pl-2">{headerContent}</span>}
           </span>
           <span className={`text-slate-400 transition-transform duration-300 ${open ? 'rotate-180' : ''}`}>
@@ -519,7 +519,7 @@ function TimelineBlock({
 
   return (
     <div className={`${roundedClass} ${border} ${bg} p-8 md:p-10 ${mbClass}`}>
-      <div className="text-base font-semibold mb-3">{title}</div>
+      {title && <div className="text-base font-semibold mb-3">{title}</div>}
       <div ref={measureRef} className="w-full h-0 overflow-hidden" />
       <PensionSegmentsBar segments={segments} geometry={geometry} />
     </div>
@@ -534,30 +534,39 @@ function PeriodCard({ title, amount, period, colorClass, icon, pensionTypes }: {
   icon: string;
   pensionTypes?: string[];
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+  
   return (
-    <div className={`p-8 rounded-2xl border-2 ${colorClass} bg-slate-900/40 backdrop-blur-sm`}>
-      <div className="flex items-center gap-3 mb-4">
-        <span className="text-3xl">{icon}</span>
-        <div className="text-lg font-bold text-slate-300">{title}</div>
-      </div>
-      <div className="text-4xl font-bold text-slate-100 mb-3">
-        {amount > 0 ? `月額 ${(amount / 12 / 10000).toFixed(1)}万円` : '---'}
-      </div>
-      {amount > 0 && (
-        <div className="text-xl font-normal text-slate-400 mb-4">
-          年額 {(amount / 10000).toFixed(0)}万円
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`rounded-lg border-2 ${colorClass} bg-slate-900/40 backdrop-blur-sm p-2 hover:bg-slate-900/60 transition-colors inline-flex items-center justify-center`}
+      >
+        <span className="text-base cursor-pointer opacity-60">{icon}</span>
+      </button>
+      {isOpen && (
+        <div className={`absolute top-full left-0 mt-2 z-50 p-4 rounded-xl border-2 ${colorClass} bg-slate-900/95 backdrop-blur-sm shadow-xl min-w-[280px] animate-slide-down`}>
+          <div className="text-lg font-bold text-slate-300 mb-2">{title}</div>
+          <div className="text-2xl font-bold text-slate-100 mb-2">
+            {amount > 0 ? `月額 ${(amount / 12 / 10000).toFixed(1)}万円` : '---'}
+          </div>
+          {amount > 0 && (
+            <div className="text-sm font-normal text-slate-400 mb-3">
+              年額 {(amount / 10000).toFixed(0)}万円
+            </div>
+          )}
+          {pensionTypes && pensionTypes.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {pensionTypes.map((type, idx) => (
+                <span key={idx} className="px-2 py-1 rounded-md text-xs font-semibold bg-slate-700/50 text-slate-300 border border-slate-600/50">
+                  {type}
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="text-xs text-slate-500">{period}</div>
         </div>
       )}
-      {pensionTypes && pensionTypes.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          {pensionTypes.map((type, idx) => (
-            <span key={idx} className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-slate-700/50 text-slate-300 border border-slate-600/50">
-              {type}
-            </span>
-          ))}
-        </div>
-      )}
-      <div className="text-base text-slate-500">{period}</div>
     </div>
   );
 }
@@ -1327,23 +1336,24 @@ export default function DisabilityPensionPage() {
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-amber-500/30 pb-20">
       <div className="bg-slate-900/50 border-b border-slate-800 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h1 className="text-xl font-bold flex items-center gap-2">
-              <span className="w-2 h-8 bg-amber-500 rounded-full"></span>
-              障害年金シミュレーター
-            </h1>
-            <Link
-              href="/simulators/disability-pension/rules"
-              className="text-base text-slate-400 hover:text-amber-400 transition-colors flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800/50 border border-slate-700 hover:border-amber-500/50"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-              </svg>
-              障害年金について
-            </Link>
-          </div>
-          <div className="flex items-center gap-4">
+        <div className="max-w-6xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-4">
+              <h1 className="text-xl font-bold flex items-center gap-2">
+                <span className="w-2 h-8 bg-amber-500 rounded-full"></span>
+                障害年金シミュレーター
+              </h1>
+              <Link
+                href="/simulators/disability-pension/rules"
+                className="text-base text-slate-400 hover:text-amber-400 transition-colors flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800/50 border border-slate-700 hover:border-amber-500/50"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                </svg>
+                障害年金について
+              </Link>
+            </div>
+            <div className="flex items-center gap-4">
             <button onClick={() => setShowNotes(!showNotes)} className="text-sm text-slate-400 hover:text-white transition-colors">
               このシミュレータの注意点
             </button>
@@ -1351,6 +1361,29 @@ export default function DisabilityPensionPage() {
               TOPへ戻る
             </Link>
           </div>
+          </div>
+          
+          {/* Navigation Links */}
+          <nav className="flex flex-wrap gap-3 mt-3">
+            <Link
+              href="/simulators/customer-profile"
+              className="px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700 text-slate-300 hover:text-sky-400 hover:border-sky-500/50 hover:bg-slate-800/80 transition-all duration-300 text-sm font-medium"
+            >
+              基本情報設定
+            </Link>
+            <Link
+              href="/simulators/survivor-pension"
+              className="px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700 text-slate-300 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-slate-800/80 transition-all duration-300 text-sm font-medium"
+            >
+              遺族年金
+            </Link>
+            <Link
+              href="/simulators/necessary-coverage"
+              className="px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700 text-slate-300 hover:text-rose-400 hover:border-rose-500/50 hover:bg-slate-800/80 transition-all duration-300 text-sm font-medium"
+            >
+              必要保障額
+            </Link>
+          </nav>
         </div>
 
         {showNotes && (
@@ -1540,51 +1573,53 @@ export default function DisabilityPensionPage() {
                   <div className="w-12 h-12 rounded-xl bg-rose-500/10 flex items-center justify-center border border-rose-500/30">
                     <span className="text-2xl">👩</span>
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <h2 className="text-2xl font-bold text-slate-100">妻の受給額</h2>
                     <p className="text-sm text-slate-400 mt-0.5">妻が障害状態になった場合</p>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-                  <PeriodCard
-                    title="加算あり期間"
-                    amount={timelineDataWife.total}
-                    period={timelineDataWife.block1 ? `${ageWife}歳 - ${timelineDataWife.ageAfterChange}歳` : '---'}
-                    colorClass="border-amber-500/30"
-                    icon="🏥"
-                    pensionTypes={timelineDataWife.pensionTypes}
-                  />
-                  {timelineDataWife.block2.segments.length > 0 && (
+                  <div className="flex items-center gap-2">
                     <PeriodCard
-                      title="加算終了後"
-                      amount={timelineDataWife.basicPension + calculateDisabilityEmployeePension(levelWife, 0, 0, avgStdMonthlyWife, monthsWife, true)}
-                      period={`${timelineDataWife.ageAfterChange}歳 - 65歳`}
-                      colorClass="border-sky-500/30"
-                      icon="💼"
-                      pensionTypes={['障害基礎年金', '障害厚生年金']}
+                      title="加算あり期間"
+                      amount={timelineDataWife.total}
+                      period={timelineDataWife.block1 ? `${ageWife}歳 - ${timelineDataWife.ageAfterChange}歳` : '---'}
+                      colorClass="border-amber-500/30"
+                      icon="🏥"
+                      pensionTypes={timelineDataWife.pensionTypes}
                     />
-                  )}
-                  {timelineDataWife.block2_65plus.segments.length > 0 && (
-                    <PeriodCard
-                      title="65歳以降（最適給付）"
-                      amount={timelineDataWife.block2_65plus.optimizedAmount}
-                      period="65歳 - 100歳"
-                      colorClass="border-emerald-500/30"
-                      icon="✨"
-                      pensionTypes={timelineDataWife.block2_65plus.optimizedPattern === 'A'
-                        ? ['障害基礎年金', '障害厚生年金']
-                        : timelineDataWife.block2_65plus.switchAge
-                          ? [`老齢基礎年金（${timelineDataWife.block2_65plus.switchAge}歳繰下げ）`, `老齢厚生年金（${timelineDataWife.block2_65plus.switchAge}歳繰下げ）`]
-                          : ['老齢基礎年金', '老齢厚生年金']}
-                    />
-                  )}
+                    {timelineDataWife.block2.segments.length > 0 && (
+                      <PeriodCard
+                        title="加算終了後"
+                        amount={timelineDataWife.basicPension + calculateDisabilityEmployeePension(levelWife, 0, 0, avgStdMonthlyWife, monthsWife, true)}
+                        period={`${timelineDataWife.ageAfterChange}歳 - 65歳`}
+                        colorClass="border-sky-500/30"
+                        icon="💼"
+                        pensionTypes={['障害基礎年金', '障害厚生年金']}
+                      />
+                    )}
+                    {timelineDataWife.block2_65plus.segments.length > 0 && (
+                      <PeriodCard
+                        title="65歳以降（最適給付）"
+                        amount={timelineDataWife.block2_65plus.optimizedAmount}
+                        period="65歳 - 100歳"
+                        colorClass="border-emerald-500/30"
+                        icon="✨"
+                        pensionTypes={timelineDataWife.block2_65plus.optimizedPattern === 'A'
+                          ? ['障害基礎年金', '障害厚生年金']
+                          : timelineDataWife.block2_65plus.switchAge
+                            ? [`老齢基礎年金（${timelineDataWife.block2_65plus.switchAge}歳繰下げ）`, `老齢厚生年金（${timelineDataWife.block2_65plus.switchAge}歳繰下げ）`]
+                            : ['老齢基礎年金', '老齢厚生年金']}
+                      />
+                    )}
+                  </div>
                 </div>
 
                 {timelineDataWife.block1 && (
-                  <>
+                  <Accordion
+                    title="① 👶 子がいる期間（加算あり期間）"
+                    defaultOpen={true}
+                  >
                     <TimelineBlock
-                      title="① 👶 子がいる期間（加算あり期間）"
+                      title=""
                       color="amber"
                       segments={timelineDataWife.block1.segments}
                       ticks={timelineDataWife.block1.ticks}
@@ -1602,14 +1637,17 @@ export default function DisabilityPensionPage() {
                         { label: '配偶者加給年金（条件満たす場合）', value: `${((ageHusband < 65 ? SPOUSE_BONUS : 0) / 10000).toFixed(1)}万円` },
                       ]}
                     />
-                  </>
+                  </Accordion>
                 )}
 
                 {timelineDataWife.block2.segments.length > 0 && (
-                  <>
+                  <Accordion
+                    title="② 💼 加算終了後 〜"
+                    defaultOpen={true}
+                  >
                     <div className="mt-8">
                       <TimelineBlock
-                        title="② 💼 加算終了後 〜"
+                        title=""
                         color="sky"
                         segments={timelineDataWife.block2.segments}
                         ticks={timelineDataWife.block2.ticks}
@@ -1624,14 +1662,17 @@ export default function DisabilityPensionPage() {
                         { label: '障害厚生年金', value: `${(calculateDisabilityEmployeePension(levelWife, 0, 0, avgStdMonthlyWife, monthsWife, true) / 10000).toFixed(1)}万円` },
                       ]}
                     />
-                  </>
+                  </Accordion>
                 )}
 
                 {timelineDataWife.block2_65plus.segments.length > 0 && (
-                  <>
+                  <Accordion
+                    title={`${timelineDataWife.block2.segments.length > 0 ? '③' : '②'} ✨ 65歳以降（最適給付）${timelineDataWife.block2_65plus.breakEvenAge ? ` [損益分岐点: ${timelineDataWife.block2_65plus.breakEvenAge}歳]` : ' [障害年金の方が有利]'}`}
+                    defaultOpen={true}
+                  >
                     <div className="mt-8">
                       <TimelineBlock
-                        title={`${timelineDataWife.block2.segments.length > 0 ? '③' : '②'} ✨ 65歳以降（最適給付）${timelineDataWife.block2_65plus.breakEvenAge ? ` [損益分岐点: ${timelineDataWife.block2_65plus.breakEvenAge}歳]` : ' [障害年金の方が有利]'}`}
+                        title=""
                         color="sky"
                         segments={timelineDataWife.block2_65plus.segments}
                         ticks={timelineDataWife.block2_65plus.ticks}
@@ -1667,7 +1708,7 @@ export default function DisabilityPensionPage() {
                         })(),
                       ].flat()}
                     />
-                  </>
+                  </Accordion>
                 )}
               </section>
 
@@ -1677,49 +1718,51 @@ export default function DisabilityPensionPage() {
                   <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/30">
                     <span className="text-2xl">👨</span>
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <h2 className="text-2xl font-bold text-slate-100">夫の受給額</h2>
                     <p className="text-sm text-slate-400 mt-0.5">夫が障害状態になった場合</p>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-                  <PeriodCard
-                    title="加算あり期間"
-                    amount={timelineDataHusband.total}
-                    period={timelineDataHusband.block1 ? `${ageHusband}歳 - ${timelineDataHusband.ageAfterChange}歳` : '---'}
-                    colorClass="border-amber-500/30"
-                    icon="🏥"
-                    pensionTypes={timelineDataHusband.pensionTypes}
-                  />
-                  {timelineDataHusband.block2.segments.length > 0 && (
+                  <div className="flex items-center gap-2">
                     <PeriodCard
-                      title="加算終了後"
-                      amount={timelineDataHusband.basicPension + calculateDisabilityEmployeePension(levelHusband, 0, 0, avgStdMonthlyHusband, monthsHusband, true)}
-                      period={`${timelineDataHusband.ageAfterChange}歳 - 65歳`}
-                      colorClass="border-sky-500/30"
-                      icon="💼"
-                      pensionTypes={['障害基礎年金', '障害厚生年金']}
+                      title="加算あり期間"
+                      amount={timelineDataHusband.total}
+                      period={timelineDataHusband.block1 ? `${ageHusband}歳 - ${timelineDataHusband.ageAfterChange}歳` : '---'}
+                      colorClass="border-amber-500/30"
+                      icon="🏥"
+                      pensionTypes={timelineDataHusband.pensionTypes}
                     />
-                  )}
-                  {timelineDataHusband.block2_65plus.segments.length > 0 && (
-                    <PeriodCard
-                      title="65歳以降（最適給付）"
-                      amount={timelineDataHusband.block2_65plus.optimizedAmount}
-                      period="65歳 - 100歳"
-                      colorClass="border-emerald-500/30"
-                      icon="✨"
-                      pensionTypes={timelineDataHusband.block2_65plus.optimizedPattern === 'A'
-                        ? ['障害基礎年金', '障害厚生年金']
-                        : timelineDataHusband.block2_65plus.switchAge
-                          ? [`老齢基礎年金（${timelineDataHusband.block2_65plus.switchAge}歳繰下げ）`, `老齢厚生年金（${timelineDataHusband.block2_65plus.switchAge}歳繰下げ）`]
-                          : ['老齢基礎年金', '老齢厚生年金']}
-                    />
-                  )}
+                    {timelineDataHusband.block2.segments.length > 0 && (
+                      <PeriodCard
+                        title="加算終了後"
+                        amount={timelineDataHusband.basicPension + calculateDisabilityEmployeePension(levelHusband, 0, 0, avgStdMonthlyHusband, monthsHusband, true)}
+                        period={`${timelineDataHusband.ageAfterChange}歳 - 65歳`}
+                        colorClass="border-sky-500/30"
+                        icon="💼"
+                        pensionTypes={['障害基礎年金', '障害厚生年金']}
+                      />
+                    )}
+                    {timelineDataHusband.block2_65plus.segments.length > 0 && (
+                      <PeriodCard
+                        title="65歳以降（最適給付）"
+                        amount={timelineDataHusband.block2_65plus.optimizedAmount}
+                        period="65歳 - 100歳"
+                        colorClass="border-emerald-500/30"
+                        icon="✨"
+                        pensionTypes={timelineDataHusband.block2_65plus.optimizedPattern === 'A'
+                          ? ['障害基礎年金', '障害厚生年金']
+                          : timelineDataHusband.block2_65plus.switchAge
+                            ? [`老齢基礎年金（${timelineDataHusband.block2_65plus.switchAge}歳繰下げ）`, `老齢厚生年金（${timelineDataHusband.block2_65plus.switchAge}歳繰下げ）`]
+                            : ['老齢基礎年金', '老齢厚生年金']}
+                      />
+                    )}
+                  </div>
                 </div>
 
                 {timelineDataHusband.block1 && (
-                  <>
+                  <Accordion
+                    title="① 👶 子がいる期間（加算あり期間）"
+                    defaultOpen={true}
+                  >
                     <TimelineBlock
                       title="① 👶 子がいる期間（加算あり期間）"
                       color="amber"
@@ -1739,14 +1782,17 @@ export default function DisabilityPensionPage() {
                         { label: '配偶者加給年金（条件満たす場合）', value: `${((ageWife < 65 ? SPOUSE_BONUS : 0) / 10000).toFixed(1)}万円` },
                       ]}
                     />
-                  </>
+                  </Accordion>
                 )}
 
                 {timelineDataHusband.block2.segments.length > 0 && (
-                  <>
+                  <Accordion
+                    title="② 💼 加算終了後 〜"
+                    defaultOpen={true}
+                  >
                     <div className="mt-8">
                       <TimelineBlock
-                        title="② 💼 加算終了後 〜"
+                        title=""
                         color="sky"
                         segments={timelineDataHusband.block2.segments}
                         ticks={timelineDataHusband.block2.ticks}
@@ -1761,14 +1807,17 @@ export default function DisabilityPensionPage() {
                         { label: '障害厚生年金', value: `${(calculateDisabilityEmployeePension(levelHusband, 0, 0, avgStdMonthlyHusband, monthsHusband, true) / 10000).toFixed(1)}万円` },
                       ]}
                     />
-                  </>
+                  </Accordion>
                 )}
 
                 {timelineDataHusband.block2_65plus.segments.length > 0 && (
-                  <>
+                  <Accordion
+                    title={`${timelineDataHusband.block2.segments.length > 0 ? '③' : '②'} ✨ 65歳以降（最適給付）${timelineDataHusband.block2_65plus.breakEvenAge ? ` [損益分岐点: ${timelineDataHusband.block2_65plus.breakEvenAge}歳]` : ' [障害年金の方が有利]'}`}
+                    defaultOpen={true}
+                  >
                     <div className="mt-8">
                       <TimelineBlock
-                        title={`${timelineDataHusband.block2.segments.length > 0 ? '③' : '②'} ✨ 65歳以降（最適給付）${timelineDataHusband.block2_65plus.breakEvenAge ? ` [損益分岐点: ${timelineDataHusband.block2_65plus.breakEvenAge}歳]` : ' [障害年金の方が有利]'}`}
+                        title=""
                         color="sky"
                         segments={timelineDataHusband.block2_65plus.segments}
                         ticks={timelineDataHusband.block2_65plus.ticks}
@@ -1804,7 +1853,7 @@ export default function DisabilityPensionPage() {
                         })(),
                       ].flat()}
                     />
-                  </>
+                  </Accordion>
                 )}
               </section>
             </>

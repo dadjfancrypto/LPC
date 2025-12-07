@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ライフプラン・シミュレーター",
+  title: "LPS",
   description: "年金・必要保障額などのシミュレーションツール",
 };
 
