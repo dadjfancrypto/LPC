@@ -1275,7 +1275,7 @@ export default function NecessaryCoveragePage() {
     return (
         <main className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-rose-500/30 pb-20">
             <div className="bg-slate-900/50 border-b border-slate-800 backdrop-blur-md sticky top-0 z-50">
-                <div className="max-w-4xl mx-auto px-6 py-4">
+                <div className="w-full max-w-[1920px] mx-auto px-6 py-4">
                     <div className="flex items-center justify-between mb-3">
                         <h1 className="text-xl font-bold flex items-center gap-2">
                             <span className="w-2 h-8 bg-rose-500 rounded-full"></span>
@@ -1310,7 +1310,7 @@ export default function NecessaryCoveragePage() {
                 </div>
             </div>
 
-            <div className="max-w-4xl mx-auto px-6 py-10">
+            <div className="w-full max-w-[1920px] mx-auto px-6 py-10">
                 <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-10 shadow-lg">
                     <h2 className="text-lg font-bold mb-6 flex items-center gap-2">
                         <span>⚙️</span> シミュレーション条件設定
@@ -1469,54 +1469,68 @@ export default function NecessaryCoveragePage() {
                     <div className="space-y-16">
                         {profile.basicInfo.spouseType === 'couple' ? (
                             <>
-                                <ScenarioSection
-                                    result={scenarios.husbandDeath}
-                                    profile={profile}
-                                    color="emerald"
-                                    icon="💀"
-                                    description="夫が死亡した場合、家庭から夫の収入がなくなる。公的保障による補填額を確認します"
-                                    scenarioKey="husbandDeath"
-                                    displayPeriodModes={displayPeriodModes}
-                                    setDisplayPeriodModes={setDisplayPeriodModes}
-                                    customEndAges={customEndAges}
-                                    setCustomEndAges={setCustomEndAges}
-                                />
-                                <ScenarioSection
-                                    result={scenarios.husbandDisability}
-                                    profile={profile}
-                                    color="amber"
-                                    icon="🏥"
-                                    description="夫が障害状態になった場合、収入減と支出増による不足額"
-                                    scenarioKey="husbandDisability"
-                                    displayPeriodModes={displayPeriodModes}
-                                    setDisplayPeriodModes={setDisplayPeriodModes}
-                                    customEndAges={customEndAges}
-                                    setCustomEndAges={setCustomEndAges}
-                                />
-                                <ScenarioSection
-                                    result={scenarios.wifeDeath}
-                                    profile={profile}
-                                    color="emerald"
-                                    icon="💀"
-                                    description="妻が死亡した場合、残された夫と子の生活費不足額"
-                                    scenarioKey="wifeDeath"
-                                    displayPeriodModes={displayPeriodModes}
-                                    setDisplayPeriodModes={setDisplayPeriodModes}
-                                    customEndAges={customEndAges}
-                                    setCustomEndAges={setCustomEndAges}
-                                />
-                                <ScenarioSection
-                                    result={scenarios.wifeDisability}
-                                    profile={profile}
-                                    color="amber"
-                                    icon="🏥"
-                                    description="妻が障害状態になった場合、家事代行費等の支出増も考慮が必要"
-                                    scenarioKey="wifeDisability"
-                                    displayPeriodModes={displayPeriodModes}
-                                    setDisplayPeriodModes={setDisplayPeriodModes}
-                                    customEndAges={customEndAges}
-                                    setCustomEndAges={setCustomEndAges}
-                                />
+                                {/* 死亡シナリオ：2カラムで横並び */}
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                    <div className="w-full">
+                                        <ScenarioSection
+                                            result={scenarios.husbandDeath}
+                                            profile={profile}
+                                            color="emerald"
+                                            icon="💀"
+                                            description="夫が死亡した場合、家庭から夫の収入がなくなる。公的保障による補填額を確認します"
+                                            scenarioKey="husbandDeath"
+                                            displayPeriodModes={displayPeriodModes}
+                                            setDisplayPeriodModes={setDisplayPeriodModes}
+                                            customEndAges={customEndAges}
+                                            setCustomEndAges={setCustomEndAges}
+                                        />
+                                    </div>
+                                    <div className="w-full">
+                                        <ScenarioSection
+                                            result={scenarios.wifeDeath}
+                                            profile={profile}
+                                            color="emerald"
+                                            icon="💀"
+                                            description="妻が死亡した場合、残された夫と子の生活費不足額"
+                                            scenarioKey="wifeDeath"
+                                            displayPeriodModes={displayPeriodModes}
+                                            setDisplayPeriodModes={setDisplayPeriodModes}
+                                            customEndAges={customEndAges}
+                                            setCustomEndAges={setCustomEndAges}
+                                        />
+                                    </div>
+                                </div>
+                                {/* 障害シナリオ：2カラムで横並び */}
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                    <div className="w-full">
+                                        <ScenarioSection
+                                            result={scenarios.husbandDisability}
+                                            profile={profile}
+                                            color="amber"
+                                            icon="🏥"
+                                            description="夫が障害状態になった場合、収入減と支出増による不足額"
+                                            scenarioKey="husbandDisability"
+                                            displayPeriodModes={displayPeriodModes}
+                                            setDisplayPeriodModes={setDisplayPeriodModes}
+                                            customEndAges={customEndAges}
+                                            setCustomEndAges={setCustomEndAges}
+                                        />
+                                    </div>
+                                    <div className="w-full">
+                                        <ScenarioSection
+                                            result={scenarios.wifeDisability}
+                                            profile={profile}
+                                            color="amber"
+                                            icon="🏥"
+                                            description="妻が障害状態になった場合、家事代行費等の支出増も考慮が必要"
+                                            scenarioKey="wifeDisability"
+                                            displayPeriodModes={displayPeriodModes}
+                                            setDisplayPeriodModes={setDisplayPeriodModes}
+                                            customEndAges={customEndAges}
+                                            setCustomEndAges={setCustomEndAges}
+                                        />
+                                    </div>
+                                </div>
                             </>
                         ) : (
                             <>
@@ -1709,11 +1723,6 @@ function ScenarioSection({
                     <div className={`text-3xl font-bold ${netShortfall > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
                         {netShortfall > 0 ? `${shortfallText}万円` : '不足なし'}
                     </div>
-                    {netShortfall > 0 && (
-                        <div className="text-xs text-rose-400/70 mt-1">
-                            月あたり最大不足: {(result.monthlyShortfallMax / 10000).toFixed(1)}万円
-                        </div>
-                    )}
                     {deductionMessages.length > 0 && (
                         <div className="text-[11px] text-slate-500 mt-2">
                             {deductionMessages.join(' / ')} を控除済み
