@@ -891,12 +891,18 @@ function StackedAreaChart({
 export default function NecessaryCoveragePage() {
     const [profile, setProfile] = useState<CustomerProfile | null>(null);
     // 生活費調整率
-    const [expenseRatioSurvivor, setExpenseRatioSurvivor] = useState(70); // 遺族の生活費率（現在の生活費の何%になるか、デフォルト70%）
+    const [expenseRatioSurvivor, setExpenseRatioSurvivor] = useState(80); // 遺族の生活費率（現在の生活費の何%になるか、デフォルト80%）
     const [expenseRatioDisability, setExpenseRatioDisability] = useState(110); // 医療・介護を考慮した一般的な増加率（約110%）
     // 就労収入調整率（リスク調整）
     const [workIncomeRatio, setWorkIncomeRatio] = useState(90); // デフォルト90%（共働きで就労継続を想定）
     const [currentSavingsMan, setCurrentSavingsMan] = useState(0); // 既存の貯蓄・保険（万円）
     const [showSavingsInfo, setShowSavingsInfo] = useState(false);
+    const [educationCourse, setEducationCourse] = useState<'public' | 'private_uni' | 'private_hs' | 'private_jhs'>('public'); // 教育費コース
+    const [showEducationCourse, setShowEducationCourse] = useState(false); // 教育費コースのアコーディオン
+    const [showPublicCourse, setShowPublicCourse] = useState(false); // すべて公立コースのアコーディオン
+    const [showPrivateUniCourse, setShowPrivateUniCourse] = useState(false); // 大学のみ私立コースのアコーディオン
+    const [showPrivateHsCourse, setShowPrivateHsCourse] = useState(false); // 高校から私立コースのアコーディオン
+    const [showPrivateJhsCourse, setShowPrivateJhsCourse] = useState(false); // 中学から私立コースのアコーディオン
     const [showDeathSettings, setShowDeathSettings] = useState(false); // 死亡時シナリオの条件設定のアコーディオン
     const [showDisabilitySettings, setShowDisabilitySettings] = useState(false); // 障害時シナリオの条件設定のアコーディオン
     const [funeralCost, setFuneralCost] = useState<2000000 | 750000 | 0>(2000000); // 葬儀代：一般的な葬儀200万円、家族葬75万円、0は選択なし
@@ -1106,12 +1112,14 @@ export default function NecessaryCoveragePage() {
                 let workIncome = 0;
                 // 就労収入：昇給率は考慮せず、現在の給料ベースで一定（フラット）に推移させる
                 if (type === 'survivor') {
+                    // 遺族シナリオ：就労率を適用
                     if (currentAge < 65) {
                         workIncome = survivorBaseIncome * (workIncomeRatio / 100);
                     }
                 } else {
+                    // 障害シナリオ：就労率は適用せず、配偶者の就労収入は100%として計算
                     if (spouseAge > 0 && spouseAge < 65) {
-                        workIncome = survivorBaseIncome * (workIncomeRatio / 100);
+                        workIncome = survivorBaseIncome; // 障害シナリオでは就労率を適用しない
                     }
                 }
 
@@ -1175,15 +1183,18 @@ export default function NecessaryCoveragePage() {
                         (targetPerson === 'wife' && profile.danshinHolder.includes('wife'))
                     );
 
-                    // 1. 住宅ローン（団信加入者の場合のみ消える）
+                    // 1. 住宅ローン（団信加入者の場合のみ浮く支出に含める）
+                    // ダンシンあり = 死んだら住宅ローンが保険で支払われる = 浮く支出に含める
+                    // ダンシンなし = 死んでも住宅ローンは残る = 浮く支出に含めない
                     const housingLoan = hasDanshin ? housingLoanAnnual : 0;
 
-                    // 2. 夫の生活費（浮くお金）
-                    // 計算式: (現在の生活費 - 住宅ローン（団信加入者の場合のみ）) * (1 - 遺族生活費率)
-                    const livingExpenseBase = Math.max(0, currentExpenseAnnual - (hasDanshin ? housingLoanAnnual : 0));
+                    // 2. 生活費から住宅ローンを引いた残りの30%が浮く支出
+                    // 計算式: (現在の生活費 - 住宅ローン（ダンシンありの場合のみ）) * (1 - 遺族生活費率)
+                    const livingExpenseBase = currentExpenseAnnual - (hasDanshin ? housingLoanAnnual : 0);
                     const survivorRatio = expenseRatioSurvivor / 100;
                     const deceasedLivingExpense = livingExpenseBase * (1 - survivorRatio);
 
+                    // 3. 浮く支出 = 住宅ローン（ダンシンありの場合のみ）+ 生活費削減分
                     grayArea = housingLoan + deceasedLivingExpense;
 
                     // 必要保障額（ターゲット）は、手取り年収からグレーエリアを引いたもの
@@ -1372,10 +1383,10 @@ export default function NecessaryCoveragePage() {
                         {profile.basicInfo.spouseType === 'couple' ? (
                             <>
                                 {/* 死亡時シナリオ用の条件設定 */}
-                                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 pb-4 shadow-lg mb-6">
+                                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 pb-2 shadow-lg mb-4">
                                     <button
                                         onClick={() => setShowDeathSettings((prev) => !prev)}
-                                        className="w-full flex items-center justify-between mb-4"
+                                        className="w-full flex items-center justify-between mb-2"
                                     >
                                         <h2 className="text-lg font-bold flex items-center gap-2">
                                             <span>⚙️</span> 死亡時シナリオの条件設定
@@ -1387,9 +1398,9 @@ export default function NecessaryCoveragePage() {
                                     
                                     {showDeathSettings && (
                                         <div>
-                                            <div className="space-y-3">
-                                                <div className="mb-2">
-                                                    <label className="block text-sm font-medium text-slate-400 mb-2">
+                                            <div className="space-y-2">
+                                                <div className="mb-1">
+                                                    <label className="block text-sm font-medium text-slate-400 mb-1">
                                                         遺族の生活費率: <span className="text-emerald-400 font-bold">{expenseRatioSurvivor}%</span>
                                                     </label>
                                                     <input
@@ -1398,9 +1409,9 @@ export default function NecessaryCoveragePage() {
                                                         onChange={(e) => setExpenseRatioSurvivor(Number(e.target.value))}
                                                         className="w-1/4 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
                                                     />
-                                                    <p className="text-xs text-slate-500 mt-2">現在の生活費を100%として、パートナーが亡くなった後の遺族の生活費が何%になるかを設定します。一般的には60〜80%程度です。</p>
+                                                    <p className="text-xs text-slate-500 mt-1">現在の生活費を100%として、パートナーが亡くなった後の遺族の生活費が何%になるかを設定します。一般的には60〜80%程度です。</p>
                                                 </div>
-                                                <div className="flex items-center gap-2 mb-2">
+                                                <div className="flex items-center gap-2 mb-1">
                                                     <label className="block text-sm font-medium text-slate-400">現在の貯蓄・既存保険総額</label>
                                                     <button
                                                         type="button"
@@ -1462,6 +1473,8 @@ export default function NecessaryCoveragePage() {
                                             setDisplayPeriodModes={setDisplayPeriodModes}
                                             customEndAges={customEndAges}
                                             setCustomEndAges={setCustomEndAges}
+                                            expenseRatioSurvivor={expenseRatioSurvivor}
+                                            setExpenseRatioSurvivor={setExpenseRatioSurvivor}
                                         />
                                     </div>
                                     <div className="w-full">
@@ -1476,6 +1489,8 @@ export default function NecessaryCoveragePage() {
                                             setDisplayPeriodModes={setDisplayPeriodModes}
                                             customEndAges={customEndAges}
                                             setCustomEndAges={setCustomEndAges}
+                                            expenseRatioSurvivor={expenseRatioSurvivor}
+                                            setExpenseRatioSurvivor={setExpenseRatioSurvivor}
                                         />
                                     </div>
                                 </div>
@@ -1486,9 +1501,110 @@ export default function NecessaryCoveragePage() {
                                         <span>⚠️</span> 懸念点
                                     </h3>
                                     <div className="space-y-3 text-sm text-slate-300 leading-relaxed">
-                                        <p>
-                                            上記の不足額は、このように算出されていますが、<strong className="text-emerald-400">パートナーが亡くなると以下の要因により、実際の不足額がさらに増える可能性が高い</strong>ことをご理解ください：
-                                        </p>
+                                        <div>
+                                            <strong className="text-emerald-400">・教育費が継続してかかる</strong>：
+                                            パートナーが亡くなっても、子供の教育費は継続してかかります。
+                                            <div className="mt-2">
+                                                <button
+                                                    onClick={() => setShowEducationCourse((prev) => !prev)}
+                                                    className="w-full flex items-center justify-between text-left"
+                                                >
+                                                    <label className="text-xs text-slate-400">教育費コース</label>
+                                                    <span className={`text-xs text-slate-500 transition-transform ${showEducationCourse ? 'rotate-180' : ''}`}>▼</span>
+                                                </button>
+                                                {showEducationCourse && (
+                                                    <div className="mt-2 p-3 bg-slate-950/60 border border-slate-800 rounded-lg space-y-3">
+                                                        <div>
+                                                            <label className="block text-xs text-slate-400 mb-2">コースを選択</label>
+                                                            <select
+                                                                value={educationCourse}
+                                                                onChange={(e) => setEducationCourse(e.target.value as 'public' | 'private_uni' | 'private_hs' | 'private_jhs')}
+                                                                className="w-full rounded-xl px-3 py-2 bg-slate-800/50 border border-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-slate-100 text-sm"
+                                                            >
+                                                                <option value="public">すべて公立（約1,000万円）</option>
+                                                                <option value="private_uni">大学のみ私立（約1,200万円）</option>
+                                                                <option value="private_hs">高校から私立（約1,400万円）</option>
+                                                                <option value="private_jhs">中学から私立（約1,800万円）</option>
+                                                            </select>
+                                                        </div>
+                                                        <div className="text-xs text-slate-300 space-y-2">
+                                                            <div>
+                                                                <button
+                                                                    onClick={() => setShowPublicCourse((prev) => !prev)}
+                                                                    className="w-full flex items-center justify-between text-left"
+                                                                >
+                                                                    <strong className="text-emerald-400">すべて公立（約1,000万円）</strong>
+                                                                    <span className={`text-xs text-slate-500 transition-transform ${showPublicCourse ? 'rotate-180' : ''}`}>▼</span>
+                                                                </button>
+                                                                {showPublicCourse && (
+                                                                    <div className="text-slate-400 mt-1 space-y-1 pl-2">
+                                                                        <div>小学校：約30万円/年（6年間で約180万円）</div>
+                                                                        <div>中学校：約45万円/年（3年間で約135万円）</div>
+                                                                        <div>高校：約50万円/年（3年間で約150万円）</div>
+                                                                        <div>大学：約70万円/年（4年間で約280万円）</div>
+                                                                        <div className="mt-1 font-semibold">合計：約745万円（入学金・その他含む約1,000万円）</div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div>
+                                                                <button
+                                                                    onClick={() => setShowPrivateUniCourse((prev) => !prev)}
+                                                                    className="w-full flex items-center justify-between text-left"
+                                                                >
+                                                                    <strong className="text-emerald-400">大学のみ私立（約1,200万円）</strong>
+                                                                    <span className={`text-xs text-slate-500 transition-transform ${showPrivateUniCourse ? 'rotate-180' : ''}`}>▼</span>
+                                                                </button>
+                                                                {showPrivateUniCourse && (
+                                                                    <div className="text-slate-400 mt-1 space-y-1 pl-2">
+                                                                        <div>小学校：約30万円/年（6年間で約180万円）</div>
+                                                                        <div>中学校：約45万円/年（3年間で約135万円）</div>
+                                                                        <div>高校：約50万円/年（3年間で約150万円）</div>
+                                                                        <div>大学：約150万円/年（4年間で約600万円）</div>
+                                                                        <div className="mt-1 font-semibold">合計：約1,065万円（入学金・その他含む約1,200万円）</div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div>
+                                                                <button
+                                                                    onClick={() => setShowPrivateHsCourse((prev) => !prev)}
+                                                                    className="w-full flex items-center justify-between text-left"
+                                                                >
+                                                                    <strong className="text-emerald-400">高校から私立（約1,400万円）</strong>
+                                                                    <span className={`text-xs text-slate-500 transition-transform ${showPrivateHsCourse ? 'rotate-180' : ''}`}>▼</span>
+                                                                </button>
+                                                                {showPrivateHsCourse && (
+                                                                    <div className="text-slate-400 mt-1 space-y-1 pl-2">
+                                                                        <div>小学校：約30万円/年（6年間で約180万円）</div>
+                                                                        <div>中学校：約45万円/年（3年間で約135万円）</div>
+                                                                        <div>高校：約100万円/年（3年間で約300万円）</div>
+                                                                        <div>大学：約150万円/年（4年間で約600万円）</div>
+                                                                        <div className="mt-1 font-semibold">合計：約1,215万円（入学金・その他含む約1,400万円）</div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div>
+                                                                <button
+                                                                    onClick={() => setShowPrivateJhsCourse((prev) => !prev)}
+                                                                    className="w-full flex items-center justify-between text-left"
+                                                                >
+                                                                    <strong className="text-emerald-400">中学から私立（約1,800万円）</strong>
+                                                                    <span className={`text-xs text-slate-500 transition-transform ${showPrivateJhsCourse ? 'rotate-180' : ''}`}>▼</span>
+                                                                </button>
+                                                                {showPrivateJhsCourse && (
+                                                                    <div className="text-slate-400 mt-1 space-y-1 pl-2">
+                                                                        <div>小学校：約30万円/年（6年間で約180万円）</div>
+                                                                        <div>中学校：約130万円/年（3年間で約390万円）</div>
+                                                                        <div>高校：約100万円/年（3年間で約300万円）</div>
+                                                                        <div>大学：約150万円/年（4年間で約600万円）</div>
+                                                                        <div className="mt-1 font-semibold">合計：約1,470万円（入学金・その他含む約1,800万円）</div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
                                         <ul className="space-y-2 pl-4 list-disc">
                                             <li>
                                                 <strong className="text-emerald-400">葬式代で貯蓄が減る可能性</strong>：葬儀代と火葬式の費用がかかります。
@@ -1536,61 +1652,38 @@ export default function NecessaryCoveragePage() {
                                                         さらに、<strong className="text-white">今後のキャリアを諦めなければいけない</strong>などの就労に対するリスクも考慮する必要があります。昇進や転職の機会を失うことで、長期的な収入増加の機会が制限される可能性があります。
                                                     </p>
                                                 </div>
-                                                {(() => {
-                                                    const wifeAnnual = profile.basicInfo.annualIncomeWife || profile.basicInfo.avgStdMonthlyWife * 12;
-                                                    const husbandAnnual = profile.basicInfo.annualIncomeHusband || profile.basicInfo.avgStdMonthlyHusband * 12;
-                                                    const wifeMonthly90 = wifeAnnual ? (wifeAnnual * 0.9 / 12 / 10000).toFixed(1) : null;
-                                                    const husbandMonthly90 = husbandAnnual ? (husbandAnnual * 0.9 / 12 / 10000).toFixed(1) : null;
-                                                    
-                                                    if (wifeMonthly90 && husbandMonthly90) {
-                                                        return (
-                                                            <span className="block mt-1 text-emerald-300">
-                                                                実際のデータでは、就労率が90%になることが多く、この場合<strong className="text-white">妻の場合は約{wifeMonthly90}万円/月、夫の場合は約{husbandMonthly90}万円/月</strong>になる可能性が高いです。
-                                                            </span>
-                                                        );
-                                                    } else if (wifeMonthly90) {
-                                                        return (
-                                                            <span className="block mt-1 text-emerald-300">
-                                                                実際のデータでは、就労率が90%になることが多く、この場合<strong className="text-white">妻の場合は約{wifeMonthly90}万円/月</strong>になる可能性が高いです。
-                                                            </span>
-                                                        );
-                                                    } else if (husbandMonthly90) {
-                                                        return (
-                                                            <span className="block mt-1 text-emerald-300">
-                                                                実際のデータでは、就労率が90%になることが多く、この場合<strong className="text-white">夫の場合は約{husbandMonthly90}万円/月</strong>になる可能性が高いです。
-                                                            </span>
-                                                        );
-                                                    }
-                                                    return null;
-                                                })()}
                                                 <div className="mt-3 ml-4">
-                                                    <label className="block text-sm font-medium text-slate-400 mb-2">
-                                                        遺族/配偶者の就労率: <span className="text-sky-400 font-bold">{workIncomeRatio}%</span>
-                                                    </label>
-                                                    <input
-                                                        type="range" min="0" max="100" step="10"
-                                                        value={workIncomeRatio}
-                                                        onChange={(e) => setWorkIncomeRatio(Number(e.target.value))}
-                                                        className="w-1/4 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
-                                                    />
-                                                    <div className="mt-3 p-0 max-w-md bg-slate-950/60 border border-slate-800 rounded-lg">
-                                                        <div className="px-[2px] py-0.5">
-                                                            <p className="text-xs text-slate-400 mb-1">調整後の配偶者就労収入（月額）</p>
-                                                        {profile?.basicInfo?.spouseType === 'couple' ? (
-                                                            <p className="text-base font-bold text-sky-400 whitespace-nowrap overflow-x-auto">
-                                                                夫死亡時（妻）: {profile.basicInfo.annualIncomeWife || profile.basicInfo.avgStdMonthlyWife * 12
-                                                                    ? `${((profile.basicInfo.annualIncomeWife || profile.basicInfo.avgStdMonthlyWife * 12) * (workIncomeRatio / 100) / 12 / 10000).toFixed(1)}万円/月`
-                                                                    : '未設定'} | 妻死亡時（夫）: {profile.basicInfo.annualIncomeHusband || profile.basicInfo.avgStdMonthlyHusband * 12
-                                                                        ? `${((profile.basicInfo.annualIncomeHusband || profile.basicInfo.avgStdMonthlyHusband * 12) * (workIncomeRatio / 100) / 12 / 10000).toFixed(1)}万円/月`
+                                                    <div className="flex items-center gap-0">
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-slate-400 mb-2">
+                                                                遺族/配偶者の就労率: <span className="text-sky-400 font-bold">{workIncomeRatio}%</span>
+                                                            </label>
+                                                            <input
+                                                                type="range" min="0" max="100" step="10"
+                                                                value={workIncomeRatio}
+                                                                onChange={(e) => setWorkIncomeRatio(Number(e.target.value))}
+                                                                className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                                                            />
+                                                        </div>
+                                                        <div className="p-0 max-w-md bg-slate-950/60 border border-slate-800 rounded-lg ml-2">
+                                                            <div className="px-[2px] py-0.5">
+                                                                <p className="text-xs text-slate-400 mb-1">調整後の配偶者就労収入（月額）</p>
+                                                            {profile?.basicInfo?.spouseType === 'couple' ? (
+                                                                <p className="text-base font-bold text-sky-400 whitespace-nowrap overflow-x-auto">
+                                                                    夫死亡時（妻）: {profile.basicInfo.annualIncomeWife || profile.basicInfo.avgStdMonthlyWife * 12
+                                                                        ? `${((profile.basicInfo.annualIncomeWife || profile.basicInfo.avgStdMonthlyWife * 12) * (workIncomeRatio / 100) / 12 / 10000).toFixed(1)}万円/月`
+                                                                        : '未設定'} | 妻死亡時（夫）: {profile.basicInfo.annualIncomeHusband || profile.basicInfo.avgStdMonthlyHusband * 12
+                                                                            ? `${((profile.basicInfo.annualIncomeHusband || profile.basicInfo.avgStdMonthlyHusband * 12) * (workIncomeRatio / 100) / 12 / 10000).toFixed(1)}万円/月`
+                                                                            : '未設定'}
+                                                                </p>
+                                                            ) : (
+                                                                <p className="text-base font-bold text-sky-400">
+                                                                    {profile?.basicInfo?.annualIncome || profile?.basicInfo?.avgStdMonthly * 12
+                                                                        ? `${((profile.basicInfo.annualIncome || profile.basicInfo.avgStdMonthly * 12) * (workIncomeRatio / 100) / 12 / 10000).toFixed(1)}万円/月`
                                                                         : '未設定'}
-                                                            </p>
-                                                        ) : (
-                                                            <p className="text-base font-bold text-sky-400">
-                                                                {profile?.basicInfo?.annualIncome || profile?.basicInfo?.avgStdMonthly * 12
-                                                                    ? `${((profile.basicInfo.annualIncome || profile.basicInfo.avgStdMonthly * 12) * (workIncomeRatio / 100) / 12 / 10000).toFixed(1)}万円/月`
-                                                                    : '未設定'}
-                                                            </p>
-                                                        )}
+                                                                </p>
+                                                            )}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1604,10 +1697,10 @@ export default function NecessaryCoveragePage() {
                                 </div>
 
                                 {/* 障害時シナリオ用の条件設定 */}
-                                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 pb-4 shadow-lg mb-6">
+                                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 pb-2 shadow-lg mb-4">
                                     <button
                                         onClick={() => setShowDisabilitySettings((prev) => !prev)}
-                                        className="w-full flex items-center justify-between mb-4"
+                                        className="w-full flex items-center justify-between mb-2"
                                     >
                                         <h2 className="text-lg font-bold flex items-center gap-2">
                                             <span>⚙️</span> 障害時シナリオの条件設定
@@ -1662,57 +1755,106 @@ export default function NecessaryCoveragePage() {
                                         <span>⚠️</span> 懸念点
                                     </h3>
                                     <div className="space-y-3 text-sm text-slate-300 leading-relaxed">
-                                        <p>
-                                            障害時シナリオでは、<strong className="text-amber-400">月収が減少</strong>し、月収の不足額が発生します。しかし、それだけではありません：
-                                        </p>
-                                        
-                                        {/* 現在の生活費と調整後の障害生活費を表示 */}
-                                        <div className="max-w-md grid grid-cols-1 md:grid-cols-2 gap-0 my-2">
-                                            <div className="p-0 bg-slate-950/60 border border-slate-800 rounded-l-xl border-r-0">
-                                                <div className="px-[2px] py-0.5">
-                                                    <p className="text-xs text-slate-400 mb-0.5">現在の生活費（顧客プロフィールより）</p>
-                                                    <p className="text-xl font-bold text-white">
-                                                        {profile.monthlyLivingExpense ? `${(profile.monthlyLivingExpense / 10000).toFixed(1)}万円/月` : '未設定'}
-                                                    </p>
-                                                    <p className="text-xs text-slate-500 mt-0.5">
-                                                        {profile.monthlyLivingExpense ? `年額 ${(profile.monthlyLivingExpense * 12 / 10000).toFixed(0)}万円` : ''}
-                                                    </p>
+                                        {/* 生活費の増加を一番上に配置 */}
+                                        <div>
+                                            <strong className="text-amber-400 text-base">生活費の増加</strong>
+                                            <p className="mt-2">
+                                                障害により、治療費、介護費、リハビリ費用、家事代行費などが発生し、生活費が大幅に増加します。障害生活費率で調整していますが、実際にはさらに増える可能性があります。
+                                            </p>
+                                            
+                                            {/* 現在の生活費と調整後の障害生活費を表示 */}
+                                            <div className="max-w-md grid grid-cols-1 md:grid-cols-2 gap-0 my-3">
+                                                <div className="p-0 bg-slate-950/60 border border-slate-800 rounded-l-xl border-r-0">
+                                                    <div className="px-[2px] py-0.5">
+                                                        <p className="text-xs text-slate-400 mb-0.5">現在の生活費（顧客プロフィールより）</p>
+                                                        <p className="text-xl font-bold text-white">
+                                                            {profile.monthlyLivingExpense ? `${(profile.monthlyLivingExpense / 10000).toFixed(1)}万円/月` : '未設定'}
+                                                        </p>
+                                                        <p className="text-xs text-slate-500 mt-0.5">
+                                                            {profile.monthlyLivingExpense ? `年額 ${(profile.monthlyLivingExpense * 12 / 10000).toFixed(0)}万円` : ''}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="p-0 bg-amber-950/30 border border-amber-800/50 rounded-r-xl border-l-0">
+                                                    <div className="px-[2px] py-0.5">
+                                                        <p className="text-xs text-slate-400 mb-0.5">調整後の障害生活費（月額）</p>
+                                                        <p className="text-xl font-bold text-amber-400">
+                                                            {profile.monthlyLivingExpense
+                                                                ? `${(profile.monthlyLivingExpense * (expenseRatioDisability / 100) / 10000).toFixed(1)}万円/月`
+                                                                : '未設定'}
+                                                        </p>
+                                                        <p className="text-xs text-slate-500 mt-0.5">
+                                                            {profile.monthlyLivingExpense
+                                                                ? `現在の生活費から ${expenseRatioDisability >= 100 ? '+' : ''}${((expenseRatioDisability / 100 - 1) * 100).toFixed(0)}%`
+                                                                : ''}
+                                                        </p>
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="p-0 bg-amber-950/30 border border-amber-800/50 rounded-r-xl border-l-0">
-                                                <div className="px-[2px] py-0.5">
-                                                    <p className="text-xs text-slate-400 mb-0.5">調整後の障害生活費（月額）</p>
-                                                    <p className="text-xl font-bold text-amber-400">
-                                                        {profile.monthlyLivingExpense
-                                                            ? `${(profile.monthlyLivingExpense * (expenseRatioDisability / 100) / 10000).toFixed(1)}万円/月`
-                                                            : '未設定'}
-                                                    </p>
-                                                    <p className="text-xs text-slate-500 mt-0.5">
-                                                        {profile.monthlyLivingExpense
-                                                            ? `現在の生活費から ${expenseRatioDisability >= 100 ? '+' : ''}${((expenseRatioDisability / 100 - 1) * 100).toFixed(0)}%`
-                                                            : ''}
-                                                    </p>
-                                                </div>
+
+                                            <div className="my-4">
+                                                <label className="block text-sm font-medium text-slate-400 mb-2">
+                                                    障害生活費率: <span className="text-amber-400 font-bold">{expenseRatioDisability}%</span>
+                                                </label>
+                                                <input
+                                                    type="range" min="80" max="150" step="5"
+                                                    value={expenseRatioDisability}
+                                                    onChange={(e) => setExpenseRatioDisability(Number(e.target.value))}
+                                                    className="w-1/4 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                                                />
+                                                <p className="text-xs text-slate-500 mt-2">治療・介護費を含めると110〜130%程度が一般値で、介護が長期化するケースではさらに上振れします。</p>
                                             </div>
                                         </div>
 
-                                        <div className="my-4">
-                                            <label className="block text-sm font-medium text-slate-400 mb-2">
-                                                障害生活費率: <span className="text-amber-400 font-bold">{expenseRatioDisability}%</span>
-                                            </label>
-                                            <input
-                                                type="range" min="80" max="150" step="5"
-                                                value={expenseRatioDisability}
-                                                onChange={(e) => setExpenseRatioDisability(Number(e.target.value))}
-                                                className="w-1/4 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
-                                            />
-                                            <p className="text-xs text-slate-500 mt-2">治療・介護費を含めると110〜130%程度が一般値で、介護が長期化するケースではさらに上振れします。</p>
+                                        {/* 厚生年金加入の場合、傷病手当金1.5年分の金額を表示 */}
+                                        {(() => {
+                                            const isCouple = profile.basicInfo.spouseType === 'couple';
+                                            let hasEmployeePension = false;
+                                            let avgStdMonthly = 0;
+                                            
+                                            if (isCouple) {
+                                                // 夫婦の場合、夫または妻が厚生年金に加入しているかチェック
+                                                const husbandHasPension = (profile.basicInfo.monthsHusband || 0) > 0;
+                                                const wifeHasPension = (profile.basicInfo.monthsWife || 0) > 0;
+                                                // どちらかが厚生年金に加入している場合
+                                                if (husbandHasPension || wifeHasPension) {
+                                                    hasEmployeePension = true;
+                                                    // 夫と妻の平均標準報酬月額の平均を計算
+                                                    const husbandAvg = profile.basicInfo.avgStdMonthlyHusband || 0;
+                                                    const wifeAvg = profile.basicInfo.avgStdMonthlyWife || 0;
+                                                    avgStdMonthly = (husbandAvg + wifeAvg) / 2;
+                                                }
+                                            } else {
+                                                // 独身の場合
+                                                hasEmployeePension = profile.basicInfo.hasEmployeePension || (profile.basicInfo.employeePensionMonths || 0) > 0;
+                                                avgStdMonthly = profile.basicInfo.avgStdMonthly || 0;
+                                            }
+                                            
+                                            if (hasEmployeePension && avgStdMonthly > 0) {
+                                                // 傷病手当金の計算
+                                                // 標準報酬月額の2/3が1日あたりの金額、最長1.5年間（18ヶ月）支給
+                                                const dailyAllowance = avgStdMonthly * (2 / 3) / 30; // 1日あたり
+                                                const allowance1_5Years = dailyAllowance * 30 * 18; // 1.5年分（18ヶ月）
+                                                const monthlyAllowance = allowance1_5Years / 18; // 月額
+                                                
+                                                return (
+                                                    <div className="mt-4 p-3 bg-amber-950/30 border border-amber-800/50 rounded-lg">
+                                                        <p className="text-sm text-amber-300">
+                                                            <strong className="text-amber-400">厚生年金加入の場合</strong>、傷病手当金が最長1.5年間（約<strong className="text-white">{(monthlyAllowance / 10000).toFixed(1)}万円/月</strong>）支給される可能性があります。
+                                                        </p>
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        })()}
+
+                                        <div className="mt-4">
+                                            <strong className="text-amber-400 text-base">月収の不足</strong>
+                                            <p className="mt-2">
+                                                障害により就労不能または就労制限が発生し、月収が減少します。この不足額はシミュレーションで計算されています。
+                                            </p>
                                         </div>
 
-                                        <ul className="space-y-2 pl-4 list-disc">
-                                            <li><strong className="text-amber-400">月収の不足</strong>：障害により就労不能または就労制限が発生し、月収が減少します。この不足額はシミュレーションで計算されています。</li>
-                                            <li><strong className="text-amber-400">生活費の増加</strong>：治療費、介護費、リハビリ費用、家事代行費などが発生し、生活費が大幅に増加します。障害生活費率で調整していますが、実際にはさらに増える可能性があります。</li>
-                                        </ul>
                                         <p className="mt-4 text-amber-300 font-semibold">
                                             これらの要因を考慮すると、<strong className="text-white">月収の不足額に加えて、生活費の増加分も考慮する必要があり</strong>、実際に必要な保障額は<strong className="text-white">さらに大きくなる可能性が高い</strong>ことをご理解ください。
                                         </p>
@@ -1763,57 +1905,106 @@ export default function NecessaryCoveragePage() {
                                         <span>⚠️</span> 懸念点
                                     </h3>
                                     <div className="space-y-3 text-sm text-slate-300 leading-relaxed">
-                                        <p>
-                                            障害時シナリオでは、<strong className="text-amber-400">月収が減少</strong>し、月収の不足額が発生します。しかし、それだけではありません：
-                                        </p>
-                                        
-                                        {/* 現在の生活費と調整後の障害生活費を表示 */}
-                                        <div className="max-w-md grid grid-cols-1 md:grid-cols-2 gap-0 my-2">
-                                            <div className="p-0 bg-slate-950/60 border border-slate-800 rounded-l-xl border-r-0">
-                                                <div className="px-[2px] py-0.5">
-                                                    <p className="text-xs text-slate-400 mb-0.5">現在の生活費（顧客プロフィールより）</p>
-                                                    <p className="text-xl font-bold text-white">
-                                                        {profile.monthlyLivingExpense ? `${(profile.monthlyLivingExpense / 10000).toFixed(1)}万円/月` : '未設定'}
-                                                    </p>
-                                                    <p className="text-xs text-slate-500 mt-0.5">
-                                                        {profile.monthlyLivingExpense ? `年額 ${(profile.monthlyLivingExpense * 12 / 10000).toFixed(0)}万円` : ''}
-                                                    </p>
+                                        {/* 生活費の増加を一番上に配置 */}
+                                        <div>
+                                            <strong className="text-amber-400 text-base">生活費の増加</strong>
+                                            <p className="mt-2">
+                                                障害により、治療費、介護費、リハビリ費用、家事代行費などが発生し、生活費が大幅に増加します。障害生活費率で調整していますが、実際にはさらに増える可能性があります。
+                                            </p>
+                                            
+                                            {/* 現在の生活費と調整後の障害生活費を表示 */}
+                                            <div className="max-w-md grid grid-cols-1 md:grid-cols-2 gap-0 my-3">
+                                                <div className="p-0 bg-slate-950/60 border border-slate-800 rounded-l-xl border-r-0">
+                                                    <div className="px-[2px] py-0.5">
+                                                        <p className="text-xs text-slate-400 mb-0.5">現在の生活費（顧客プロフィールより）</p>
+                                                        <p className="text-xl font-bold text-white">
+                                                            {profile.monthlyLivingExpense ? `${(profile.monthlyLivingExpense / 10000).toFixed(1)}万円/月` : '未設定'}
+                                                        </p>
+                                                        <p className="text-xs text-slate-500 mt-0.5">
+                                                            {profile.monthlyLivingExpense ? `年額 ${(profile.monthlyLivingExpense * 12 / 10000).toFixed(0)}万円` : ''}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="p-0 bg-amber-950/30 border border-amber-800/50 rounded-r-xl border-l-0">
+                                                    <div className="px-[2px] py-0.5">
+                                                        <p className="text-xs text-slate-400 mb-0.5">調整後の障害生活費（月額）</p>
+                                                        <p className="text-xl font-bold text-amber-400">
+                                                            {profile.monthlyLivingExpense
+                                                                ? `${(profile.monthlyLivingExpense * (expenseRatioDisability / 100) / 10000).toFixed(1)}万円/月`
+                                                                : '未設定'}
+                                                        </p>
+                                                        <p className="text-xs text-slate-500 mt-0.5">
+                                                            {profile.monthlyLivingExpense
+                                                                ? `現在の生活費から ${expenseRatioDisability >= 100 ? '+' : ''}${((expenseRatioDisability / 100 - 1) * 100).toFixed(0)}%`
+                                                                : ''}
+                                                        </p>
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="p-0 bg-amber-950/30 border border-amber-800/50 rounded-r-xl border-l-0">
-                                                <div className="px-[2px] py-0.5">
-                                                    <p className="text-xs text-slate-400 mb-0.5">調整後の障害生活費（月額）</p>
-                                                    <p className="text-xl font-bold text-amber-400">
-                                                        {profile.monthlyLivingExpense
-                                                            ? `${(profile.monthlyLivingExpense * (expenseRatioDisability / 100) / 10000).toFixed(1)}万円/月`
-                                                            : '未設定'}
-                                                    </p>
-                                                    <p className="text-xs text-slate-500 mt-0.5">
-                                                        {profile.monthlyLivingExpense
-                                                            ? `現在の生活費から ${expenseRatioDisability >= 100 ? '+' : ''}${((expenseRatioDisability / 100 - 1) * 100).toFixed(0)}%`
-                                                            : ''}
-                                                    </p>
-                                                </div>
+
+                                            <div className="my-4">
+                                                <label className="block text-sm font-medium text-slate-400 mb-2">
+                                                    障害生活費率: <span className="text-amber-400 font-bold">{expenseRatioDisability}%</span>
+                                                </label>
+                                                <input
+                                                    type="range" min="80" max="150" step="5"
+                                                    value={expenseRatioDisability}
+                                                    onChange={(e) => setExpenseRatioDisability(Number(e.target.value))}
+                                                    className="w-1/4 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                                                />
+                                                <p className="text-xs text-slate-500 mt-2">治療・介護費を含めると110〜130%程度が一般値で、介護が長期化するケースではさらに上振れします。</p>
                                             </div>
                                         </div>
 
-                                        <div className="my-4">
-                                            <label className="block text-sm font-medium text-slate-400 mb-2">
-                                                障害生活費率: <span className="text-amber-400 font-bold">{expenseRatioDisability}%</span>
-                                            </label>
-                                            <input
-                                                type="range" min="80" max="150" step="5"
-                                                value={expenseRatioDisability}
-                                                onChange={(e) => setExpenseRatioDisability(Number(e.target.value))}
-                                                className="w-1/4 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
-                                            />
-                                            <p className="text-xs text-slate-500 mt-2">治療・介護費を含めると110〜130%程度が一般値で、介護が長期化するケースではさらに上振れします。</p>
+                                        {/* 厚生年金加入の場合、傷病手当金1.5年分の金額を表示 */}
+                                        {(() => {
+                                            const isCouple = profile.basicInfo.spouseType === 'couple';
+                                            let hasEmployeePension = false;
+                                            let avgStdMonthly = 0;
+                                            
+                                            if (isCouple) {
+                                                // 夫婦の場合、夫または妻が厚生年金に加入しているかチェック
+                                                const husbandHasPension = (profile.basicInfo.monthsHusband || 0) > 0;
+                                                const wifeHasPension = (profile.basicInfo.monthsWife || 0) > 0;
+                                                // どちらかが厚生年金に加入している場合
+                                                if (husbandHasPension || wifeHasPension) {
+                                                    hasEmployeePension = true;
+                                                    // 夫と妻の平均標準報酬月額の平均を計算
+                                                    const husbandAvg = profile.basicInfo.avgStdMonthlyHusband || 0;
+                                                    const wifeAvg = profile.basicInfo.avgStdMonthlyWife || 0;
+                                                    avgStdMonthly = (husbandAvg + wifeAvg) / 2;
+                                                }
+                                            } else {
+                                                // 独身の場合
+                                                hasEmployeePension = profile.basicInfo.hasEmployeePension || (profile.basicInfo.employeePensionMonths || 0) > 0;
+                                                avgStdMonthly = profile.basicInfo.avgStdMonthly || 0;
+                                            }
+                                            
+                                            if (hasEmployeePension && avgStdMonthly > 0) {
+                                                // 傷病手当金の計算
+                                                // 標準報酬月額の2/3が1日あたりの金額、最長1.5年間（18ヶ月）支給
+                                                const dailyAllowance = avgStdMonthly * (2 / 3) / 30; // 1日あたり
+                                                const allowance1_5Years = dailyAllowance * 30 * 18; // 1.5年分（18ヶ月）
+                                                const monthlyAllowance = allowance1_5Years / 18; // 月額
+                                                
+                                                return (
+                                                    <div className="mt-4 p-3 bg-amber-950/30 border border-amber-800/50 rounded-lg">
+                                                        <p className="text-sm text-amber-300">
+                                                            <strong className="text-amber-400">厚生年金加入の場合</strong>、傷病手当金が最長1.5年間（約<strong className="text-white">{(monthlyAllowance / 10000).toFixed(1)}万円/月</strong>）支給される可能性があります。
+                                                        </p>
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        })()}
+
+                                        <div className="mt-4">
+                                            <strong className="text-amber-400 text-base">月収の不足</strong>
+                                            <p className="mt-2">
+                                                障害により就労不能または就労制限が発生し、月収が減少します。この不足額はシミュレーションで計算されています。
+                                            </p>
                                         </div>
 
-                                        <ul className="space-y-2 pl-4 list-disc">
-                                            <li><strong className="text-amber-400">月収の不足</strong>：障害により就労不能または就労制限が発生し、月収が減少します。この不足額はシミュレーションで計算されています。</li>
-                                            <li><strong className="text-amber-400">生活費の増加</strong>：治療費、介護費、リハビリ費用、家事代行費などが発生し、生活費が大幅に増加します。障害生活費率で調整していますが、実際にはさらに増える可能性があります。</li>
-                                        </ul>
                                         <p className="mt-4 text-amber-300 font-semibold">
                                             これらの要因を考慮すると、<strong className="text-white">月収の不足額に加えて、生活費の増加分も考慮する必要があり</strong>、実際に必要な保障額は<strong className="text-white">さらに大きくなる可能性が高い</strong>ことをご理解ください。
                                         </p>
@@ -1848,6 +2039,8 @@ function ScenarioSection({
     setDisplayPeriodModes,
     customEndAges,
     setCustomEndAges,
+    expenseRatioSurvivor,
+    setExpenseRatioSurvivor,
 }: {
     result: ScenarioResult;
     profile: CustomerProfile;
@@ -1859,6 +2052,8 @@ function ScenarioSection({
     setDisplayPeriodModes: React.Dispatch<React.SetStateAction<Record<string, 'child19' | 'child23' | 'retirement' | 'custom'>>>;
     customEndAges: Record<string, number>;
     setCustomEndAges: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+    expenseRatioSurvivor?: number;
+    setExpenseRatioSurvivor?: React.Dispatch<React.SetStateAction<number>>;
 }) {
     const [isPeriodCardOpen, setIsPeriodCardOpen] = useState(false);
     const displayPeriodMode = displayPeriodModes[scenarioKey] || 'child23';
@@ -1869,6 +2064,7 @@ function ScenarioSection({
     
     // トグルボタンの状態管理（各シナリオごとに独立）
     const [showAllowancesToggle, setShowAllowancesToggle] = useState(true);
+    const [showGrayAreaCalculation, setShowGrayAreaCalculation] = useState(false);
     
     // 児童手当・児童扶養手当の合計額を計算（最初のデータから取得）
     const firstDataEntry = result.data.length > 0 ? result.data[0] : null;
@@ -2021,9 +2217,81 @@ function ScenarioSection({
                             )}
                         </>
                     )}
-                    <div className="flex items-center gap-1.5">
-                        <span className="w-3 h-3 rounded-full bg-slate-500/30 border border-slate-400/50"></span>
-                        <span className="text-slate-400">浮く支出（住宅ローン・故人の生活費）: {(result.data.length > 0 ? (result.data[0].grayArea || 0) / 120000 : 0).toFixed(1)}万円</span>
+                    <div className="flex flex-col gap-1.5">
+                        <button
+                            onClick={() => setShowGrayAreaCalculation((prev) => !prev)}
+                            className="flex items-center gap-1.5 text-left"
+                        >
+                            <span className="w-3 h-3 rounded-full bg-slate-500/30 border border-slate-400/50"></span>
+                            <span className="text-slate-400 flex items-center gap-1">
+                                浮く支出（住宅ローン・故人の生活費）: {(result.data.length > 0 ? (result.data[0].grayArea || 0) / 120000 : 0).toFixed(1)}万円
+                                <span className={`text-xs transition-transform ${showGrayAreaCalculation ? 'rotate-180' : ''}`}>▼</span>
+                            </span>
+                        </button>
+                        {showGrayAreaCalculation && result.category === 'survivor' && (() => {
+                            // 遺族シナリオの場合のみ表示
+                            const isHusbandScenario = result.title.includes('夫死亡');
+                            const isWifeScenario = result.title.includes('妻死亡');
+                            const targetPerson = isHusbandScenario ? 'husband' : (isWifeScenario ? 'wife' : 'single');
+                            
+                            // ダンシンのチェック
+                            const hasDanshin = profile.danshinHolder && (
+                                (targetPerson === 'husband' && profile.danshinHolder.includes('husband')) ||
+                                (targetPerson === 'wife' && profile.danshinHolder.includes('wife'))
+                            );
+                            
+                            // 住宅ローン月額
+                            const housingLoanMonthly = (profile.details?.housingLoan as number) || 0;
+                            const housingLoanAnnual = housingLoanMonthly * 12;
+                            
+                            // 現在の生活費
+                            const currentExpenseMonthly = profile.monthlyLivingExpense || 0;
+                            const currentExpenseAnnual = currentExpenseMonthly * 12;
+                            
+                            // 生活費から住宅ローンを引いた残り
+                            const livingExpenseBase = currentExpenseAnnual - (hasDanshin ? housingLoanAnnual : 0);
+                            const survivorRatio = (expenseRatioSurvivor || 80) / 100;
+                            const deceasedLivingExpense = livingExpenseBase * (1 - survivorRatio);
+                            
+                            return (
+                                <div className="ml-4 mt-2 p-3 bg-slate-950/60 border border-slate-800 rounded-lg text-xs text-slate-300 space-y-2">
+                                    <div className="font-semibold text-slate-200">浮く支出の計算方法</div>
+                                    <div className="space-y-2 pl-2">
+                                        {hasDanshin && (
+                                            <div>
+                                                <div>1. 住宅ローン（団信加入者の場合のみ浮く支出に含める）: {housingLoanMonthly > 0 ? `${(housingLoanMonthly / 10000).toFixed(1)}万円/月` : 'なし'}</div>
+                                            </div>
+                                        )}
+                                        <div>
+                                            <div>2. 生活費から住宅ローンを引いた残りの{100 - (expenseRatioSurvivor || 80)}%が浮く支出</div>
+                                            <div className="text-slate-400 text-[11px] pl-2 mt-1">
+                                                現在の生活費: {currentExpenseMonthly > 0 ? `${(currentExpenseMonthly / 10000).toFixed(1)}万円/月` : '未設定'}
+                                                {hasDanshin && housingLoanMonthly > 0 && (
+                                                    <>（住宅ローン: {housingLoanMonthly > 0 ? `${(housingLoanMonthly / 10000).toFixed(1)}万円/月` : 'なし'}を控除）</>
+                                                )}
+                                            </div>
+                                            {expenseRatioSurvivor !== undefined && setExpenseRatioSurvivor && (
+                                                <div className="mt-2">
+                                                    <label className="block text-xs text-slate-400 mb-1">
+                                                        遺族の生活費率: <span className="text-emerald-400 font-bold">{expenseRatioSurvivor}%</span>
+                                                    </label>
+                                                    <input
+                                                        type="range" min="50" max="100" step="5"
+                                                        value={expenseRatioSurvivor}
+                                                        onChange={(e) => setExpenseRatioSurvivor(Number(e.target.value))}
+                                                        className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                                                    />
+                                                </div>
+                                            )}
+                                            <div className="text-slate-400 text-[11px] pl-2 mt-1">
+                                                計算式: ({currentExpenseMonthly > 0 ? `${(currentExpenseMonthly / 10000).toFixed(1)}万円` : '現在の生活費'}{hasDanshin && housingLoanMonthly > 0 ? ` - ${(housingLoanMonthly / 10000).toFixed(1)}万円` : ''}) × {100 - (expenseRatioSurvivor || 80)}% = {deceasedLivingExpense > 0 ? `${(deceasedLivingExpense / 12 / 10000).toFixed(1)}万円/月` : '0万円/月'}
+                                            </div>
+                                        </div>
+                                        <div>3. 浮く支出 = {hasDanshin && housingLoanMonthly > 0 ? `住宅ローン(${(housingLoanMonthly / 10000).toFixed(1)}万円/月) + ` : ''}生活費削減分({(deceasedLivingExpense / 12 / 10000).toFixed(1)}万円/月) = {((hasDanshin ? housingLoanMonthly : 0) + deceasedLivingExpense / 12) > 0 ? `${(((hasDanshin ? housingLoanMonthly : 0) + deceasedLivingExpense / 12) / 10000).toFixed(1)}万円/月` : '0万円/月'}</div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
                     </div>
                     <div className="flex items-center gap-1.5">
                         <span className="w-3 h-3 rounded-full bg-rose-500/80 border border-rose-400"></span>
