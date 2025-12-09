@@ -81,6 +81,7 @@ type ScenarioResult = {
     category: 'survivor' | 'disability';
     activeMonths: number;
     targetActiveTotal: number;
+    funeralCost: number; // 葬儀代（死亡時シナリオのみ）
 };
 
 const SAVINGS_OPTIONS_MAN = Array.from({ length: 101 }, (_, i) => i * 50); // 0〜5000万円を50万円刻み
@@ -876,14 +877,16 @@ export default function NecessaryCoveragePage() {
     const [workIncomeRatio, setWorkIncomeRatio] = useState(90); // デフォルト90%（共働きで就労継続を想定）
     const [currentSavingsMan, setCurrentSavingsMan] = useState(0); // 既存の貯蓄・保険（万円）
     const [showSavingsInfo, setShowSavingsInfo] = useState(false);
+    const [showDeathSettings, setShowDeathSettings] = useState(false); // 死亡時シナリオの条件設定のアコーディオン
+    const [funeralCost, setFuneralCost] = useState<2000000 | 750000 | 0>(2000000); // 葬儀代：一般的な葬儀200万円、家族葬75万円、0は選択なし
     // 各シナリオごとのグラフ表示期間設定
     const [displayPeriodModes, setDisplayPeriodModes] = useState<Record<string, 'child19' | 'child23' | 'retirement' | 'custom'>>({
         husbandDeath: 'child23',
         wifeDeath: 'child23',
-        husbandDisability: 'child23',
-        wifeDisability: 'child23',
+        husbandDisability: 'retirement',
+        wifeDisability: 'retirement',
         singleDeath: 'child23',
-        singleDisability: 'child23',
+        singleDisability: 'retirement',
     });
     const [customEndAges, setCustomEndAges] = useState<Record<string, number>>({
         husbandDeath: 65,
@@ -1197,7 +1200,11 @@ export default function NecessaryCoveragePage() {
                 ? Math.min(sicknessAllowanceTotal, weightedShortfallTotal)
                 : 0;
             // 最終保障総額の計算から傷病手当金の控除を削除：貯蓄のみを控除
-            const savingsApplied = Math.min(currentSavingsYen, weightedShortfallTotal);
+            // 死亡時シナリオの場合、葬儀代を貯蓄から控除（葬儀代が選択されている場合のみ）
+            const effectiveSavings = type === 'survivor' && funeralCost > 0
+                ? Math.max(0, currentSavingsYen - funeralCost)
+                : currentSavingsYen;
+            const savingsApplied = Math.min(effectiveSavings, weightedShortfallTotal);
 
             const distributeAllowance = (total: number) =>
                 weightedEntries.map((item) => (weightedShortfallTotal > 0 ? (item.weight / weightedShortfallTotal) * total : 0));
@@ -1221,7 +1228,8 @@ export default function NecessaryCoveragePage() {
             const targetActiveTotal = data.reduce((sum, entry) => sum + entry.totalTarget * (entry.monthsActive / 12), 0);
             totalShortfall = weightedShortfallTotal;
             // 最終保障総額 = 総不足額 - 既存貯蓄・保険総額（傷病手当金の控除は削除）
-            const netShortfall = Math.max(0, weightedShortfallTotal - savingsApplied);
+            // 死亡時シナリオの場合、葬儀代を不足額に加算（葬儀代が選択されている場合のみ）
+            const netShortfall = Math.max(0, weightedShortfallTotal - savingsApplied) + (type === 'survivor' && funeralCost > 0 ? funeralCost : 0);
             const activeShortfalls = data.filter(d => d.monthsActive > 0).map(d => d.shortfall / 12);
             monthlyShortfallMax = activeShortfalls.length ? Math.max(...activeShortfalls) : 0;
 
@@ -1244,7 +1252,8 @@ export default function NecessaryCoveragePage() {
                 hasShortfall: netShortfall > 10000,
                 category: type,
                 activeMonths: activeMonthsSum,
-                targetActiveTotal
+                targetActiveTotal,
+                funeralCost: type === 'survivor' && funeralCost > 0 ? funeralCost : 0 // 死亡時シナリオのみ葬儀代を記録（選択されている場合のみ）
             };
         };
 
@@ -1262,7 +1271,7 @@ export default function NecessaryCoveragePage() {
             singleDisability: calculateScenario('disability', 'single', getEndAge('singleDisability')),
         });
 
-    }, [profile, expenseRatioSurvivor, expenseRatioDisability, workIncomeRatio, currentSavingsYen, sicknessAllowanceTotal, customEndAges]);
+    }, [profile, expenseRatioSurvivor, expenseRatioDisability, workIncomeRatio, currentSavingsYen, sicknessAllowanceTotal, customEndAges, funeralCost]);
 
     if (!profile) {
         return (
@@ -1311,164 +1320,78 @@ export default function NecessaryCoveragePage() {
             </div>
 
             <div className="w-full max-w-[1920px] mx-auto px-6 py-10">
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-10 shadow-lg">
-                    <h2 className="text-lg font-bold mb-6 flex items-center gap-2">
-                        <span>⚙️</span> シミュレーション条件設定
-                    </h2>
-
-                    {/* 現在の生活費を表示 */}
-                    <div className="mb-6 p-4 bg-slate-950/60 border border-slate-800 rounded-xl">
-                        <div className="flex items-center justify-between">
-                        <div>
-                                <p className="text-xs text-slate-400 mb-1">現在の生活費（顧客プロフィールより）</p>
-                                <p className="text-2xl font-bold text-white">
-                                    {profile.monthlyLivingExpense ? `${(profile.monthlyLivingExpense / 10000).toFixed(1)}万円/月` : '未設定'}
-                                </p>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-xs text-slate-400 mb-1">年額換算</p>
-                                <p className="text-lg font-semibold text-slate-300">
-                                    {profile.monthlyLivingExpense ? `${(profile.monthlyLivingExpense * 12 / 10000).toFixed(0)}万円/年` : '未設定'}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-400 mb-2">
-                                遺族生活費率: <span className="text-emerald-400 font-bold">{expenseRatioSurvivor}%</span>
-                            </label>
-                            <input
-                                type="range" min="50" max="100" step="5"
-                                value={expenseRatioSurvivor}
-                                onChange={(e) => setExpenseRatioSurvivor(Number(e.target.value))}
-                                className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                            />
-                            <div className="mt-3 p-3 bg-slate-950/60 border border-slate-800 rounded-lg">
-                                <p className="text-xs text-slate-400 mb-1">調整後の遺族生活費（月額）</p>
-                                <p className="text-xl font-bold text-emerald-400">
-                                    {profile.monthlyLivingExpense
-                                        ? `${(profile.monthlyLivingExpense * (expenseRatioSurvivor / 100) / 10000).toFixed(1)}万円/月`
-                                        : '未設定'}
-                                </p>
-                                <p className="text-xs text-slate-500 mt-1">
-                                    {profile.monthlyLivingExpense
-                                        ? `現在の生活費から ${expenseRatioSurvivor >= 100 ? '+' : ''}${((expenseRatioSurvivor / 100 - 1) * 100).toFixed(0)}%`
-                                        : ''}
-                                </p>
-                        </div>
-                            <p className="text-xs text-slate-500 mt-2">一般的には60〜80%で設定されることが多く、共働き世帯の平均は約70%です。</p>
-                            </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-slate-400 mb-2">
-                                障害生活費率: <span className="text-amber-400 font-bold">{expenseRatioDisability}%</span>
-                            </label>
-                            <input
-                                type="range" min="80" max="150" step="5"
-                                value={expenseRatioDisability}
-                                onChange={(e) => setExpenseRatioDisability(Number(e.target.value))}
-                                className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
-                            />
-                            <div className="mt-3 p-3 bg-slate-950/60 border border-slate-800 rounded-lg">
-                                <p className="text-xs text-slate-400 mb-1">調整後の障害生活費（月額）</p>
-                                <p className="text-xl font-bold text-amber-400">
-                                    {profile.monthlyLivingExpense
-                                        ? `${(profile.monthlyLivingExpense * (expenseRatioDisability / 100) / 10000).toFixed(1)}万円/月`
-                                        : '未設定'}
-                                </p>
-                                <p className="text-xs text-slate-500 mt-1">
-                                    {profile.monthlyLivingExpense
-                                        ? `現在の生活費から ${expenseRatioDisability >= 100 ? '+' : ''}${((expenseRatioDisability / 100 - 1) * 100).toFixed(0)}%`
-                                        : ''}
-                                </p>
-                        </div>
-                            <p className="text-xs text-slate-500 mt-2">治療・介護費を含めると110〜130%程度が一般値で、介護が長期化するケースではさらに上振れします。</p>
-                </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-slate-400 mb-2">
-                                遺族/配偶者の就労率: <span className="text-sky-400 font-bold">{workIncomeRatio}%</span>
-                            </label>
-                            <input
-                                type="range" min="0" max="100" step="10"
-                                value={workIncomeRatio}
-                                onChange={(e) => setWorkIncomeRatio(Number(e.target.value))}
-                                className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
-                            />
-                            <div className="mt-3 p-3 bg-slate-950/60 border border-slate-800 rounded-lg">
-                                <p className="text-xs text-slate-400 mb-1">調整後の配偶者就労収入（月額）</p>
-                                {profile?.basicInfo?.spouseType === 'couple' ? (
-                                    <p className="text-base font-bold text-sky-400 whitespace-nowrap overflow-x-auto">
-                                        夫死亡時（妻）: {profile.basicInfo.annualIncomeWife || profile.basicInfo.avgStdMonthlyWife * 12
-                                            ? `${((profile.basicInfo.annualIncomeWife || profile.basicInfo.avgStdMonthlyWife * 12) * (workIncomeRatio / 100) / 12 / 10000).toFixed(1)}万円/月`
-                                            : '未設定'} | 妻死亡時（夫）: {profile.basicInfo.annualIncomeHusband || profile.basicInfo.avgStdMonthlyHusband * 12
-                                                ? `${((profile.basicInfo.annualIncomeHusband || profile.basicInfo.avgStdMonthlyHusband * 12) * (workIncomeRatio / 100) / 12 / 10000).toFixed(1)}万円/月`
-                                                : '未設定'}
-                                    </p>
-                                ) : (
-                                    <p className="text-xl font-bold text-sky-400">
-                                        {profile?.basicInfo?.annualIncome || profile?.basicInfo?.avgStdMonthly * 12
-                                            ? `${((profile.basicInfo.annualIncome || profile.basicInfo.avgStdMonthly * 12) * (workIncomeRatio / 100) / 12 / 10000).toFixed(1)}万円/月`
-                                            : '未設定'}
-                                    </p>
-                                )}
-                                <p className="text-xs text-slate-500 mt-1">
-                                    就労率 {workIncomeRatio}% を適用
-                                </p>
-                                        </div>
-                            <p className="text-xs text-slate-500 mt-2">共働き世帯では40〜60%が現実的なラインとされ、デフォルトの90%は「現状維持に近い働き方」を想定しています。</p>
-                                        </div>
-
-                        <div className="md:col-span-3 space-y-3">
-                            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                                <label className="block text-sm font-medium text-slate-400">現在の貯蓄・既存保険総額</label>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowSavingsInfo((prev) => !prev)}
-                                    className="inline-flex items-center gap-2 text-sm font-semibold text-amber-300 hover:text-amber-200 transition-colors"
-                                >
-                                    <span role="img" aria-label="hint">💡</span>
-                                    入力しなくても問題ありません。
-                                    <span className={`text-xs transition-transform ${showSavingsInfo ? 'rotate-180' : ''}`}>⌃</span>
-                                </button>
-                                        </div>
-                            <div className="relative">
-                                <select
-                                    value={currentSavingsMan}
-                                    onChange={(e) => setCurrentSavingsMan(Number(e.target.value))}
-                                    className="w-full rounded-xl px-4 py-3 bg-slate-800/50 border border-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-slate-100 font-mono text-lg appearance-none"
-                                >
-                                    {SAVINGS_OPTIONS_MAN.map((option) => (
-                                        <option key={option} value={option}>
-                                            {option.toLocaleString()}万円
-                                        </option>
-                                    ))}
-                                </select>
-                                <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-slate-500">
-                                    ▼
-                                </span>
-                                        </div>
-                            {showSavingsInfo && (
-                                <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 text-xs leading-relaxed space-y-2 animate-fade-in">
-                                    <p className="text-slate-300 font-semibold">【現在の貯蓄・既存保険総額】について</p>
-                                    <p className="text-slate-400">この項目は、お客様の<strong className="text-white font-semibold">「今の備え（貯金や学資保険、既存の死亡保険など）」</strong>をシミュレーションに反映させ、<strong className="text-emerald-300">本当に必要な保険額</strong>を正確に計算するためにあります。</p>
-                                    <p className="text-slate-400"><strong className="text-white">入力しなくても問題ありません。</strong></p>
-                                    <ul className="text-slate-400 space-y-1 pl-4 list-disc">
-                                        <li>入力しない場合（0万円のまま）は、「貯蓄が全くない状態で、公的年金とご家族の収入だけで生活した場合の<strong className="text-rose-300">最大の不足額</strong>」として算出します。</li>
-                                        <li>FPとしての責任として、お客様が<strong className="text-white">「保険で確保したい」</strong>金額を優先し、あえて貯蓄を入れずに計算することも可能です。後ほどFPにご相談の際に、貯蓄の使い道を一緒に検討します。</li>
-                                    </ul>
-                            </div>
-                        )}
-                                        </div>
-                                        </div>
-                                    </div>
-
                 {scenarios && (
                     <div className="space-y-16">
                         {profile.basicInfo.spouseType === 'couple' ? (
                             <>
+                                {/* 死亡時シナリオ用の条件設定 */}
+                                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 pb-4 shadow-lg mb-6">
+                                    <button
+                                        onClick={() => setShowDeathSettings((prev) => !prev)}
+                                        className="w-full flex items-center justify-between mb-4"
+                                    >
+                                        <h2 className="text-lg font-bold flex items-center gap-2">
+                                            <span>⚙️</span> 死亡時シナリオの条件設定
+                                        </h2>
+                                        <span className={`text-slate-400 transition-transform ${showDeathSettings ? 'rotate-180' : ''}`}>
+                                            ⌃
+                                        </span>
+                                    </button>
+                                    
+                                    {showDeathSettings && (
+                                        <div>
+                                            {/* 説明カード */}
+                                            <div className="mb-6 p-4 bg-emerald-950/30 border border-emerald-800/50 rounded-xl">
+                                                <p className="text-sm text-slate-300 leading-relaxed">
+                                                    <strong className="text-emerald-400">死亡時シナリオについて：</strong> このシミュレーションでは、条件設定の<strong className="text-white">貯蓄のみ</strong>が考慮されます。ただし、実際には<strong className="text-rose-400">葬式代などで貯蓄がなくなる可能性が高い</strong>こと、また<strong className="text-rose-400">パートナーの就労率が下がる可能性</strong>があることをご理解ください。
+                                                </p>
+                                            </div>
+
+                                            <div className="space-y-3">
+                                                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                                                    <label className="block text-sm font-medium text-slate-400">現在の貯蓄・既存保険総額</label>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowSavingsInfo((prev) => !prev)}
+                                                        className="inline-flex items-center gap-2 text-sm font-semibold text-amber-300 hover:text-amber-200 transition-colors"
+                                                    >
+                                                        <span role="img" aria-label="hint">💡</span>
+                                                        入力しなくても問題ありません。
+                                                        <span className={`text-xs transition-transform ${showSavingsInfo ? 'rotate-180' : ''}`}>⌃</span>
+                                                    </button>
+                                                </div>
+                                                <div className="relative">
+                                                    <select
+                                                        value={currentSavingsMan}
+                                                        onChange={(e) => setCurrentSavingsMan(Number(e.target.value))}
+                                                        className="w-full rounded-xl px-4 py-3 bg-slate-800/50 border border-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-slate-100 font-mono text-lg appearance-none"
+                                                    >
+                                                        {SAVINGS_OPTIONS_MAN.map((option) => (
+                                                            <option key={option} value={option}>
+                                                                {option.toLocaleString()}万円
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-slate-500">
+                                                        ▼
+                                                    </span>
+                                                </div>
+                                                {showSavingsInfo && (
+                                                    <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 text-xs leading-relaxed space-y-2 animate-fade-in">
+                                                        <p className="text-slate-300 font-semibold">【現在の貯蓄・既存保険総額】について</p>
+                                                        <p className="text-slate-400">この項目は、お客様の<strong className="text-white font-semibold">「今の備え（貯金や学資保険、既存の死亡保険など）」</strong>をシミュレーションに反映させ、<strong className="text-emerald-300">本当に必要な保険額</strong>を正確に計算するためにあります。</p>
+                                                        <p className="text-slate-400"><strong className="text-white">入力しなくても問題ありません。</strong></p>
+                                                        <ul className="text-slate-400 space-y-1 pl-4 list-disc">
+                                                            <li>入力しない場合（0万円のまま）は、「貯蓄が全くない状態で、公的年金とご家族の収入だけで生活した場合の<strong className="text-rose-300">最大の不足額</strong>」として算出します。</li>
+                                                            <li>FPとしての責任として、お客様が<strong className="text-white">「保険で確保したい」</strong>金額を優先し、あえて貯蓄を入れずに計算することも可能です。後ほどFPにご相談の際に、貯蓄の使い道を一緒に検討します。</li>
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
                                 {/* 死亡シナリオ：2カラムで横並び */}
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                     <div className="w-full">
@@ -1500,6 +1423,174 @@ export default function NecessaryCoveragePage() {
                                         />
                                     </div>
                                 </div>
+
+                                {/* 死亡時シナリオの懸念点カード */}
+                                <div className="bg-rose-950/20 border border-rose-800/50 rounded-2xl p-6 shadow-lg">
+                                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-rose-300">
+                                        <span>⚠️</span> 懸念点
+                                    </h3>
+                                    <div className="space-y-3 text-sm text-slate-300 leading-relaxed">
+                                        <p>
+                                            上記の不足額は、このように算出されていますが、<strong className="text-rose-400">パートナーが亡くなると以下の要因により、実際の不足額がさらに増える可能性が高い</strong>ことをご理解ください：
+                                        </p>
+                                        <ul className="space-y-2 pl-4 list-disc">
+                                            <li>
+                                                <strong className="text-rose-400">葬式代で貯蓄が減る可能性</strong>：葬儀代と火葬式の費用がかかります。
+                                                <div className="mt-2 ml-4 space-y-2">
+                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={funeralCost === 2000000}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    setFuneralCost(2000000);
+                                                                } else {
+                                                                    setFuneralCost(0);
+                                                                }
+                                                            }}
+                                                            className="w-4 h-4 text-rose-500 bg-slate-800 border-slate-700 rounded focus:ring-rose-500 focus:ring-2"
+                                                        />
+                                                        <span className="text-xs text-slate-400">
+                                                            一般的な葬儀（葬儀代＋火葬式）の平均相場：<strong className="text-rose-300">約150万円〜300万円</strong>（平均：225万円）→ 中間値<strong className="text-rose-300">200万円</strong>を保障に追加
+                                                        </span>
+                                                    </label>
+                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={funeralCost === 750000}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    setFuneralCost(750000);
+                                                                } else {
+                                                                    setFuneralCost(0);
+                                                                }
+                                                            }}
+                                                            className="w-4 h-4 text-rose-500 bg-slate-800 border-slate-700 rounded focus:ring-rose-500 focus:ring-2"
+                                                        />
+                                                        <span className="text-xs text-slate-400">
+                                                            最近増えている家族葬（葬儀代＋火葬式）の相場：<strong className="text-rose-300">約50万円〜100万円</strong>（平均：75万円）→ 中間値<strong className="text-rose-300">75万円</strong>を保障に追加
+                                                        </span>
+                                                    </label>
+                                                </div>
+                                            </li>
+                                            <li>
+                                                <strong className="text-rose-400">就労率が下がり給料が減る可能性</strong>：パートナーを失った悲しみや、子育て・家事の負担増により、就労率が想定より下がり、収入が減少する可能性があります。
+                                                <div className="mt-2 ml-4">
+                                                    <p className="text-sm text-rose-300">
+                                                        さらに、<strong className="text-white">今後のキャリアを諦めなければいけない</strong>などの就労に対するリスクも考慮する必要があります。昇進や転職の機会を失うことで、長期的な収入増加の機会が制限される可能性があります。
+                                                    </p>
+                                                </div>
+                                                {(() => {
+                                                    const wifeAnnual = profile.basicInfo.annualIncomeWife || profile.basicInfo.avgStdMonthlyWife * 12;
+                                                    const husbandAnnual = profile.basicInfo.annualIncomeHusband || profile.basicInfo.avgStdMonthlyHusband * 12;
+                                                    const wifeMonthly90 = wifeAnnual ? (wifeAnnual * 0.9 / 12 / 10000).toFixed(1) : null;
+                                                    const husbandMonthly90 = husbandAnnual ? (husbandAnnual * 0.9 / 12 / 10000).toFixed(1) : null;
+                                                    
+                                                    if (wifeMonthly90 && husbandMonthly90) {
+                                                        return (
+                                                            <span className="block mt-1 text-rose-300">
+                                                                実際のデータでは、就労率が90%になることが多く、この場合<strong className="text-white">妻の場合は約{wifeMonthly90}万円/月、夫の場合は約{husbandMonthly90}万円/月</strong>になる可能性が高いです。
+                                                            </span>
+                                                        );
+                                                    } else if (wifeMonthly90) {
+                                                        return (
+                                                            <span className="block mt-1 text-rose-300">
+                                                                実際のデータでは、就労率が90%になることが多く、この場合<strong className="text-white">妻の場合は約{wifeMonthly90}万円/月</strong>になる可能性が高いです。
+                                                            </span>
+                                                        );
+                                                    } else if (husbandMonthly90) {
+                                                        return (
+                                                            <span className="block mt-1 text-rose-300">
+                                                                実際のデータでは、就労率が90%になることが多く、この場合<strong className="text-white">夫の場合は約{husbandMonthly90}万円/月</strong>になる可能性が高いです。
+                                                            </span>
+                                                        );
+                                                    }
+                                                    return null;
+                                                })()}
+                                                <div className="mt-3 ml-4">
+                                                    <label className="block text-sm font-medium text-slate-400 mb-2">
+                                                        遺族/配偶者の就労率: <span className="text-sky-400 font-bold">{workIncomeRatio}%</span>
+                                                    </label>
+                                                    <input
+                                                        type="range" min="0" max="100" step="10"
+                                                        value={workIncomeRatio}
+                                                        onChange={(e) => setWorkIncomeRatio(Number(e.target.value))}
+                                                        className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                                                    />
+                                                    <div className="mt-3 p-3 bg-slate-950/60 border border-slate-800 rounded-lg">
+                                                        <p className="text-xs text-slate-400 mb-1">調整後の配偶者就労収入（月額）</p>
+                                                        {profile?.basicInfo?.spouseType === 'couple' ? (
+                                                            <p className="text-base font-bold text-sky-400 whitespace-nowrap overflow-x-auto">
+                                                                夫死亡時（妻）: {profile.basicInfo.annualIncomeWife || profile.basicInfo.avgStdMonthlyWife * 12
+                                                                    ? `${((profile.basicInfo.annualIncomeWife || profile.basicInfo.avgStdMonthlyWife * 12) * (workIncomeRatio / 100) / 12 / 10000).toFixed(1)}万円/月`
+                                                                    : '未設定'} | 妻死亡時（夫）: {profile.basicInfo.annualIncomeHusband || profile.basicInfo.avgStdMonthlyHusband * 12
+                                                                        ? `${((profile.basicInfo.annualIncomeHusband || profile.basicInfo.avgStdMonthlyHusband * 12) * (workIncomeRatio / 100) / 12 / 10000).toFixed(1)}万円/月`
+                                                                        : '未設定'}
+                                                            </p>
+                                                        ) : (
+                                                            <p className="text-base font-bold text-sky-400">
+                                                                {profile?.basicInfo?.annualIncome || profile?.basicInfo?.avgStdMonthly * 12
+                                                                    ? `${((profile.basicInfo.annualIncome || profile.basicInfo.avgStdMonthly * 12) * (workIncomeRatio / 100) / 12 / 10000).toFixed(1)}万円/月`
+                                                                    : '未設定'}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </li>
+                                            <li><strong className="text-rose-400">外食や雑費が増える可能性</strong>：家事の負担増により、外食や家事代行サービスの利用が増え、生活費が想定より増加する可能性があります。</li>
+                                        </ul>
+                                        <p className="mt-4 text-rose-300 font-semibold">
+                                            これらの要因を考慮すると、実際に必要な保障額は上記の計算結果よりも<strong className="text-white">さらに大きくなる可能性が高い</strong>ことをご理解ください。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* 障害時シナリオ用の条件設定 */}
+                                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 pb-4 shadow-lg mb-6">
+                                    <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+                                        <span>⚙️</span> 障害時シナリオの条件設定
+                                    </h2>
+
+                                    {/* 現在の生活費と調整後の障害生活費を表示 */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                        <div className="p-4 bg-slate-950/60 border border-slate-800 rounded-xl">
+                                            <p className="text-xs text-slate-400 mb-1">現在の生活費（顧客プロフィールより）</p>
+                                            <p className="text-2xl font-bold text-white">
+                                                {profile.monthlyLivingExpense ? `${(profile.monthlyLivingExpense / 10000).toFixed(1)}万円/月` : '未設定'}
+                                            </p>
+                                            <p className="text-xs text-slate-500 mt-1">
+                                                {profile.monthlyLivingExpense ? `年額 ${(profile.monthlyLivingExpense * 12 / 10000).toFixed(0)}万円` : ''}
+                                            </p>
+                                        </div>
+                                        <div className="p-4 bg-amber-950/30 border border-amber-800/50 rounded-xl">
+                                            <p className="text-xs text-slate-400 mb-1">調整後の障害生活費（月額）</p>
+                                            <p className="text-2xl font-bold text-amber-400">
+                                                {profile.monthlyLivingExpense
+                                                    ? `${(profile.monthlyLivingExpense * (expenseRatioDisability / 100) / 10000).toFixed(1)}万円/月`
+                                                    : '未設定'}
+                                            </p>
+                                            <p className="text-xs text-slate-500 mt-1">
+                                                {profile.monthlyLivingExpense
+                                                    ? `現在の生活費から ${expenseRatioDisability >= 100 ? '+' : ''}${((expenseRatioDisability / 100 - 1) * 100).toFixed(0)}%`
+                                                    : ''}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-400 mb-2">
+                                            障害生活費率: <span className="text-amber-400 font-bold">{expenseRatioDisability}%</span>
+                                        </label>
+                                        <input
+                                            type="range" min="80" max="150" step="5"
+                                            value={expenseRatioDisability}
+                                            onChange={(e) => setExpenseRatioDisability(Number(e.target.value))}
+                                            className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                                        />
+                                        <p className="text-xs text-slate-500 mt-2">治療・介護費を含めると110〜130%程度が一般値で、介護が長期化するケースではさらに上振れします。</p>
+                                    </div>
+                                </div>
+
                                 {/* 障害シナリオ：2カラムで横並び */}
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                     <div className="w-full">
@@ -1531,24 +1622,76 @@ export default function NecessaryCoveragePage() {
                                         />
                                     </div>
                                 </div>
+
+                                {/* 障害時シナリオの懸念点カード */}
+                                <div className="bg-amber-950/20 border border-amber-800/50 rounded-2xl p-6 shadow-lg">
+                                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-amber-300">
+                                        <span>⚠️</span> 懸念点
+                                    </h3>
+                                    <div className="space-y-3 text-sm text-slate-300 leading-relaxed">
+                                        <p>
+                                            障害時シナリオでは、<strong className="text-amber-400">月収が減少</strong>し、月収の不足額が発生します。しかし、それだけではありません：
+                                        </p>
+                                        <ul className="space-y-2 pl-4 list-disc">
+                                            <li><strong className="text-amber-400">月収の不足</strong>：障害により就労不能または就労制限が発生し、月収が減少します。この不足額はシミュレーションで計算されています。</li>
+                                            <li><strong className="text-amber-400">生活費の増加</strong>：治療費、介護費、リハビリ費用、家事代行費などが発生し、生活費が大幅に増加します。障害生活費率で調整していますが、実際にはさらに増える可能性があります。</li>
+                                        </ul>
+                                        <p className="mt-4 text-amber-300 font-semibold">
+                                            これらの要因を考慮すると、<strong className="text-white">月収の不足額に加えて、生活費の増加分も考慮する必要があり</strong>、実際に必要な保障額は<strong className="text-white">さらに大きくなる可能性が高い</strong>ことをご理解ください。
+                                        </p>
+                                    </div>
+                                </div>
                             </>
                         ) : (
                             <>
-                                {/* 独身の場合、子供がいる場合のみ遺族年金シナリオを表示 */}
-                                {profile.basicInfo.childrenAges && profile.basicInfo.childrenAges.length > 0 && (
-                                    <ScenarioSection
-                                        result={scenarios.singleDeath}
-                                        profile={profile}
-                                        color="emerald"
-                                        icon="💀"
-                                        description="死亡時の整理資金や、親族への遺族年金"
-                                        scenarioKey="singleDeath"
-                                        displayPeriodModes={displayPeriodModes}
-                                        setDisplayPeriodModes={setDisplayPeriodModes}
-                                        customEndAges={customEndAges}
-                                        setCustomEndAges={setCustomEndAges}
-                                    />
-                                )}
+                                {/* 独身の場合、遺族年金がないため死亡時シナリオは非表示 */}
+
+                                {/* 独身：障害時シナリオ用の条件設定 */}
+                                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
+                                    <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+                                        <span>⚙️</span> 障害時シナリオの条件設定
+                                    </h2>
+
+                                    {/* 現在の生活費と調整後の障害生活費を表示 */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                        <div className="p-4 bg-slate-950/60 border border-slate-800 rounded-xl">
+                                            <p className="text-xs text-slate-400 mb-1">現在の生活費（顧客プロフィールより）</p>
+                                            <p className="text-2xl font-bold text-white">
+                                                {profile.monthlyLivingExpense ? `${(profile.monthlyLivingExpense / 10000).toFixed(1)}万円/月` : '未設定'}
+                                            </p>
+                                            <p className="text-xs text-slate-500 mt-1">
+                                                {profile.monthlyLivingExpense ? `年額 ${(profile.monthlyLivingExpense * 12 / 10000).toFixed(0)}万円` : ''}
+                                            </p>
+                                        </div>
+                                        <div className="p-4 bg-amber-950/30 border border-amber-800/50 rounded-xl">
+                                            <p className="text-xs text-slate-400 mb-1">調整後の障害生活費（月額）</p>
+                                            <p className="text-2xl font-bold text-amber-400">
+                                                {profile.monthlyLivingExpense
+                                                    ? `${(profile.monthlyLivingExpense * (expenseRatioDisability / 100) / 10000).toFixed(1)}万円/月`
+                                                    : '未設定'}
+                                            </p>
+                                            <p className="text-xs text-slate-500 mt-1">
+                                                {profile.monthlyLivingExpense
+                                                    ? `現在の生活費から ${expenseRatioDisability >= 100 ? '+' : ''}${((expenseRatioDisability / 100 - 1) * 100).toFixed(0)}%`
+                                                    : ''}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-400 mb-2">
+                                            障害生活費率: <span className="text-amber-400 font-bold">{expenseRatioDisability}%</span>
+                                        </label>
+                                        <input
+                                            type="range" min="80" max="150" step="5"
+                                            value={expenseRatioDisability}
+                                            onChange={(e) => setExpenseRatioDisability(Number(e.target.value))}
+                                            className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                                        />
+                                        <p className="text-xs text-slate-500 mt-2">治療・介護費を含めると110〜130%程度が一般値で、介護が長期化するケースではさらに上振れします。</p>
+                                    </div>
+                                </div>
+
                                 <ScenarioSection
                                     result={scenarios.singleDisability}
                                     profile={profile}
@@ -1561,6 +1704,25 @@ export default function NecessaryCoveragePage() {
                                     customEndAges={customEndAges}
                                     setCustomEndAges={setCustomEndAges}
                                 />
+
+                                {/* 独身：障害時シナリオの懸念点カード */}
+                                <div className="bg-amber-950/20 border border-amber-800/50 rounded-2xl p-6 shadow-lg">
+                                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-amber-300">
+                                        <span>⚠️</span> 懸念点
+                                    </h3>
+                                    <div className="space-y-3 text-sm text-slate-300 leading-relaxed">
+                                        <p>
+                                            障害時シナリオでは、<strong className="text-amber-400">月収が減少</strong>し、月収の不足額が発生します。しかし、それだけではありません：
+                                        </p>
+                                        <ul className="space-y-2 pl-4 list-disc">
+                                            <li><strong className="text-amber-400">月収の不足</strong>：障害により就労不能または就労制限が発生し、月収が減少します。この不足額はシミュレーションで計算されています。</li>
+                                            <li><strong className="text-amber-400">生活費の増加</strong>：治療費、介護費、リハビリ費用、家事代行費などが発生し、生活費が大幅に増加します。障害生活費率で調整していますが、実際にはさらに増える可能性があります。</li>
+                                        </ul>
+                                        <p className="mt-4 text-amber-300 font-semibold">
+                                            これらの要因を考慮すると、<strong className="text-white">月収の不足額に加えて、生活費の増加分も考慮する必要があり</strong>、実際に必要な保障額は<strong className="text-white">さらに大きくなる可能性が高い</strong>ことをご理解ください。
+                                        </p>
+                                    </div>
+                                </div>
                             </>
                         )}
                     </div>
@@ -1602,6 +1764,7 @@ function ScenarioSection({
     customEndAges: Record<string, number>;
     setCustomEndAges: React.Dispatch<React.SetStateAction<Record<string, number>>>;
 }) {
+    const [isPeriodCardOpen, setIsPeriodCardOpen] = useState(false);
     const displayPeriodMode = displayPeriodModes[scenarioKey] || 'child23';
     const customEndAge = customEndAges[scenarioKey] || 65;
     const calculatedEndAge = customEndAge;
@@ -1670,12 +1833,16 @@ function ScenarioSection({
     const shortfallText = (netShortfall / 10000).toFixed(0);
     const sicknessDeduction = result.sicknessDeduction;
     const savingsApplied = result.savingsApplied;
+    const funeralCost = result.funeralCost;
     const deductionMessages: string[] = [];
     if (sicknessDeduction > 0) {
         deductionMessages.push(`傷病手当金 ${(sicknessDeduction / 10000).toFixed(0)}万円`);
     }
     if (savingsApplied > 0) {
         deductionMessages.push(`貯蓄から ${(savingsApplied / 10000).toFixed(0)}万円 控除`);
+    }
+    if (funeralCost > 0) {
+        deductionMessages.push(`葬儀代 ${(funeralCost / 10000).toFixed(0)}万円 を考慮済み`);
     }
 
     // ラジオボタン選択時にcustomEndAgeを更新する関数
@@ -1890,70 +2057,82 @@ function ScenarioSection({
             </div>
 
             {/* グラフ表示期間選択 */}
-            <div className="mt-6 p-4 bg-slate-900/50 border border-slate-700 rounded-lg">
-                <label className="block text-sm font-medium text-slate-300 mb-3">
-                    グラフ表示期間
-                </label>
-                <div className="space-y-2">
-                    {/* 最初の3つを横並び */}
-                    <div className="flex flex-nowrap gap-2">
-                        <label className="flex items-center gap-1.5 p-2 bg-slate-800/50 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800 transition-colors">
-                            <input
-                                type="radio"
-                                name={`displayPeriod-${result.title}`}
-                                value="child19"
-                                checked={displayPeriodMode === 'child19'}
-                                onChange={() => handlePeriodModeChange('child19')}
-                                className="w-4 h-4 text-emerald-500 accent-emerald-500"
-                            />
-                            <span className="text-xs text-slate-300">最下子19歳まで</span>
-                        </label>
-                        <label className="flex items-center gap-1.5 p-2 bg-slate-800/50 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800 transition-colors">
-                            <input
-                                type="radio"
-                                name={`displayPeriod-${result.title}`}
-                                value="child23"
-                                checked={displayPeriodMode === 'child23'}
-                                onChange={() => handlePeriodModeChange('child23')}
-                                className="w-4 h-4 text-emerald-500 accent-emerald-500"
-                            />
-                            <span className="text-xs text-slate-300">最下子23歳まで</span>
-                        </label>
-                        <label className="flex items-center gap-1.5 p-2 bg-slate-800/50 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800 transition-colors">
-                            <input
-                                type="radio"
-                                name={`displayPeriod-${result.title}`}
-                                value="retirement"
-                                checked={displayPeriodMode === 'retirement'}
-                                onChange={() => handlePeriodModeChange('retirement')}
-                                className="w-4 h-4 text-emerald-500 accent-emerald-500"
-                            />
-                            <span className="text-xs text-slate-300">老齢年金開始まで</span>
-                        </label>
-                    </div>
+            <div className="mt-6">
+                <button
+                    onClick={() => setIsPeriodCardOpen(!isPeriodCardOpen)}
+                    className="w-full flex items-center justify-between p-4 bg-slate-900/50 border border-slate-700 rounded-lg hover:bg-slate-800/50 transition-colors"
+                >
+                    <label className="block text-sm font-medium text-slate-300 cursor-pointer">
+                        グラフ表示期間
+                    </label>
+                    <span className={`text-slate-400 transition-transform ${isPeriodCardOpen ? 'rotate-180' : ''}`}>
+                        ⌃
+                    </span>
+                </button>
+                {isPeriodCardOpen && (
+                    <div className="mt-2 p-4 bg-slate-900/50 border border-slate-700 rounded-lg">
+                        <div className="space-y-2">
+                            {/* 最初の3つを横並び */}
+                            <div className="flex flex-nowrap gap-2">
+                                <label className="flex items-center gap-1.5 p-2 bg-slate-800/50 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800 transition-colors">
+                                    <input
+                                        type="radio"
+                                        name={`displayPeriod-${result.title}`}
+                                        value="child19"
+                                        checked={displayPeriodMode === 'child19'}
+                                        onChange={() => handlePeriodModeChange('child19')}
+                                        className="w-4 h-4 text-emerald-500 accent-emerald-500"
+                                    />
+                                    <span className="text-xs text-slate-300">最下子19歳まで</span>
+                                </label>
+                                <label className="flex items-center gap-1.5 p-2 bg-slate-800/50 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800 transition-colors">
+                                    <input
+                                        type="radio"
+                                        name={`displayPeriod-${result.title}`}
+                                        value="child23"
+                                        checked={displayPeriodMode === 'child23'}
+                                        onChange={() => handlePeriodModeChange('child23')}
+                                        className="w-4 h-4 text-emerald-500 accent-emerald-500"
+                                    />
+                                    <span className="text-xs text-slate-300">最下子23歳まで</span>
+                                </label>
+                                <label className="flex items-center gap-1.5 p-2 bg-slate-800/50 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800 transition-colors">
+                                    <input
+                                        type="radio"
+                                        name={`displayPeriod-${result.title}`}
+                                        value="retirement"
+                                        checked={displayPeriodMode === 'retirement'}
+                                        onChange={() => handlePeriodModeChange('retirement')}
+                                        className="w-4 h-4 text-emerald-500 accent-emerald-500"
+                                    />
+                                    <span className="text-xs text-slate-300">老齢年金開始まで</span>
+                                </label>
+                            </div>
 
-                    {/* スライドバーを常に表示 */}
-                    <div className="mt-2 p-4 bg-slate-950/60 border border-slate-800 rounded-lg">
-                        <label className="block text-sm font-medium text-slate-400 mb-2">
-                            表示終了年齢: <span className="text-emerald-400 font-bold">{customEndAge}歳</span>
-                        </label>
-                        <input
-                            type="range"
-                            min={profile?.basicInfo?.spouseType === 'couple'
-                                ? Math.max(profile.basicInfo.ageHusband || 0, profile.basicInfo.ageWife || 0)
-                                : (profile?.basicInfo?.age || 30)}
-                            max="75"
-                            step="1"
-                            value={customEndAge}
-                            onChange={(e) => {
-                                const newAge = Number(e.target.value);
-                                setCustomEndAges(prev => ({ ...prev, [scenarioKey]: newAge }));
-                                setDisplayPeriodModes(prev => ({ ...prev, [scenarioKey]: 'custom' }));
-                            }}
-                            className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                        />
+                            {/* スライドバーを常に表示 */}
+                            <div className="mt-2 p-4 bg-slate-950/60 border border-slate-800 rounded-lg">
+                                <label className="block text-sm font-medium text-slate-400 mb-2">
+                                    表示終了年齢: <span className="text-emerald-400 font-bold">{customEndAge}歳</span>
+                                </label>
+                                <input
+                                    type="range"
+                                    min={profile?.basicInfo?.spouseType === 'couple'
+                                        ? Math.max(profile.basicInfo.ageHusband || 0, profile.basicInfo.ageWife || 0)
+                                        : (profile?.basicInfo?.age || 30)}
+                                    max="75"
+                                    step="1"
+                                    value={customEndAge}
+                                    onChange={(e) => {
+                                        const newAge = Number(e.target.value);
+                                        setCustomEndAges(prev => ({ ...prev, [scenarioKey]: newAge }));
+                                        setDisplayPeriodModes(prev => ({ ...prev, [scenarioKey]: 'custom' }));
+                                    }}
+                                    className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                                />
+                            </div>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
             {savingsApplied > 0 && (
