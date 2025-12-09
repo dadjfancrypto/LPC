@@ -479,14 +479,18 @@ function StackedAreaChart({
                             ? Math.max(entry.allowancesMonthly, MIN_VISUAL_AMOUNT) 
                             : 0;
                         
-                        // Layer 3: 不要な支出（グレー）
-                        let visualGrayAmount = entry.grayAreaMonthly > 0 
-                            ? Math.max(entry.grayAreaMonthly, MIN_VISUAL_AMOUNT) 
-                            : 0;
-                        
                         // Layer 4: 真の不足額（赤）
                         let visualShortfallAmount = entry.shortfallMonthly > 0 
                             ? Math.max(entry.shortfallMonthly, MIN_VISUAL_AMOUNT) 
+                            : 0;
+                        
+                        // Layer 3: 不要な支出（グレー）
+                        // 不足額レイヤーが最小サイズ（4万円）で表示される場合、グレーレイヤーを満水基準から4万円を引いた値までに制限
+                        const maxGrayAmount = visualShortfallAmount >= MIN_VISUAL_AMOUNT
+                            ? currentSalaryMonthly - MIN_VISUAL_AMOUNT
+                            : currentSalaryMonthly;
+                        let visualGrayAmount = entry.grayAreaMonthly > 0 
+                            ? Math.min(Math.max(entry.grayAreaMonthly, MIN_VISUAL_AMOUNT), maxGrayAmount)
                             : 0;
                         
                         // Layer 5: 余剰額（青）- 満水基準ラインの上に表示
@@ -525,11 +529,18 @@ function StackedAreaChart({
                         // 積み上げ座標の計算（調整後の視覚的な高さを使用）
                         const pensionY = getY(visualPensionAmount);
                         const allowancesY = getY(visualPensionAmount + visualAllowancesAmount);
-                        const grayY = getY(visualPensionAmount + visualAllowancesAmount + visualGrayAmount);
                         
                         // 余剰額のY座標（満水基準ラインの上に表示）
                         const fullWaterAmount = currentSalaryMonthly; // 満水基準（月収）
                         const fullWaterY = getY(fullWaterAmount);
+                        
+                        // 不足額レイヤーが最小サイズ（4万円）で表示される場合、グレーレイヤーの上端を満水基準から4万円を引いた値までに制限
+                        const maxGrayTopAmount = visualShortfallAmount >= MIN_VISUAL_AMOUNT
+                            ? currentSalaryMonthly - MIN_VISUAL_AMOUNT
+                            : currentSalaryMonthly;
+                        const maxGrayTopY = getY(maxGrayTopAmount);
+                        const calculatedGrayY = getY(visualPensionAmount + visualAllowancesAmount + visualGrayAmount);
+                        const grayY = Math.min(calculatedGrayY, maxGrayTopY);
                         
                         // 不足額は基準ライン（fullWaterY）から下に向かって表示
                         // 不足額 = （基準ライン）-（公的年金＋児童手当＋浮く支出）
@@ -658,6 +669,11 @@ function StackedAreaChart({
                                     const fullWaterAmount = currentSalaryMonthly; // 満水基準（月収）
                                     const fullWaterY = getY(fullWaterAmount);
                                     
+                                    // 不足額レイヤーが最小サイズ（4万円）で表示される場合、グレーレイヤーを満水基準から4万円を引いた値までに制限
+                                    const maxGrayY = visualShortfallAmount >= MIN_VISUAL_AMOUNT
+                                        ? getY(currentSalaryMonthly - MIN_VISUAL_AMOUNT)
+                                        : fullWaterY;
+                                    
                                     // 浮く支出レイヤーの下端を正しく計算
                                     // showAllowancesToggleがfalseの時、allowancesYはpensionYと同じ値になる可能性がある
                                     const grayAreaBottomY = showAllowancesToggle ? allowancesY : pensionY;
@@ -737,15 +753,19 @@ function StackedAreaChart({
                                             </g>
     );
                                     } else {
-                                        // 30万円以下の場合（従来通り）
-                                        const grayAreaHeight = Math.max(grayAreaBottomY - grayY, 0);
-                                        const grayAreaCenterY = grayY + grayAreaHeight / 2;
+                                        // 30万円以下の場合
+                                        // グレーレイヤーの上端は不足額レイヤーの下端と同じ位置
+                                        // 不足額レイヤーの下端 = fullWaterY + shortfallHeight（Y座標系では下方向が大きい値）
+                                        const grayAreaTopY = fullWaterY + shortfallHeight;
+                                        // Y座標系では下方向が大きい値なので、grayAreaBottomY - grayAreaTopYが正の値になる
+                                        const grayAreaHeight = Math.max(grayAreaBottomY - grayAreaTopY, 0);
+                                        const grayAreaCenterY = grayAreaTopY + grayAreaHeight / 2;
                                         
                                         return (
                                             <g>
                                                 <rect
                                                     x={currentX}
-                                                    y={grayY}
+                                                    y={grayAreaTopY}
                                                     width={width}
                                                     height={grayAreaHeight}
                                                     fill={grayAreaColor}
@@ -871,7 +891,7 @@ function StackedAreaChart({
 export default function NecessaryCoveragePage() {
     const [profile, setProfile] = useState<CustomerProfile | null>(null);
     // 生活費調整率
-    const [expenseRatioSurvivor, setExpenseRatioSurvivor] = useState(70); // 一般的な生活費圧縮率（約70%）
+    const [expenseRatioSurvivor, setExpenseRatioSurvivor] = useState(70); // 遺族の生活費率（現在の生活費の何%になるか、デフォルト70%）
     const [expenseRatioDisability, setExpenseRatioDisability] = useState(110); // 医療・介護を考慮した一般的な増加率（約110%）
     // 就労収入調整率（リスク調整）
     const [workIncomeRatio, setWorkIncomeRatio] = useState(90); // デフォルト90%（共働きで就労継続を想定）
@@ -1027,28 +1047,40 @@ export default function NecessaryCoveragePage() {
                 if (type === 'survivor') {
         if (basicInfo.spouseType === 'couple') {
                         if (targetPerson === 'husband') {
+                            // 遺族（妻）の老齢年金開始年齢を取得
+                            const oldAgeStart = basicInfo.oldAgeStartWife || 65;
                             let kiso = 0;
                             if (eligibleChildren18 > 0) {
                                 kiso = kisoAnnualByCount(eligibleChildren18);
                             }
                             const kousei = proportionAnnual(basicInfo.avgStdMonthlyHusband, basicInfo.monthsHusband, basicInfo.useMinashi300Husband);
             let chukorei = 0;
-                            if (eligibleChildren18 === 0 && currentAge >= 40 && currentAge < 65) {
+                            if (eligibleChildren18 === 0 && currentAge >= 40 && currentAge < oldAgeStart) {
                 chukorei = CHUKOREI_KASAN;
             }
-                            if (currentAge >= 65) {
+                            if (currentAge >= oldAgeStart) {
+                                // 老齢年金開始後：老齢基礎年金 + 遺族厚生年金
                                 pension = kousei + KISO_BASE_ANNUAL;
                             } else {
+                                // 老齢年金開始前：遺族基礎年金（子がいる場合）+ 遺族厚生年金 + 中高齢寡婦加算（条件を満たす場合）
                                 pension = kiso + kousei + chukorei;
                             }
                         }
                         else if (targetPerson === 'wife') {
+                            // 遺族（夫）の老齢年金開始年齢を取得
+                            const oldAgeStart = basicInfo.oldAgeStartHusband || 65;
                             let kiso = 0;
                             if (eligibleChildren18 > 0) {
                                 kiso = kisoAnnualByCount(eligibleChildren18);
                             }
                             const kousei = proportionAnnual(basicInfo.avgStdMonthlyWife, basicInfo.monthsWife, basicInfo.useMinashi300Wife);
-                            pension = kiso + kousei;
+                            if (currentAge >= oldAgeStart) {
+                                // 老齢年金開始後：老齢基礎年金 + 遺族厚生年金
+                                pension = kousei + KISO_BASE_ANNUAL;
+                            } else {
+                                // 老齢年金開始前：遺族基礎年金（子がいる場合）+ 遺族厚生年金
+                                pension = kiso + kousei;
+                            }
                         }
                     } else {
                         const kousei = proportionAnnual(basicInfo.avgStdMonthly, basicInfo.employeePensionMonths, basicInfo.useMinashi300);
@@ -1084,10 +1116,14 @@ export default function NecessaryCoveragePage() {
                 }
 
                 const expenseRatio = type === 'survivor' ? expenseRatioSurvivor : expenseRatioDisability;
-                // 遺族シナリオでは団信により住宅ローンが免除されるため控除、障害シナリオでは控除しない
-                const expenseBase = type === 'survivor'
-                    ? currentExpenseAnnual - housingLoanAnnual  // 遺族: 住宅ローンを控除
-                    : currentExpenseAnnual;  // 障害: 住宅ローンを含む
+                // 遺族シナリオでは団信加入者の場合のみ住宅ローンが免除されるため控除、障害シナリオでは控除しない
+                const hasDanshin = profile.danshinHolder && (
+                    (targetPerson === 'husband' && profile.danshinHolder.includes('husband')) ||
+                    (targetPerson === 'wife' && profile.danshinHolder.includes('wife'))
+                );
+                const expenseBase = type === 'survivor' && hasDanshin
+                    ? currentExpenseAnnual - housingLoanAnnual  // 遺族: 団信加入者の場合のみ住宅ローンを控除
+                    : currentExpenseAnnual;  // 遺族（団信なし）・障害: 住宅ローンを含む
                 const baseExpense = Math.round(expenseBase * (expenseRatio / 100));
 
                 let educationCost = 0;
@@ -1133,12 +1169,18 @@ export default function NecessaryCoveragePage() {
                     // 遺族シナリオ: 「収入保障（給与填補）ベース」
                     // ターゲット = 事故前の手取り年収 - 不要な支出（グレーエリア）
 
-                    // 1. 住宅ローン（団信で消える）
-                    const housingLoan = housingLoanAnnual;
+                    // 団信加入者のチェック
+                    const hasDanshin = profile.danshinHolder && (
+                        (targetPerson === 'husband' && profile.danshinHolder.includes('husband')) ||
+                        (targetPerson === 'wife' && profile.danshinHolder.includes('wife'))
+                    );
+
+                    // 1. 住宅ローン（団信加入者の場合のみ消える）
+                    const housingLoan = hasDanshin ? housingLoanAnnual : 0;
 
                     // 2. 夫の生活費（浮くお金）
-                    // 計算式: (現在の生活費 - 住宅ローン) * (1 - 遺族生活費率)
-                    const livingExpenseBase = Math.max(0, currentExpenseAnnual - housingLoanAnnual);
+                    // 計算式: (現在の生活費 - 住宅ローン（団信加入者の場合のみ）) * (1 - 遺族生活費率)
+                    const livingExpenseBase = Math.max(0, currentExpenseAnnual - (hasDanshin ? housingLoanAnnual : 0));
                     const survivorRatio = expenseRatioSurvivor / 100;
                     const deceasedLivingExpense = livingExpenseBase * (1 - survivorRatio);
 
@@ -1234,10 +1276,14 @@ export default function NecessaryCoveragePage() {
             const activeShortfalls = data.filter(d => d.monthsActive > 0).map(d => d.shortfall / 12);
             monthlyShortfallMax = activeShortfalls.length ? Math.max(...activeShortfalls) : 0;
 
-            // 団信による住宅ローン免除額（遺族シナリオのみ、65歳までの期間）
-            const exemptedHousingLoan = type === 'survivor'
-                ? housingLoanAnnual * (activeMonthsSum / 12)  // 遺族: 65歳までの住宅ローン免除額
-                : 0;  // 障害: 団信は適用されない
+            // 団信による住宅ローン免除額（遺族シナリオで団信加入者の場合のみ、65歳までの期間）
+            const hasDanshin = profile.danshinHolder && (
+                (targetPerson === 'husband' && profile.danshinHolder.includes('husband')) ||
+                (targetPerson === 'wife' && profile.danshinHolder.includes('wife'))
+            );
+            const exemptedHousingLoan = type === 'survivor' && hasDanshin
+                ? housingLoanAnnual * (activeMonthsSum / 12)  // 遺族: 団信加入者の場合のみ65歳までの住宅ローン免除額
+                : 0;  // 遺族（団信なし）・障害: 団信は適用されない
 
         return {
                 title: type === 'survivor' ?
@@ -1342,33 +1388,49 @@ export default function NecessaryCoveragePage() {
                                     {showDeathSettings && (
                                         <div>
                                             <div className="space-y-3">
-                                                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                                                <div className="mb-2">
+                                                    <label className="block text-sm font-medium text-slate-400 mb-2">
+                                                        遺族の生活費率: <span className="text-emerald-400 font-bold">{expenseRatioSurvivor}%</span>
+                                                    </label>
+                                                    <input
+                                                        type="range" min="50" max="100" step="5"
+                                                        value={expenseRatioSurvivor}
+                                                        onChange={(e) => setExpenseRatioSurvivor(Number(e.target.value))}
+                                                        className="w-1/4 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                                                    />
+                                                    <p className="text-xs text-slate-500 mt-2">現在の生活費を100%として、パートナーが亡くなった後の遺族の生活費が何%になるかを設定します。一般的には60〜80%程度です。</p>
+                                                </div>
+                                                <div className="flex items-center gap-2 mb-2">
                                                     <label className="block text-sm font-medium text-slate-400">現在の貯蓄・既存保険総額</label>
                                                     <button
                                                         type="button"
                                                         onClick={() => setShowSavingsInfo((prev) => !prev)}
-                                                        className="inline-flex items-center gap-2 text-sm font-semibold text-amber-300 hover:text-amber-200 transition-colors"
+                                                        className="inline-flex items-center gap-1 text-xs font-semibold text-amber-300 hover:text-amber-200 transition-colors"
                                                     >
                                                         <span role="img" aria-label="hint">💡</span>
                                                         入力しなくても問題ありません。
                                                         <span className={`text-xs transition-transform ${showSavingsInfo ? 'rotate-180' : ''}`}>⌃</span>
                                                     </button>
                                                 </div>
-                                                <div className="relative">
-                                                    <select
-                                                        value={currentSavingsMan}
-                                                        onChange={(e) => setCurrentSavingsMan(Number(e.target.value))}
-                                                        className="w-full rounded-xl px-4 py-3 bg-slate-800/50 border border-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-slate-100 font-mono text-lg appearance-none"
-                                                    >
-                                                        {SAVINGS_OPTIONS_MAN.map((option) => (
-                                                            <option key={option} value={option}>
-                                                                {option.toLocaleString()}万円
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                    <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-slate-500">
-                                                        ▼
-                                                    </span>
+                                                <div className="p-0 max-w-md bg-slate-950/60 border border-slate-800 rounded-lg">
+                                                    <div className="px-[2px] py-0.5">
+                                                        <div className="relative">
+                                                            <select
+                                                                value={currentSavingsMan}
+                                                                onChange={(e) => setCurrentSavingsMan(Number(e.target.value))}
+                                                                className="w-full rounded-xl px-2 py-1 bg-slate-800/50 border border-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-slate-100 font-mono text-sm appearance-none"
+                                                            >
+                                                                {SAVINGS_OPTIONS_MAN.map((option) => (
+                                                                    <option key={option} value={option}>
+                                                                        {option.toLocaleString()}万円
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-500">
+                                                                ▼
+                                                            </span>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                                 {showSavingsInfo && (
                                                     <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 text-xs leading-relaxed space-y-2 animate-fade-in">
