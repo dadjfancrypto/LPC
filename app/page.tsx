@@ -161,6 +161,33 @@ export default function Home() {
               </div>
             </div>
           </Link>
+
+          {/* Work Page - Risk Map */}
+          <Link
+            href="/work"
+            className="group relative p-8 rounded-3xl bg-slate-900/40 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-900/60 transition-all duration-500 backdrop-blur-sm overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="relative flex flex-col h-full">
+              <div className="w-14 h-14 mb-6 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 group-hover:scale-110 transition-transform duration-500 border border-indigo-500/20 group-hover:border-indigo-500/40 group-hover:shadow-[0_0_20px_rgba(99,102,241,0.2)]">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-7 h-7">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h4.125M8.25 8.25l2.25-2.25m0 0l2.25 2.25m-2.25-2.25v13.5m0 0l2.25 2.25m-2.25-2.25l-2.25 2.25M12 8.25V12m0 0v3.75m0-3.75h3.75m-3.75 0H12" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-slate-100 mb-3 group-hover:text-indigo-400 transition-colors">
+                あなたの人生リスクMAP
+              </h2>
+              <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">
+                リスクマトリクスを使って、人生のリスクを「事故の頻度」と「損害額」で整理し、可視化します。
+              </p>
+              <div className="flex items-center text-indigo-400 text-sm font-bold group-hover:translate-x-2 transition-transform duration-300">
+                ワークをはじめる
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 ml-2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                </svg>
+              </div>
+            </div>
+          </Link>
         </div>
 
         {/* Simulation Disclaimer Section */}

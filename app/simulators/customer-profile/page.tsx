@@ -2,12 +2,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import {
-  EducationCourse,
-  EDUCATION_COURSE_LABELS,
-  calculateHouseholdEducationCost,
-  CramSchoolOptions
-} from '@/app/utils/education-costs';
 
 // Customer Profileの型定義
 type LivingExpenseDetail = {
@@ -56,9 +50,6 @@ type CustomerProfileBasicInfo = {
   avgStdMonthly: number; // 平均標準報酬月額（2003年4月以降の値として扱う）
   useMinashi300: boolean; // 本人のみなし300月チェックボックス
 
-  // 教育費コース
-  educationCourse: EducationCourse;
-  cramSchoolOptions: CramSchoolOptions;
 };
 
 type CustomerProfile = {
@@ -203,16 +194,14 @@ function LivingExpenseSelector({
 
   // 詳細項目の変更ハンドラ
   const handleDetailChange = (key: keyof LivingExpenseDetail, val: number) => {
-    const newDetails = { ...details, [key]: val };
+    const newDetails = { ...details, [key]: Math.max(0, val) }; // マイナスにならないように制限
     setDetails(newDetails);
   };
 
   // モード切替時のハンドラ
   const handleModeChange = (detailed: boolean) => {
     setIsDetailed(detailed);
-    if (detailed) {
-      setValue(calculateTotal(details));
-    }
+    // 詳細モードに切り替えても、現在のvalueは変更しない
   };
 
   return (
@@ -283,8 +272,8 @@ function LivingExpenseSelector({
       {/* 詳細入力フォーム */}
       {isDetailed && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-800/50 animate-fade-in-up">
-          {(Object.keys(EXPENSE_LABELS) as Array<keyof LivingExpenseDetail>).map((key) => (
-            <div key={key} className="space-y-2">
+          {(['food', 'housingLoan', 'dailyGoods', 'rent', 'utilities', 'communication', 'education', 'lifeInsurance', 'entertainment', 'savings'] as Array<keyof LivingExpenseDetail>).map((key) => (
+            <div key={key} className="space-y-2 flex flex-col">
               <label className="text-xs font-bold text-slate-400">{EXPENSE_LABELS[key]}</label>
               <div className="relative">
                 <input
@@ -333,33 +322,9 @@ function LivingExpenseSelector({
                 </div>
               )}
 
-              {/* 教育費の再計算ボタン */}
-              {key === 'education' && basicInfo.childrenCount !== undefined && basicInfo.childrenCount > 0 && (
-                <div className="flex flex-col gap-2 mt-2 p-3 bg-slate-800/30 rounded-lg border border-slate-700/50">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-slate-400">コース: {EDUCATION_COURSE_LABELS[basicInfo.educationCourse]}</span>
-                  </div>
-                  <button
-                    onClick={() => {
-                      const cost = calculateHouseholdEducationCost(
-                        basicInfo.educationCourse,
-                        basicInfo.childrenAges,
-                        basicInfo.cramSchoolOptions
-                      );
-                      handleDetailChange('education', cost);
-                    }}
-                    className="text-[10px] text-sky-400 hover:text-sky-300 flex items-center gap-1 transition-colors"
-                  >
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                    </svg>
-                    <span>{EDUCATION_COURSE_LABELS[basicInfo.educationCourse]}で再計算</span>
-                  </button>
-                </div>
-              )}
 
               {/* 加減算ボタン */}
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-center gap-2 self-center">
                 {[10000, 5000, 1000].map((amount) => (
                   <button
                     key={amount}
@@ -533,17 +498,6 @@ function BasicInfoInput({
             ))}
           </div>
 
-          {/* 教育費コース設定 */}
-          <div className="mt-6 pt-4 border-t border-slate-700/50">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">教育費コース</label>
-            <Select
-              value={basicInfo.educationCourse}
-              onChange={(e: any) => setBasicInfo({ ...basicInfo, educationCourse: e.target.value as EducationCourse })}
-              options={Object.entries(EDUCATION_COURSE_LABELS).map(([key, label]) => (
-                <option key={key} value={key}>{label}</option>
-              ))}
-            />
-          </div>
         </div>
       )}
 
@@ -790,16 +744,16 @@ export default function CustomerProfilePage() {
   const [profile, setProfile] = useState<CustomerProfile>({
     monthlyLivingExpense: 0, // 0は「--」として表示
     details: {
-      food: 50_000,
-      communication: 10_000,
-      utilities: 15_000,
-      education: 30_000,
+      food: 0,
+      communication: 0,
+      utilities: 0,
+      education: 0,
       housingLoan: 0,
-      rent: 80_000,
-      dailyGoods: 20_000,
-      entertainment: 20_000,
-      lifeInsurance: 15_000,
-      savings: 50_000,
+      rent: 0,
+      dailyGoods: 0,
+      entertainment: 0,
+      lifeInsurance: 0,
+      savings: 0,
     },
     danshinHolder: ['husband'], // デフォルトは夫
     basicInfo: {
@@ -825,8 +779,6 @@ export default function CustomerProfilePage() {
       annualIncome: 4_500_000,
       avgStdMonthly: Math.round(4_500_000 / 12), // 0は未入力として扱う（--を表示）
       useMinashi300: false,
-      educationCourse: 'private_hs', // デフォルト
-      cramSchoolOptions: { elementary: true, juniorHigh: true, highSchool: true }, // デフォルトでON
     },
     isLivingExpenseDetailed: false,
   });
@@ -991,16 +943,16 @@ export default function CustomerProfilePage() {
                 const clearedProfile = {
                   monthlyLivingExpense: 0,
                   details: {
-                    food: 50_000,
-                    communication: 10_000,
-                    utilities: 15_000,
-                    education: 30_000,
+                    food: 0,
+                    communication: 0,
+                    utilities: 0,
+                    education: 0,
                     housingLoan: 0,
-                    rent: 80_000,
-                    dailyGoods: 20_000,
-                    entertainment: 20_000,
-                    lifeInsurance: 15_000,
-                    savings: 50_000,
+                    rent: 0,
+                    dailyGoods: 0,
+                    entertainment: 0,
+                    lifeInsurance: 0,
+                    savings: 0,
                   },
                   danshinHolder: ['husband'],
                   isLivingExpenseDetailed: false,
@@ -1024,8 +976,6 @@ export default function CustomerProfilePage() {
                     employeePensionMonths: 300,
                     avgStdMonthly: 0,
                     useMinashi300: false,
-                    educationCourse: 'private_hs' as const,
-                    cramSchoolOptions: { elementary: false, juniorHigh: false, highSchool: false },
                   },
                 } as CustomerProfile;
                 setProfile(clearedProfile);
@@ -1075,8 +1025,6 @@ export default function CustomerProfilePage() {
                     employeePensionMonths: 300,
                     avgStdMonthly: 0,
                     useMinashi300: false,
-                    educationCourse: 'private_uni' as const,
-                    cramSchoolOptions: { elementary: false, juniorHigh: false, highSchool: true },
                   },
                 } as CustomerProfile;
                 setProfile(coupleProfile);
@@ -1128,8 +1076,6 @@ export default function CustomerProfilePage() {
                     employeePensionMonths: 300,
                     avgStdMonthly: 0,
                     useMinashi300: false,
-                    educationCourse: 'private_uni' as const,
-                    cramSchoolOptions: { elementary: false, juniorHigh: false, highSchool: true },
                   },
                 } as CustomerProfile;
                 setProfile(couple25Profile);
@@ -1180,8 +1126,6 @@ export default function CustomerProfilePage() {
                     annualIncome: 2_500_000,
                     avgStdMonthly: 210_000,
                     useMinashi300: true,
-                    educationCourse: 'private_hs' as const,
-                    cramSchoolOptions: { elementary: false, juniorHigh: false, highSchool: false },
                   },
                 } as CustomerProfile;
                 setProfile(singleMotherProfile);
@@ -1231,8 +1175,6 @@ export default function CustomerProfilePage() {
                     employeePensionMonths: 100,
                     avgStdMonthly: 250_000,
                     useMinashi300: true,
-                    educationCourse: 'private_hs' as const,
-                    cramSchoolOptions: { elementary: false, juniorHigh: false, highSchool: false },
                   },
                 } as CustomerProfile;
                 setProfile(singleProfile);

@@ -1285,7 +1285,7 @@ export default function NecessaryCoveragePage() {
                             } else {
                                 // 老齢年金開始前：遺族基礎年金（子がいる場合）+ 遺族厚生年金
                             pension = kiso + kousei;
-                            }
+                        }
                         }
                     } else if (basicInfo.spouseType !== undefined && basicInfo.spouseType === 'none') {
                         // シングルマザー/ファザー家庭：親が死亡した場合、子に遺族基礎年金と遺族厚生年金が支給される

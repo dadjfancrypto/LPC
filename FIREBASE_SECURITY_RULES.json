@@ -1,0 +1,19 @@
+{
+  "rules": {
+    "work": {
+      "$sessionId": {
+        ".read": true,
+        ".write": true,
+        "panels": {
+          ".read": true,
+          ".write": true
+        },
+        "users": {
+          ".read": true,
+          ".write": true
+        }
+      }
+    }
+  }
+}
+
