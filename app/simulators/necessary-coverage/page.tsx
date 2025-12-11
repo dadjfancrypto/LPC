@@ -1287,7 +1287,7 @@ export default function NecessaryCoveragePage() {
                             pension = kiso + kousei;
                             }
                         }
-                    } else if (basicInfo.spouseType === 'none') {
+                    } else if (basicInfo.spouseType !== undefined && basicInfo.spouseType === 'none') {
                         // シングルマザー/ファザー家庭：親が死亡した場合、子に遺族基礎年金と遺族厚生年金が支給される
                         let kiso = 0;
                         if (eligibleChildren18 > 0) {
