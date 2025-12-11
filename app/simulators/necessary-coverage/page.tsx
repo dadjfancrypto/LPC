@@ -1137,7 +1137,7 @@ export default function NecessaryCoveragePage() {
     // profileが読み込まれたときに各シナリオのcustomEndAgeを初期化
     useEffect(() => {
         if (!profile) return;
-        const currentAge = profile.basicInfo.spouseType === 'couple'
+        const currentAge = (profile.basicInfo.spouseType !== undefined && profile.basicInfo.spouseType === 'couple')
             ? (profile.basicInfo.ageHusband || profile.basicInfo.ageWife || 0)
             : (profile.basicInfo.age || 0);
 
@@ -1250,7 +1250,7 @@ export default function NecessaryCoveragePage() {
                 const eligibleChildrenDisability = calculateEligibleChildrenCount(childrenCurrentAges, 2);
 
                 if (type === 'survivor') {
-        if (basicInfo.spouseType === 'couple') {
+        if (basicInfo.spouseType !== undefined && basicInfo.spouseType === 'couple') {
                         if (targetPerson === 'husband') {
                             // 遺族（妻）の老齢年金開始年齢を取得
                             const oldAgeStart = basicInfo.oldAgeStartWife || 65;
@@ -1601,7 +1601,7 @@ export default function NecessaryCoveragePage() {
             <div className="w-full max-w-[1920px] mx-auto px-6 py-10">
                 {scenarios && (
                     <div className="space-y-16">
-                        {profile.basicInfo.spouseType === 'couple' ? (
+                        {(profile.basicInfo.spouseType !== undefined && profile.basicInfo.spouseType === 'couple') ? (
                             <>
                                 {/* 死亡時シナリオ用の条件設定 */}
                                 <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 pb-2 shadow-lg mb-4">
@@ -1891,7 +1891,7 @@ export default function NecessaryCoveragePage() {
                                                         <div className="p-0 max-w-md bg-slate-950/60 border border-slate-800 rounded-lg ml-2">
                                                             <div className="px-[2px] py-0.5">
                                                                 <p className="text-xs text-slate-400 mb-1">調整後の配偶者就労収入（月額）</p>
-                                                            {profile?.basicInfo?.spouseType === 'couple' ? (
+                                                            {(profile?.basicInfo?.spouseType !== undefined && profile?.basicInfo?.spouseType === 'couple') ? (
                                                                 <p className="text-base font-bold text-sky-400 whitespace-nowrap overflow-x-auto">
                                                                     夫死亡時（妻）: {profile.basicInfo.annualIncomeWife || profile.basicInfo.avgStdMonthlyWife * 12
                                                                         ? `${((profile.basicInfo.annualIncomeWife || profile.basicInfo.avgStdMonthlyWife * 12) * (workIncomeRatio / 100) / 12 / 10000).toFixed(1)}万円/月`
@@ -2033,7 +2033,7 @@ export default function NecessaryCoveragePage() {
 
                                         {/* 厚生年金加入の場合、傷病手当金1.5年分の金額を表示 */}
                                         {(() => {
-                                            const isCouple = profile.basicInfo.spouseType === 'couple';
+                                            const isCouple = profile.basicInfo.spouseType !== undefined && profile.basicInfo.spouseType === 'couple';
                                             let hasEmployeePension = false;
                                             let avgStdMonthly = 0;
                                             
@@ -2184,7 +2184,7 @@ export default function NecessaryCoveragePage() {
 
                                         {/* 厚生年金加入の場合、傷病手当金1.5年分の金額を表示 */}
                                         {(() => {
-                                            const isCouple = profile.basicInfo.spouseType === 'couple';
+                                            const isCouple = profile.basicInfo.spouseType !== undefined && profile.basicInfo.spouseType === 'couple';
                                             let hasEmployeePension = false;
                                             let avgStdMonthly = 0;
                                             
@@ -2254,7 +2254,7 @@ export default function NecessaryCoveragePage() {
                             
                             const elementIds: string[] = [];
                             
-                            if (profile.basicInfo.spouseType === 'couple') {
+                            if (profile.basicInfo.spouseType !== undefined && profile.basicInfo.spouseType === 'couple') {
                                 // 夫婦の場合
                                 elementIds.push(
                                     'scenario-husband-death',
@@ -2421,10 +2421,10 @@ function ScenarioSection({
         setDisplayPeriodModes(prev => ({ ...prev, [scenarioKey]: mode }));
         if (!profile) return;
         
-        const currentAge = profile.basicInfo.spouseType === 'couple'
+        const currentAge = (profile.basicInfo.spouseType !== undefined && profile.basicInfo.spouseType === 'couple')
             ? (profile.basicInfo.ageHusband || profile.basicInfo.ageWife || 0)
             : (profile.basicInfo.age || 0);
-        const oldAgeStart = profile.basicInfo.spouseType === 'couple'
+        const oldAgeStart = (profile.basicInfo.spouseType !== undefined && profile.basicInfo.spouseType === 'couple')
             ? (profile.basicInfo.oldAgeStartHusband || profile.basicInfo.oldAgeStartWife || 65)
             : (profile.basicInfo.oldAgeStart || 65);
 
@@ -2777,7 +2777,7 @@ function ScenarioSection({
                         </label>
                         <input
                             type="range"
-                            min={profile?.basicInfo?.spouseType === 'couple'
+                            min={(profile?.basicInfo?.spouseType !== undefined && profile?.basicInfo?.spouseType === 'couple')
                                 ? Math.max(profile.basicInfo.ageHusband || 0, profile.basicInfo.ageWife || 0)
                                 : (profile?.basicInfo?.age || 30)}
                             max="75"
