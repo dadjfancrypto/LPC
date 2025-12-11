@@ -2184,7 +2184,8 @@ export default function NecessaryCoveragePage() {
 
                                         {/* 厚生年金加入の場合、傷病手当金1.5年分の金額を表示 */}
                                         {(() => {
-                                            const isCouple = profile.basicInfo.spouseType !== undefined && profile.basicInfo.spouseType === 'couple';
+                                            // 独身シナリオなので、常にfalse
+                                            const isCouple = false;
                                             let hasEmployeePension = false;
                                             let avgStdMonthly = 0;
                                             
