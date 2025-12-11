@@ -10,7 +10,7 @@ interface SimulationDisclaimerProps {
 export default function SimulationDisclaimer({ isOpen: externalIsOpen, onToggle }: SimulationDisclaimerProps) {
   const [internalIsOpen, setInternalIsOpen] = useState(false);
   const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
-  const detailsRef = useRef<HTMLDetailsElement>(null);
+  const detailsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (externalIsOpen !== undefined && externalIsOpen && detailsRef.current) {
