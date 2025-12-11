@@ -99,7 +99,7 @@ export default function WorkPage() {
         const hasInitialPanels = panelsArray.some(p => p.id.startsWith('initial-panel-'));
         
         // 初期パネルが存在しない場合、追加する
-        if (!hasInitialPanels && !initialPanelsLoaded && database) {
+        if (!hasInitialPanels && !initialPanelsLoaded && database && sessionId) {
           const panelsToAdd = initialPanels.map((panel, index) => ({
             ...panel,
             id: `initial-panel-${Date.now()}-${index}`,
@@ -111,18 +111,20 @@ export default function WorkPage() {
           
           // Firebaseに初期パネルを追加（既存のパネルとマージ）
           panelsToAdd.forEach(panel => {
-            const panelRef = ref(database, `work/${sessionId}/panels/${panel.id}`);
-            set(panelRef, {
-              text: panel.text,
-              x: panel.x,
-              y: panel.y,
-              width: panel.width,
-              height: panel.height,
-              userId: panel.userId,
-              userName: panel.userName,
-              createdAt: panel.createdAt,
-              updatedAt: panel.updatedAt,
-            });
+            if (database) {
+              const panelRef = ref(database, `work/${sessionId}/panels/${panel.id}`);
+              set(panelRef, {
+                text: panel.text,
+                x: panel.x,
+                y: panel.y,
+                width: panel.width,
+                height: panel.height,
+                userId: panel.userId,
+                userName: panel.userName,
+                createdAt: panel.createdAt,
+                updatedAt: panel.updatedAt,
+              });
+            }
           });
           setInitialPanelsLoaded(true);
         } else {
@@ -131,7 +133,7 @@ export default function WorkPage() {
         }
       } else {
         // データが存在しない場合、初期パネルを追加
-        if (!initialPanelsLoaded && database) {
+        if (!initialPanelsLoaded && database && sessionId) {
           const panelsToAdd = initialPanels.map((panel, index) => ({
             ...panel,
             id: `initial-panel-${Date.now()}-${index}`,
@@ -143,18 +145,20 @@ export default function WorkPage() {
           
           // Firebaseに初期パネルを追加
           panelsToAdd.forEach(panel => {
-            const panelRef = ref(database, `work/${sessionId}/panels/${panel.id}`);
-            set(panelRef, {
-              text: panel.text,
-              x: panel.x,
-              y: panel.y,
-              width: panel.width,
-              height: panel.height,
-              userId: panel.userId,
-              userName: panel.userName,
-              createdAt: panel.createdAt,
-              updatedAt: panel.updatedAt,
-            });
+            if (database) {
+              const panelRef = ref(database, `work/${sessionId}/panels/${panel.id}`);
+              set(panelRef, {
+                text: panel.text,
+                x: panel.x,
+                y: panel.y,
+                width: panel.width,
+                height: panel.height,
+                userId: panel.userId,
+                userName: panel.userName,
+                createdAt: panel.createdAt,
+                updatedAt: panel.updatedAt,
+              });
+            }
           });
           setInitialPanelsLoaded(true);
         } else {
@@ -246,18 +250,20 @@ export default function WorkPage() {
 
     // Firebaseに初期パネルを追加
     panelsToAdd.forEach(panel => {
-      const panelRef = ref(database, `work/${sessionId}/panels/${panel.id}`);
-      set(panelRef, {
-        text: panel.text,
-        x: panel.x,
-        y: panel.y,
-        width: panel.width,
-        height: panel.height,
-        userId: panel.userId,
-        userName: panel.userName,
-        createdAt: panel.createdAt,
-        updatedAt: panel.updatedAt,
-      });
+      if (database) {
+        const panelRef = ref(database, `work/${sessionId}/panels/${panel.id}`);
+        set(panelRef, {
+          text: panel.text,
+          x: panel.x,
+          y: panel.y,
+          width: panel.width,
+          height: panel.height,
+          userId: panel.userId,
+          userName: panel.userName,
+          createdAt: panel.createdAt,
+          updatedAt: panel.updatedAt,
+        });
+      }
     });
   };
 
