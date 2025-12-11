@@ -1,8 +1,22 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
+import SimulationDisclaimer from '../components/SimulationDisclaimer';
 
 export default function Home() {
+  const [showDisclaimer, setShowDisclaimer] = useState(false);
+
+  const handleDisclaimerClick = () => {
+    setShowDisclaimer(true);
+    // スクロールしてコンポーネントを表示
+    setTimeout(() => {
+      const element = document.getElementById('disclaimer-section');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
+  };
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-sky-500/30">
       <main className="max-w-6xl mx-auto px-6 py-20">
@@ -27,6 +41,14 @@ export default function Home() {
               将来の不確実性に、確かな備えを。<br className="hidden md:block" />
               公的年金と必要保障額を可視化する、プロフェッショナルなシミュレーションツール。
             </p>
+            <div className="mt-6">
+              <button
+                onClick={handleDisclaimerClick}
+                className="text-slate-500 hover:text-slate-400 text-sm transition-colors duration-200 underline underline-offset-4 decoration-slate-600 hover:decoration-slate-500"
+              >
+                本シミュレーションをご利用いただく前に、必ずご確認・ご了承いただきたい重要事項
+              </button>
+            </div>
           </div>
         </header>
 
@@ -139,6 +161,11 @@ export default function Home() {
               </div>
             </div>
           </Link>
+        </div>
+
+        {/* Simulation Disclaimer Section */}
+        <div id="disclaimer-section" className="mt-16">
+          <SimulationDisclaimer isOpen={showDisclaimer} onToggle={() => setShowDisclaimer(!showDisclaimer)} />
         </div>
       </main>
     </div>
