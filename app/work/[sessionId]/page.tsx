@@ -123,13 +123,64 @@ export default function WorkPage() {
         try {
           const parsedPanels = JSON.parse(localPanels);
           setPanels(parsedPanels);
-          setInitialPanelsLoaded(true);
+          // 初期パネルが存在するかチェック
+          const hasInitialPanels = parsedPanels.some((p: Panel) => p.id.startsWith('initial-panel-'));
+          setInitialPanelsLoaded(hasInitialPanels);
         } catch (e) {
           console.error('Failed to parse local panels:', e);
+          setInitialPanelsLoaded(false);
         }
+      } else {
+        // ローカルストレージにパネルがない場合、初期パネルを追加する準備
+        setInitialPanelsLoaded(false);
       }
     }
   }, [sessionId]);
+  
+  // オフラインモードで初期パネルを追加
+  useEffect(() => {
+    if (!offlineMode || !sessionId || initialPanelsLoaded || !userId) return;
+    
+    // リスクマトリクスコンテナが準備できているか確認
+    if (matrixRef.current) {
+      const initialPanelsData = getInitialPanels();
+      const panelsToAdd = initialPanelsData.map((panel, index) => ({
+        ...panel,
+        id: `initial-panel-${Date.now()}-${index}`,
+        userId,
+        userName: userName || 'ユーザー',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }));
+      
+      setPanels(panelsToAdd);
+      const localPanelsKey = `work-panels-${sessionId}`;
+      localStorage.setItem(localPanelsKey, JSON.stringify(panelsToAdd));
+      setInitialPanelsLoaded(true);
+    } else {
+      // リスクマトリクスコンテナが準備できていない場合、少し待ってから再試行
+      const timer = setTimeout(() => {
+        if (matrixRef.current && !initialPanelsLoaded) {
+          const initialPanelsData = getInitialPanels();
+          const panelsToAdd = initialPanelsData.map((panel, index) => ({
+            ...panel,
+            id: `initial-panel-${Date.now()}-${index}`,
+            userId,
+            userName: userName || 'ユーザー',
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          }));
+          
+          setPanels(panelsToAdd);
+          const localPanelsKey = `work-panels-${sessionId}`;
+          localStorage.setItem(localPanelsKey, JSON.stringify(panelsToAdd));
+          setInitialPanelsLoaded(true);
+        }
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [offlineMode, sessionId, initialPanelsLoaded, userId, userName]);
 
   // Firebase Realtime Databaseとの接続
   useEffect(() => {
