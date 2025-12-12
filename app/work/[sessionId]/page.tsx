@@ -29,22 +29,54 @@ export default function WorkPage() {
   const params = useParams();
   const router = useRouter();
   const sessionId = params?.sessionId as string;
-  // 初期パネルデータ（左側余白に配置、上下余白なし）
-  const initialPanels: Omit<Panel, 'id'>[] = [
-    { text: 'ステージの進んだがんの治療', x: 20, y: 100, width: 200, height: 40 },
-    { text: '長期の入院', x: 20, y: 140, width: 200, height: 40 },
-    { text: 'パートナーの早期死亡', x: 20, y: 180, width: 200, height: 40 },
-    { text: 'パートナーの介護や障害', x: 20, y: 220, width: 200, height: 40 },
-    { text: '介護費用 (将来的に)', x: 20, y: 260, width: 200, height: 40 },
-    { text: '交通事故による高額賠償', x: 20, y: 300, width: 200, height: 40 },
-    { text: '火災などの住宅損傷', x: 20, y: 340, width: 200, height: 40 },
-    { text: '風邪やインフルエンザ', x: 20, y: 380, width: 200, height: 40 },
-    { text: '短期の入院', x: 20, y: 420, width: 200, height: 40 },
-    { text: '骨折', x: 20, y: 460, width: 200, height: 40 },
-    { text: '上皮内がん', x: 20, y: 500, width: 200, height: 40 },
-    { text: '自動車の軽微な物損事故', x: 20, y: 540, width: 200, height: 40 },
-    { text: '旅行のキャンセル費用', x: 20, y: 580, width: 200, height: 40 },
-  ];
+  // 初期パネルデータを計算する関数（リスクマトリクスコンテナを基準に）
+  const getInitialPanels = (): Omit<Panel, 'id'>[] => {
+    if (!matrixRef.current) {
+      // フォールバック: デフォルト位置
+      return [
+        { text: 'ステージの進んだがんの治療', x: 20, y: 100, width: 200, height: 40 },
+        { text: '長期の入院', x: 20, y: 140, width: 200, height: 40 },
+        { text: 'パートナーの早期死亡', x: 20, y: 180, width: 200, height: 40 },
+        { text: 'パートナーの介護や障害', x: 20, y: 220, width: 200, height: 40 },
+        { text: '介護費用 (将来的に)', x: 20, y: 260, width: 200, height: 40 },
+        { text: '交通事故による高額賠償', x: 20, y: 300, width: 200, height: 40 },
+        { text: '火災などの住宅損傷', x: 20, y: 340, width: 200, height: 40 },
+        { text: '風邪やインフルエンザ', x: 20, y: 380, width: 200, height: 40 },
+        { text: '短期の入院', x: 20, y: 420, width: 200, height: 40 },
+        { text: '骨折', x: 20, y: 460, width: 200, height: 40 },
+        { text: '上皮内がん', x: 20, y: 500, width: 200, height: 40 },
+        { text: '自動車の軽微な物損事故', x: 20, y: 540, width: 200, height: 40 },
+        { text: '旅行のキャンセル費用', x: 20, y: 580, width: 200, height: 40 },
+      ];
+    }
+    
+    const matrixRect = matrixRef.current.getBoundingClientRect();
+    const boardRect = boardRef.current?.getBoundingClientRect();
+    if (!boardRect) {
+      return [];
+    }
+    
+    // リスクマトリクスコンテナを基準にした相対位置
+    const baseX = 20; // 左マージン
+    const baseY = 100; // 上マージン
+    const panelSpacing = 40;
+    
+    return [
+      { text: 'ステージの進んだがんの治療', x: baseX, y: baseY, width: 200, height: 40 },
+      { text: '長期の入院', x: baseX, y: baseY + panelSpacing * 1, width: 200, height: 40 },
+      { text: 'パートナーの早期死亡', x: baseX, y: baseY + panelSpacing * 2, width: 200, height: 40 },
+      { text: 'パートナーの介護や障害', x: baseX, y: baseY + panelSpacing * 3, width: 200, height: 40 },
+      { text: '介護費用 (将来的に)', x: baseX, y: baseY + panelSpacing * 4, width: 200, height: 40 },
+      { text: '交通事故による高額賠償', x: baseX, y: baseY + panelSpacing * 5, width: 200, height: 40 },
+      { text: '火災などの住宅損傷', x: baseX, y: baseY + panelSpacing * 6, width: 200, height: 40 },
+      { text: '風邪やインフルエンザ', x: baseX, y: baseY + panelSpacing * 7, width: 200, height: 40 },
+      { text: '短期の入院', x: baseX, y: baseY + panelSpacing * 8, width: 200, height: 40 },
+      { text: '骨折', x: baseX, y: baseY + panelSpacing * 9, width: 200, height: 40 },
+      { text: '上皮内がん', x: baseX, y: baseY + panelSpacing * 10, width: 200, height: 40 },
+      { text: '自動車の軽微な物損事故', x: baseX, y: baseY + panelSpacing * 11, width: 200, height: 40 },
+      { text: '旅行のキャンセル費用', x: baseX, y: baseY + panelSpacing * 12, width: 200, height: 40 },
+    ];
+  };
 
   const [panels, setPanels] = useState<Panel[]>([]);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -57,7 +89,9 @@ export default function WorkPage() {
   const [connectedUsers, setConnectedUsers] = useState<ConnectedUser[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [initialPanelsLoaded, setInitialPanelsLoaded] = useState(false);
+  const [offlineMode, setOfflineMode] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
+  const matrixRef = useRef<HTMLDivElement>(null);
   const moveThrottleRef = useRef<NodeJS.Timeout | null>(null);
   const lastUpdateRef = useRef<{ [key: string]: number }>({});
 
@@ -76,11 +110,30 @@ export default function WorkPage() {
     // ユーザー名を取得（localStorageから）
     const storedUserName = localStorage.getItem('work-user-name') || 'ユーザー';
     setUserName(storedUserName);
-  }, []);
+    
+    // オフラインモードの設定を取得（localStorageから）
+    const storedOfflineMode = localStorage.getItem('work-offline-mode') === 'true';
+    setOfflineMode(storedOfflineMode);
+    
+    // オフラインモードの場合、ローカルストレージからパネルを読み込む
+    if (storedOfflineMode && sessionId) {
+      const localPanelsKey = `work-panels-${sessionId}`;
+      const localPanels = localStorage.getItem(localPanelsKey);
+      if (localPanels) {
+        try {
+          const parsedPanels = JSON.parse(localPanels);
+          setPanels(parsedPanels);
+          setInitialPanelsLoaded(true);
+        } catch (e) {
+          console.error('Failed to parse local panels:', e);
+        }
+      }
+    }
+  }, [sessionId]);
 
   // Firebase Realtime Databaseとの接続
   useEffect(() => {
-    if (!sessionId || !userId || !database) return;
+    if (!sessionId || !userId || !database || offlineMode) return;
 
     const sessionRef = ref(database, `work/${sessionId}`);
     const panelsRef = ref(database, `work/${sessionId}/panels`);
@@ -100,75 +153,146 @@ export default function WorkPage() {
         
         // 初期パネルが存在しない場合、追加する
         if (!hasInitialPanels && !initialPanelsLoaded && database && sessionId) {
-          const panelsToAdd = initialPanels.map((panel, index) => ({
-            ...panel,
-            id: `initial-panel-${Date.now()}-${index}`,
-            userId,
-            userName: userName || 'ユーザー',
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          }));
-          
-          // Firebaseに初期パネルを追加（既存のパネルとマージ）
-          panelsToAdd.forEach(panel => {
-            if (database) {
-              const panelRef = ref(database, `work/${sessionId}/panels/${panel.id}`);
-              set(panelRef, {
-                text: panel.text,
-                x: panel.x,
-                y: panel.y,
-                width: panel.width,
-                height: panel.height,
-                userId: panel.userId,
-                userName: panel.userName,
-                createdAt: panel.createdAt,
-                updatedAt: panel.updatedAt,
-              });
-            }
-          });
-          setInitialPanelsLoaded(true);
-        } else {
-          setPanels(panelsArray);
-          setInitialPanelsLoaded(true);
+          // リスクマトリクスコンテナが準備できているか確認
+          if (matrixRef.current) {
+            const initialPanelsData = getInitialPanels();
+            const panelsToAdd = initialPanelsData.map((panel, index) => ({
+              ...panel,
+              id: `initial-panel-${Date.now()}-${index}`,
+              userId,
+              userName: userName || 'ユーザー',
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            }));
+            
+            // Firebaseに初期パネルを追加（既存のパネルとマージ）
+            panelsToAdd.forEach(panel => {
+              if (database) {
+                const panelRef = ref(database, `work/${sessionId}/panels/${panel.id}`);
+                set(panelRef, {
+                  text: panel.text,
+                  x: panel.x,
+                  y: panel.y,
+                  width: panel.width,
+                  height: panel.height,
+                  userId: panel.userId,
+                  userName: panel.userName,
+                  createdAt: panel.createdAt,
+                  updatedAt: panel.updatedAt,
+                });
+              }
+            });
+            setInitialPanelsLoaded(true);
+          } else {
+            // リスクマトリクスコンテナが準備できていない場合、少し待ってから再試行
+            setTimeout(() => {
+              if (matrixRef.current && !initialPanelsLoaded) {
+                const initialPanelsData = getInitialPanels();
+                const panelsToAdd = initialPanelsData.map((panel, index) => ({
+                  ...panel,
+                  id: `initial-panel-${Date.now()}-${index}`,
+                  userId,
+                  userName: userName || 'ユーザー',
+                  createdAt: Date.now(),
+                  updatedAt: Date.now(),
+                }));
+                
+                panelsToAdd.forEach(panel => {
+                  if (database) {
+                    const panelRef = ref(database, `work/${sessionId}/panels/${panel.id}`);
+                    set(panelRef, {
+                      text: panel.text,
+                      x: panel.x,
+                      y: panel.y,
+                      width: panel.width,
+                      height: panel.height,
+                      userId: panel.userId,
+                      userName: panel.userName,
+                      createdAt: panel.createdAt,
+                      updatedAt: panel.updatedAt,
+                    });
+                  }
+                });
+                setInitialPanelsLoaded(true);
+              }
+            }, 100);
+          }
         }
+        
+        // 既存のパネルを表示
+        setPanels(panelsArray);
+        setInitialPanelsLoaded(true);
       } else {
         // データが存在しない場合、初期パネルを追加
         if (!initialPanelsLoaded && database && sessionId) {
-          const panelsToAdd = initialPanels.map((panel, index) => ({
-            ...panel,
-            id: `initial-panel-${Date.now()}-${index}`,
-            userId,
-            userName: userName || 'ユーザー',
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          }));
-          
-          // Firebaseに初期パネルを追加
-          panelsToAdd.forEach(panel => {
-            if (database) {
-              const panelRef = ref(database, `work/${sessionId}/panels/${panel.id}`);
-              set(panelRef, {
-                text: panel.text,
-                x: panel.x,
-                y: panel.y,
-                width: panel.width,
-                height: panel.height,
-                userId: panel.userId,
-                userName: panel.userName,
-                createdAt: panel.createdAt,
-                updatedAt: panel.updatedAt,
-              });
-            }
-          });
-          setInitialPanelsLoaded(true);
-        } else {
-          setPanels([]);
+          // リスクマトリクスコンテナが準備できているか確認
+          if (matrixRef.current) {
+            const initialPanelsData = getInitialPanels();
+            const panelsToAdd = initialPanelsData.map((panel, index) => ({
+              ...panel,
+              id: `initial-panel-${Date.now()}-${index}`,
+              userId,
+              userName: userName || 'ユーザー',
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            }));
+            
+            // Firebaseに初期パネルを追加
+            panelsToAdd.forEach(panel => {
+              if (database) {
+                const panelRef = ref(database, `work/${sessionId}/panels/${panel.id}`);
+                set(panelRef, {
+                  text: panel.text,
+                  x: panel.x,
+                  y: panel.y,
+                  width: panel.width,
+                  height: panel.height,
+                  userId: panel.userId,
+                  userName: panel.userName,
+                  createdAt: panel.createdAt,
+                  updatedAt: panel.updatedAt,
+                });
+              }
+            });
+            setInitialPanelsLoaded(true);
+          } else {
+            // リスクマトリクスコンテナが準備できていない場合、少し待ってから再試行
+            setTimeout(() => {
+              if (matrixRef.current && !initialPanelsLoaded) {
+                const initialPanelsData = getInitialPanels();
+                const panelsToAdd = initialPanelsData.map((panel, index) => ({
+                  ...panel,
+                  id: `initial-panel-${Date.now()}-${index}`,
+                  userId,
+                  userName: userName || 'ユーザー',
+                  createdAt: Date.now(),
+                  updatedAt: Date.now(),
+                }));
+                
+                panelsToAdd.forEach(panel => {
+                  if (database) {
+                    const panelRef = ref(database, `work/${sessionId}/panels/${panel.id}`);
+                    set(panelRef, {
+                      text: panel.text,
+                      x: panel.x,
+                      y: panel.y,
+                      width: panel.width,
+                      height: panel.height,
+                      userId: panel.userId,
+                      userName: panel.userName,
+                      createdAt: panel.createdAt,
+                      updatedAt: panel.updatedAt,
+                    });
+                  }
+                });
+                setInitialPanelsLoaded(true);
+              }
+            }, 100);
+          }
         }
+        setPanels([]);
       }
       setIsConnected(true);
-    }, (error) => {
-      console.error('Firebase error:', error);
-      setIsConnected(false);
     });
 
     // 接続ユーザーの監視
@@ -213,14 +337,14 @@ export default function WorkPage() {
         remove(userRef);
       }
     };
-  }, [sessionId, userId, userName, initialPanelsLoaded]);
+  }, [sessionId, userId, userName, initialPanelsLoaded, offlineMode]);
 
   // パネルを追加
   const addPanel = () => {
-    if (!sessionId || !userId || !database) return;
+    if (!sessionId || !userId) return;
 
-    const panelsRef = ref(database, `work/${sessionId}/panels`);
-    const newPanel: Omit<Panel, 'id'> = {
+    const newPanel: Panel = {
+      id: `panel-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       text: '新しいリスク',
       x: 400,
       y: 300,
@@ -232,6 +356,18 @@ export default function WorkPage() {
       updatedAt: Date.now(),
     };
 
+    // オフラインモードの場合、ローカルストレージに保存
+    if (offlineMode) {
+      const updatedPanels = [...panels, newPanel];
+      setPanels(updatedPanels);
+      const localPanelsKey = `work-panels-${sessionId}`;
+      localStorage.setItem(localPanelsKey, JSON.stringify(updatedPanels));
+      return;
+    }
+
+    // オンラインモードの場合、Firebaseに追加
+    if (!database) return;
+    const panelsRef = ref(database, `work/${sessionId}/panels`);
     push(panelsRef, newPanel);
   };
 
@@ -283,6 +419,13 @@ export default function WorkPage() {
       );
       setPanels(updatedPanels);
 
+      // オフラインモードの場合、ローカルストレージに保存（即座に）
+      if (offlineMode && sessionId) {
+        const localPanelsKey = `work-panels-${sessionId}`;
+        localStorage.setItem(localPanelsKey, JSON.stringify(updatedPanels));
+        return;
+      }
+
       // スロットリング（100msごとに更新）
       if (moveThrottleRef.current) {
         clearTimeout(moveThrottleRef.current);
@@ -306,6 +449,7 @@ export default function WorkPage() {
     if (!draggingId || !boardRef.current || !sessionId) return;
 
     const boardRect = boardRef.current.getBoundingClientRect();
+    // ボード内の相対位置を計算
     const newX = e.clientX - boardRect.left - dragOffset.x;
     const newY = e.clientY - boardRect.top - dragOffset.y;
 
@@ -315,6 +459,13 @@ export default function WorkPage() {
         : panel
     );
     setPanels(updatedPanels);
+
+    // オフラインモードの場合、ローカルストレージに保存（即座に）
+    if (offlineMode && sessionId) {
+      const localPanelsKey = `work-panels-${sessionId}`;
+      localStorage.setItem(localPanelsKey, JSON.stringify(updatedPanels));
+      return;
+    }
 
     // スロットリング（100msごとに更新）
     if (moveThrottleRef.current) {
@@ -388,7 +539,20 @@ export default function WorkPage() {
 
   // パネルを削除
   const deletePanel = (id: string) => {
-    if (!sessionId || !database) return;
+    if (!sessionId) return;
+    
+    // オフラインモードの場合、ローカルストレージから削除
+    if (offlineMode) {
+      const updatedPanels = panels.filter(p => p.id !== id);
+      setPanels(updatedPanels);
+      const localPanelsKey = `work-panels-${sessionId}`;
+      localStorage.setItem(localPanelsKey, JSON.stringify(updatedPanels));
+      setEditingId(null);
+      return;
+    }
+    
+    // オンラインモードの場合、Firebaseから削除
+    if (!database) return;
     const panelRef = ref(database, `work/${sessionId}/panels/${id}`);
     remove(panelRef);
     setEditingId(null);
@@ -396,38 +560,55 @@ export default function WorkPage() {
 
   // 全てのパネルをクリアして初期パネルを初期位置に戻す
   const clearAllPanels = () => {
-    if (!sessionId || !database || !userId) return;
+    if (!sessionId || !userId) return;
+    
+    // リスクマトリクスコンテナが準備できているか確認
+    if (!matrixRef.current) {
+      // 少し待ってから再試行
+      setTimeout(() => clearAllPanels(), 100);
+      return;
+    }
     if (!confirm('全てのパネルを削除して、初期パネルを初期位置に戻しますか？')) return;
     
-    // 全てのパネルを削除
+    // 初期パネルを取得（リスクマトリクスコンテナを基準に）
+    const initialPanels = getInitialPanels();
+    
+    // 初期パネルを追加
+    const panelsToAdd = initialPanels.map((panel, index) => ({
+      ...panel,
+      id: `initial-panel-${Date.now()}-${index}`,
+      userId,
+      userName: userName || 'ユーザー',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }));
+
+    // オフラインモードの場合、ローカルストレージに保存
+    if (offlineMode) {
+      setPanels(panelsToAdd);
+      const localPanelsKey = `work-panels-${sessionId}`;
+      localStorage.setItem(localPanelsKey, JSON.stringify(panelsToAdd));
+      setEditingId(null);
+      return;
+    }
+
+    // オンラインモードの場合、Firebaseに保存
+    if (!database) return;
     const panelsRef = ref(database, `work/${sessionId}/panels`);
     remove(panelsRef).then(() => {
-      // 初期パネルを追加
-      const panelsToAdd = initialPanels.map((panel, index) => ({
-        ...panel,
-        id: `initial-panel-${Date.now()}-${index}`,
-        userId,
-        userName: userName || 'ユーザー',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      }));
-
-      // Firebaseに初期パネルを追加
       panelsToAdd.forEach(panel => {
-        if (database) {
-          const panelRef = ref(database, `work/${sessionId}/panels/${panel.id}`);
-          set(panelRef, {
-            text: panel.text,
-            x: panel.x,
-            y: panel.y,
-            width: panel.width,
-            height: panel.height,
-            userId: panel.userId,
-            userName: panel.userName,
-            createdAt: panel.createdAt,
-            updatedAt: panel.updatedAt,
-          });
-        }
+        const panelRef = ref(database, `work/${sessionId}/panels/${panel.id}`);
+        set(panelRef, {
+          text: panel.text,
+          x: panel.x,
+          y: panel.y,
+          width: panel.width,
+          height: panel.height,
+          userId: panel.userId,
+          userName: panel.userName,
+          createdAt: panel.createdAt,
+          updatedAt: panel.updatedAt,
+        });
       });
     });
     setEditingId(null);
@@ -441,13 +622,41 @@ export default function WorkPage() {
 
   // 編集保存
   const saveEditing = (id: string) => {
-    if (!sessionId || !database) return;
+    if (!sessionId) return;
+    
+    // オフラインモードの場合、ローカルストレージに保存
+    if (offlineMode) {
+      const updatedPanels = panels.map(p => 
+        p.id === id ? { ...p, text: editingText, updatedAt: Date.now() } : p
+      );
+      setPanels(updatedPanels);
+      const localPanelsKey = `work-panels-${sessionId}`;
+      localStorage.setItem(localPanelsKey, JSON.stringify(updatedPanels));
+      setEditingId(null);
+      return;
+    }
+    
+    // オンラインモードの場合、Firebaseに保存
+    if (!database) return;
     const panelRef = ref(database, `work/${sessionId}/panels/${id}`);
     update(panelRef, {
       text: editingText,
       updatedAt: Date.now(),
     });
     setEditingId(null);
+  };
+  
+  // オフラインモードの切り替え
+  const toggleOfflineMode = () => {
+    const newOfflineMode = !offlineMode;
+    setOfflineMode(newOfflineMode);
+    localStorage.setItem('work-offline-mode', String(newOfflineMode));
+    
+    if (newOfflineMode && sessionId) {
+      // オフラインモードに切り替えた場合、現在のパネルをローカルストレージに保存
+      const localPanelsKey = `work-panels-${sessionId}`;
+      localStorage.setItem(localPanelsKey, JSON.stringify(panels));
+    }
   };
 
   // 編集キャンセル
@@ -558,6 +767,17 @@ export default function WorkPage() {
             </div>
             <div className="flex items-center gap-1 md:gap-4 flex-wrap">
               <button
+                onClick={toggleOfflineMode}
+                className={`px-2 py-1 md:px-4 md:py-2 text-xs md:text-base rounded-lg transition-colors font-medium ${
+                  offlineMode
+                    ? 'bg-orange-600 hover:bg-orange-700 text-white'
+                    : 'bg-slate-600 hover:bg-slate-700 text-white'
+                }`}
+                title={offlineMode ? 'オフラインモード: タイムラグなし' : 'オンラインモード: リアルタイム同期'}
+              >
+                {offlineMode ? '⚡ オフライン' : '🌐 オンライン'}
+              </button>
+              <button
                 onClick={addPanel}
                 className="px-2 py-1 md:px-4 md:py-2 text-xs md:text-base bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
               >
@@ -569,7 +789,7 @@ export default function WorkPage() {
               >
                 クリア
               </button>
-              {sessionId && (
+              {sessionId && !offlineMode && (
                 <button
                   onClick={copySessionUrl}
                   className="px-2 py-1 md:px-4 md:py-2 text-xs md:text-base bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium"
@@ -593,7 +813,7 @@ export default function WorkPage() {
             }
           }}
         >
-          {/* よくわからないゾーン（初期パネルの一番上） */}
+          {/* よくわからないゾーン（初期パネルの一番上） - ボード基準の絶対配置 */}
           <div className="absolute z-10 hidden md:block" style={{ top: '20px', left: '120px' }}>
             <div className="w-24 h-12 md:w-32 md:h-16 border-2 border-dashed border-slate-300 bg-slate-50 rounded-lg flex items-center justify-center">
               <span className="text-xs font-semibold text-slate-700">よくわからない</span>
@@ -602,7 +822,10 @@ export default function WorkPage() {
 
           {/* リスクマトリクスの背景 */}
           <div className="absolute inset-0 flex items-center justify-center min-h-full">
-            <div className="relative w-full h-full max-w-5xl max-h-[calc(100vh-120px)] mx-auto my-8 border-4 border-blue-800">
+            <div 
+              ref={matrixRef}
+              className="relative w-full h-full max-w-5xl max-h-[calc(100vh-80px)] md:max-h-[calc(100vh-120px)] mx-auto my-2 md:my-8 border-2 md:border-4 border-blue-800"
+            >
               {/* Y軸（縦軸） */}
               <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-blue-800 transform -translate-x-1/2" />
               
