@@ -235,37 +235,6 @@ export default function WorkPage() {
     push(panelsRef, newPanel);
   };
 
-  // 初期パネルを追加（既存セッションでも使用可能）
-  const addInitialPanels = () => {
-    if (!sessionId || !userId || !database) return;
-
-    const panelsToAdd = initialPanels.map((panel, index) => ({
-      ...panel,
-      id: `initial-panel-${Date.now()}-${index}`,
-      userId,
-      userName: userName || 'ユーザー',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    }));
-
-    // Firebaseに初期パネルを追加
-    panelsToAdd.forEach(panel => {
-      if (database) {
-        const panelRef = ref(database, `work/${sessionId}/panels/${panel.id}`);
-        set(panelRef, {
-          text: panel.text,
-          x: panel.x,
-          y: panel.y,
-          width: panel.width,
-          height: panel.height,
-          userId: panel.userId,
-          userName: panel.userName,
-          createdAt: panel.createdAt,
-          updatedAt: panel.updatedAt,
-        });
-      }
-    });
-  };
 
   // パネルのサイズ変更（右端をドラッグ）
   const [resizingId, setResizingId] = useState<string | null>(null);
@@ -425,6 +394,45 @@ export default function WorkPage() {
     setEditingId(null);
   };
 
+  // 全てのパネルをクリアして初期パネルを初期位置に戻す
+  const clearAllPanels = () => {
+    if (!sessionId || !database || !userId) return;
+    if (!confirm('全てのパネルを削除して、初期パネルを初期位置に戻しますか？')) return;
+    
+    // 全てのパネルを削除
+    const panelsRef = ref(database, `work/${sessionId}/panels`);
+    remove(panelsRef).then(() => {
+      // 初期パネルを追加
+      const panelsToAdd = initialPanels.map((panel, index) => ({
+        ...panel,
+        id: `initial-panel-${Date.now()}-${index}`,
+        userId,
+        userName: userName || 'ユーザー',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }));
+
+      // Firebaseに初期パネルを追加
+      panelsToAdd.forEach(panel => {
+        if (database) {
+          const panelRef = ref(database, `work/${sessionId}/panels/${panel.id}`);
+          set(panelRef, {
+            text: panel.text,
+            x: panel.x,
+            y: panel.y,
+            width: panel.width,
+            height: panel.height,
+            userId: panel.userId,
+            userName: panel.userName,
+            createdAt: panel.createdAt,
+            updatedAt: panel.updatedAt,
+          });
+        }
+      });
+    });
+    setEditingId(null);
+  };
+
   // 編集開始
   const startEditing = (panel: Panel) => {
     setEditingId(panel.id);
@@ -501,12 +509,6 @@ export default function WorkPage() {
                 <li>開発サーバーを再起動</li>
               </ol>
             </div>
-            <Link
-              href="/"
-              className="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-            >
-              ホームに戻る
-            </Link>
           </div>
         </main>
       </div>
@@ -517,19 +519,19 @@ export default function WorkPage() {
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <main className="h-screen flex flex-col">
         {/* Header */}
-        <header className="flex-shrink-0 bg-white border-b-2 border-blue-800 py-4 relative">
+        <header className="flex-shrink-0 bg-white border-b-2 border-blue-800 py-2 md:py-4 relative">
           {/* 左側の余白スペースの中央に編集・削除ゾーンを配置 */}
-          <div className="absolute left-0 top-0 bottom-0 flex items-center justify-center" style={{ width: '208px' }}>
+          <div className="absolute left-0 top-0 bottom-0 hidden md:flex items-center justify-center" style={{ width: '208px' }}>
             <div className="flex items-center gap-2">
               <div
-                className={`w-24 h-12 border-2 border-dashed rounded-lg flex items-center justify-center transition-all ${
+                className={`w-20 h-10 md:w-24 md:h-12 border-2 border-dashed rounded-lg flex items-center justify-center transition-all ${
                   draggingId ? 'border-blue-500 bg-blue-50' : 'border-slate-300 bg-slate-50'
                 }`}
               >
                 <span className="text-xs font-semibold text-slate-700">編集</span>
               </div>
               <div
-                className={`w-24 h-12 border-2 border-dashed rounded-lg flex items-center justify-center transition-all ${
+                className={`w-20 h-10 md:w-24 md:h-12 border-2 border-dashed rounded-lg flex items-center justify-center transition-all ${
                   draggingId ? 'border-red-500 bg-red-50' : 'border-slate-300 bg-slate-50'
                 }`}
               >
@@ -537,62 +539,44 @@ export default function WorkPage() {
               </div>
             </div>
           </div>
-          <div className="max-w-6xl mx-auto flex items-center justify-between flex-wrap gap-4 px-6" style={{ marginLeft: '208px' }}>
-            <div className="flex items-center gap-4 flex-wrap">
-              <h1 className="text-2xl font-bold text-blue-800 underline">
+          <div className="max-w-6xl mx-auto flex items-center justify-between flex-wrap gap-2 md:gap-4 px-2 md:px-6 md:ml-[208px]">
+            <div className="flex items-center gap-2 md:gap-4 flex-wrap">
+              <h1 className="text-base md:text-2xl font-bold text-blue-800 underline">
                 ワーク: あなたの人生リスクMAP
               </h1>
-              <div className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-                <span className="text-sm text-slate-600">
+              <div className="flex items-center gap-1 md:gap-2">
+                <div className={`w-2 h-2 md:w-3 md:h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+                <span className="text-xs md:text-sm text-slate-600">
                   {isConnected ? '接続中' : '切断中'}
                 </span>
               </div>
               {connectedUsers.length > 0 && (
-                <div className="text-sm text-slate-600">
+                <div className="text-xs md:text-sm text-slate-600">
                   参加者: {connectedUsers.length}人
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-4 flex-wrap">
-              <input
-                type="text"
-                value={userName}
-                onChange={(e) => handleUserNameChange(e.target.value)}
-                placeholder="あなたの名前"
-                className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
-              />
+            <div className="flex items-center gap-1 md:gap-4 flex-wrap">
               <button
                 onClick={addPanel}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
+                className="px-2 py-1 md:px-4 md:py-2 text-xs md:text-base bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
               >
-                + パネルを追加
+                + 追加
               </button>
               <button
-                onClick={addInitialPanels}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium"
-                title="左側余白に初期パネル（13個）を追加"
+                onClick={clearAllPanels}
+                className="px-2 py-1 md:px-4 md:py-2 text-xs md:text-base bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium"
               >
-                + 初期パネルを追加
+                クリア
               </button>
               {sessionId && (
-                <div className="px-4 py-2 bg-slate-100 rounded-lg text-sm">
-                  <span className="text-slate-600">セッションID: </span>
-                  <span className="font-mono text-blue-600">{sessionId}</span>
-                  <button
-                    onClick={copySessionUrl}
-                    className="ml-2 text-blue-600 hover:text-blue-800 underline"
-                  >
-                    コピー
-                  </button>
-                </div>
+                <button
+                  onClick={copySessionUrl}
+                  className="px-2 py-1 md:px-4 md:py-2 text-xs md:text-base bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium"
+                >
+                  共有
+                </button>
               )}
-              <Link
-                href="/"
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg transition-colors"
-              >
-                ホームに戻る
-              </Link>
             </div>
           </div>
         </header>
@@ -609,33 +593,39 @@ export default function WorkPage() {
             }
           }}
         >
+          {/* よくわからないゾーン（初期パネルの一番上） */}
+          <div className="absolute z-10 hidden md:block" style={{ top: '20px', left: '120px' }}>
+            <div className="w-24 h-12 md:w-32 md:h-16 border-2 border-dashed border-slate-300 bg-slate-50 rounded-lg flex items-center justify-center">
+              <span className="text-xs font-semibold text-slate-700">よくわからない</span>
+            </div>
+          </div>
 
           {/* リスクマトリクスの背景 */}
           <div className="absolute inset-0 flex items-center justify-center min-h-full">
-            <div className="relative w-full h-full max-w-5xl max-h-[calc(100vh-120px)] mx-auto my-8">
+            <div className="relative w-full h-full max-w-5xl max-h-[calc(100vh-120px)] mx-auto my-8 border-4 border-blue-800">
               {/* Y軸（縦軸） */}
               <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-blue-800 transform -translate-x-1/2" />
               
               {/* X軸（横軸） */}
               <div className="absolute top-1/2 left-0 right-0 h-1 bg-blue-800 transform -translate-y-1/2" />
 
-              {/* Y軸ラベル（事故の頻度） */}
-              <div className="absolute left-1/2 top-4 transform -translate-x-1/2 text-center">
-                <div className="text-blue-800 font-bold text-lg mb-2">事故の頻度</div>
-                <div className="text-blue-800 font-semibold">よくある</div>
+              {/* Y軸ラベル（事故の頻度） - 十字線に被らないように調整 */}
+              <div className="absolute left-1/2 top-8 md:top-12 transform -translate-x-1/2 text-center z-10 bg-white px-1 md:px-2">
+                <div className="text-blue-800 font-bold text-sm md:text-lg mb-1 md:mb-2">事故の頻度</div>
+                <div className="text-blue-800 font-semibold text-xs md:text-base">よくある</div>
               </div>
-              <div className="absolute left-1/2 bottom-4 transform -translate-x-1/2 text-center">
-                <div className="text-blue-800 font-semibold">まれに</div>
+              <div className="absolute left-1/2 bottom-8 md:bottom-12 transform -translate-x-1/2 text-center z-10 bg-white px-1 md:px-2">
+                <div className="text-blue-800 font-semibold text-xs md:text-base">まれに</div>
               </div>
 
-              {/* X軸ラベル（損害額） */}
-              <div className="absolute left-4 top-1/2 transform -translate-y-1/2 -rotate-90 origin-center">
-                <div className="text-blue-800 font-bold text-lg">損害額</div>
+              {/* X軸ラベル（損害額） - 横表示、十字線に被らないように調整 */}
+              <div className="absolute left-2 md:left-4 top-1/2 transform -translate-y-1/2 -translate-y-4 md:-translate-y-6 z-10 bg-white px-1 md:px-2">
+                <div className="text-blue-800 font-bold text-sm md:text-lg text-center">損害額</div>
               </div>
-              <div className="absolute left-8 top-1/2 transform -translate-y-1/2 text-blue-800 font-semibold">
-                困らない
+              <div className="absolute left-2 md:left-3 top-1/2 transform -translate-y-1/2 translate-y-1 z-10 bg-white px-1 md:px-2">
+                <div className="text-blue-800 font-semibold text-xs md:text-base text-center whitespace-nowrap">困らない</div>
               </div>
-              <div className="absolute right-8 top-1/2 transform -translate-y-1/2 text-blue-800 font-semibold">
+              <div className="absolute right-8 md:right-12 top-1/2 transform -translate-y-1/2 text-blue-800 font-semibold text-xs md:text-base z-10 bg-white px-1 md:px-2">
                 困る
               </div>
 
@@ -651,12 +641,12 @@ export default function WorkPage() {
           {panels.map(panel => (
             <div
               key={panel.id}
-              className={`absolute bg-yellow-100 border-2 border-yellow-400 rounded-lg shadow-lg ${
-                draggingId === panel.id ? 'border-blue-500 z-50 shadow-2xl opacity-90 cursor-move' : 
+              className={`absolute bg-gradient-to-br from-yellow-50 to-yellow-100 border-2 rounded-lg shadow-md transition-all ${
+                draggingId === panel.id ? 'border-blue-500 z-50 shadow-xl opacity-90 cursor-move scale-105' : 
                 resizingId === panel.id ? 'border-green-500 z-50 cursor-ew-resize' : 
-                'z-10 cursor-move'
+                'border-yellow-300 hover:border-yellow-400 hover:shadow-lg z-10 cursor-move'
               } ${editingId === panel.id ? 'ring-2 ring-emerald-500' : ''} ${
-                panel.userId !== userId ? 'border-purple-400' : ''
+                panel.userId !== userId ? 'border-purple-300' : ''
               }`}
               style={{
                 left: `${panel.x}px`,

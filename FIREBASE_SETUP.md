@@ -96,7 +96,33 @@ NEXT_PUBLIC_FIREBASE_APP_ID=1:123456789:web:abcdef
 
 **注意**: このルールは誰でも読み書き可能です。本番環境では認証を追加することを推奨します。
 
-## 6. 動作確認
+## 6. Vercel環境変数の設定（本番環境用）
+
+**重要**: `.env.local`ファイルはローカル開発環境でのみ有効です。Vercelにデプロイする場合は、環境変数を別途設定する必要があります。
+
+### 設定手順
+
+1. [Vercel Dashboard](https://vercel.com/dashboard) にアクセス
+2. プロジェクトを選択
+3. 「Settings」→「Environment Variables」を選択
+4. 以下の環境変数を追加（`.env.local`と同じ値を使用）：
+
+```
+NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyAdF_haSqqGtizCxW2AmiYvO1RRrbmqGIQ
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=lpswork-c3e05.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_DATABASE_URL=https://lpswork-c3e05-default-rtdb.asia-southeast1.firebasedatabase.app
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=lpswork-c3e05
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=lpswork-c3e05.firebasestorage.app
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=454183894758
+NEXT_PUBLIC_FIREBASE_APP_ID=1:454183894758:web:43d7a09fd0e5cc57020527
+```
+
+5. 各環境変数で「Environment」を選択（Production、Preview、Developmentすべてにチェック推奨）
+6. 環境変数を追加した後、再デプロイを実行
+
+詳細は `VERCEL_ENV_SETUP.md` を参照してください。
+
+## 7. 動作確認
 
 1. 開発サーバーを起動: `npm run dev`
 2. ブラウザで `http://localhost:3000/work` にアクセス
