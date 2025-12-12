@@ -595,9 +595,10 @@ export default function WorkPage() {
     // オンラインモードの場合、Firebaseに保存
     if (!database) return;
     const panelsRef = ref(database, `work/${sessionId}/panels`);
+    const db = database; // TypeScript用の変数
     remove(panelsRef).then(() => {
       panelsToAdd.forEach(panel => {
-        const panelRef = ref(database, `work/${sessionId}/panels/${panel.id}`);
+        const panelRef = ref(db, `work/${sessionId}/panels/${panel.id}`);
         set(panelRef, {
           text: panel.text,
           x: panel.x,
