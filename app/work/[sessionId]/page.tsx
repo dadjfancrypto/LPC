@@ -422,30 +422,26 @@ export default function WorkPage() {
       );
       setPanels(updatedPanels);
 
-      // オフラインモードの場合、ローカルストレージに保存（即座に）
-      if (offlineMode && sessionId) {
-        const localPanelsKey = `work-panels-${sessionId}`;
-        localStorage.setItem(localPanelsKey, JSON.stringify(updatedPanels));
-        return;
-      }
-
+      // オフラインモードの場合、ローカルストレージへの保存はリサイズ終了時に行う（ラグを防ぐため）
       // スロットリング（100msごとに更新）
-      if (moveThrottleRef.current) {
-        clearTimeout(moveThrottleRef.current);
-      }
-
-      moveThrottleRef.current = setTimeout(() => {
-        if (!database || !sessionId) return;
-        const db = database; // TypeScript用の変数
-        const panel = updatedPanels.find(p => p.id === resizingId);
-        if (panel && db) {
-          const panelRef = ref(db, `work/${sessionId}/panels/${resizingId}`);
-          update(panelRef, {
-            width: panel.width,
-            updatedAt: Date.now(),
-          });
+      if (!offlineMode) {
+        if (moveThrottleRef.current) {
+          clearTimeout(moveThrottleRef.current);
         }
-      }, 100);
+
+        moveThrottleRef.current = setTimeout(() => {
+          if (!database || !sessionId) return;
+          const db = database; // TypeScript用の変数
+          const panel = updatedPanels.find(p => p.id === resizingId);
+          if (panel && db) {
+            const panelRef = ref(db, `work/${sessionId}/panels/${resizingId}`);
+            update(panelRef, {
+              width: panel.width,
+              updatedAt: Date.now(),
+            });
+          }
+        }, 100);
+      }
       return;
     }
 
@@ -464,35 +460,37 @@ export default function WorkPage() {
     );
     setPanels(updatedPanels);
 
-    // オフラインモードの場合、ローカルストレージに保存（即座に）
-    if (offlineMode && sessionId) {
-      const localPanelsKey = `work-panels-${sessionId}`;
-      localStorage.setItem(localPanelsKey, JSON.stringify(updatedPanels));
-      return;
-    }
-
+    // オフラインモードの場合、ローカルストレージへの保存はドラッグ終了時に行う（ラグを防ぐため）
     // スロットリング（100msごとに更新）
-    if (moveThrottleRef.current) {
-      clearTimeout(moveThrottleRef.current);
-    }
-
-    moveThrottleRef.current = setTimeout(() => {
-      if (!database) return;
-      const db = database; // TypeScript用の変数
-      const panel = updatedPanels.find(p => p.id === draggingId);
-      if (panel && db) {
-        const panelRef = ref(db, `work/${sessionId}/panels/${draggingId}`);
-        update(panelRef, {
-          x: panel.x,
-          y: panel.y,
-          updatedAt: Date.now(),
-        });
+    if (!offlineMode) {
+      if (moveThrottleRef.current) {
+        clearTimeout(moveThrottleRef.current);
       }
-    }, 100);
+
+      moveThrottleRef.current = setTimeout(() => {
+        if (!database) return;
+        const db = database; // TypeScript用の変数
+        const panel = updatedPanels.find(p => p.id === draggingId);
+        if (panel && db) {
+          const panelRef = ref(db, `work/${sessionId}/panels/${draggingId}`);
+          update(panelRef, {
+            x: panel.x,
+            y: panel.y,
+            updatedAt: Date.now(),
+          });
+        }
+      }, 100);
+    }
   };
 
   // ドラッグ終了
   const handleMouseUp = (e: React.MouseEvent) => {
+    // オフラインモードの場合、ドラッグ終了時にローカルストレージに保存
+    if (offlineMode && sessionId && draggingId) {
+      const localPanelsKey = `work-panels-${sessionId}`;
+      localStorage.setItem(localPanelsKey, JSON.stringify(panels));
+    }
+    
     if (moveThrottleRef.current) {
       clearTimeout(moveThrottleRef.current);
       moveThrottleRef.current = null;
@@ -500,6 +498,11 @@ export default function WorkPage() {
 
     // リサイズ終了
     if (resizingId) {
+      // オフラインモードの場合、リサイズ終了時にローカルストレージに保存
+      if (offlineMode && sessionId) {
+        const localPanelsKey = `work-panels-${sessionId}`;
+        localStorage.setItem(localPanelsKey, JSON.stringify(panels));
+      }
       setResizingId(null);
       return;
     }
