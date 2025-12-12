@@ -314,7 +314,8 @@ export default function WorkPage() {
 
     // 自分のユーザー情報を登録
     if (!database) return;
-    const userRef = ref(database, `work/${sessionId}/users/${userId}`);
+    const db = database; // TypeScript用の変数
+    const userRef = ref(db, `work/${sessionId}/users/${userId}`);
     set(userRef, {
       userName: userName || 'ユーザー',
       lastSeen: Date.now(),
@@ -322,9 +323,11 @@ export default function WorkPage() {
 
     // 定期的にlastSeenを更新（30秒ごと）
     const heartbeatInterval = setInterval(() => {
-      update(userRef, {
-        lastSeen: Date.now(),
-      });
+      if (db) {
+        update(userRef, {
+          lastSeen: Date.now(),
+        });
+      }
     }, 30000);
 
     // クリーンアップ
@@ -433,9 +436,10 @@ export default function WorkPage() {
 
       moveThrottleRef.current = setTimeout(() => {
         if (!database || !sessionId) return;
+        const db = database; // TypeScript用の変数
         const panel = updatedPanels.find(p => p.id === resizingId);
-        if (panel) {
-          const panelRef = ref(database, `work/${sessionId}/panels/${resizingId}`);
+        if (panel && db) {
+          const panelRef = ref(db, `work/${sessionId}/panels/${resizingId}`);
           update(panelRef, {
             width: panel.width,
             updatedAt: Date.now(),
@@ -474,9 +478,10 @@ export default function WorkPage() {
 
     moveThrottleRef.current = setTimeout(() => {
       if (!database) return;
+      const db = database; // TypeScript用の変数
       const panel = updatedPanels.find(p => p.id === draggingId);
-      if (panel) {
-        const panelRef = ref(database, `work/${sessionId}/panels/${draggingId}`);
+      if (panel && db) {
+        const panelRef = ref(db, `work/${sessionId}/panels/${draggingId}`);
         update(panelRef, {
           x: panel.x,
           y: panel.y,
