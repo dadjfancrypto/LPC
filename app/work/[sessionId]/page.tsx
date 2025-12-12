@@ -62,7 +62,7 @@ export default function WorkPage() {
     const panelSpacing = 40;
     
     return [
-      { text: 'ステージの進んだがんの治療', x: baseX, y: baseY, width: 200, height: 40 },
+      { text: 'ステージの進んだがん', x: baseX, y: baseY, width: 200, height: 40 },
       { text: '長期の入院', x: baseX, y: baseY + panelSpacing * 1, width: 200, height: 40 },
       { text: 'パートナーの早期死亡', x: baseX, y: baseY + panelSpacing * 2, width: 200, height: 40 },
       { text: 'パートナーの介護や障害', x: baseX, y: baseY + panelSpacing * 3, width: 200, height: 40 },
