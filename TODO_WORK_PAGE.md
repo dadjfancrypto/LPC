@@ -33,3 +33,10 @@
 - ゾーンは線で囲って、おけるスペースが明確に分かるようにする
 - 動作は不要（表示のみ）
 
+### 9. Vercel環境変数の設定
+- VercelダッシュボードでFirebase環境変数を設定
+- `.env.local`と同じ7つの環境変数を追加
+- Production、Preview、Developmentすべてに適用
+- 設定後、再デプロイを実行
+- 詳細は `VERCEL_ENV_SETUP.md` を参照
+
