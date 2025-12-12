@@ -34,7 +34,7 @@ export default function WorkPage() {
     if (!matrixRef.current) {
       // フォールバック: デフォルト位置
       return [
-        { text: 'ステージの進んだがんの治療', x: 20, y: 100, width: 200, height: 40 },
+        { text: 'ステージの進んだがん', x: 20, y: 100, width: 200, height: 40 },
         { text: '長期の入院', x: 20, y: 140, width: 200, height: 40 },
         { text: 'パートナーの早期死亡', x: 20, y: 180, width: 200, height: 40 },
         { text: 'パートナーの介護や障害', x: 20, y: 220, width: 200, height: 40 },
