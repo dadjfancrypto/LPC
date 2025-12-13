@@ -597,6 +597,7 @@ export default function DisabilityPensionPage() {
   const [ageSingle, setAgeSingle] = useState<number>(30);
   const [avgStdMonthlySingle, setAvgStdMonthlySingle] = useState<number>(Math.round(4_500_000 / 12));
   const [monthsSingle, setMonthsSingle] = useState<number>(150);
+  const [useMinashi300Single, setUseMinashi300Single] = useState<boolean>(true);
 
   const [showNotes, setShowNotes] = useState(false);
 
@@ -607,10 +608,16 @@ export default function DisabilityPensionPage() {
       if (saved) {
         try {
           const basic = JSON.parse(saved);
-          if (basic.spouseType) setSpouseType(basic.spouseType === 'single' ? 'none' : 'couple');
+          
+          // 家族構成
+          if (basic.spouseType) {
+            // 'single' は 'none' に変換、それ以外は 'couple' として扱う
+            setSpouseType(basic.spouseType === 'single' || basic.spouseType === 'none' ? 'none' : 'couple');
+          }
           if (basic.childrenCount !== undefined) setChildrenCount(basic.childrenCount);
           if (basic.childrenAges) setChildrenAges(basic.childrenAges);
 
+          // 妻の情報
           if (basic.ageWife) setAgeWife(basic.ageWife);
           if (basic.annualIncomeWife) {
             setAvgStdMonthlyWife(Math.round(basic.annualIncomeWife / 12));
@@ -620,6 +627,7 @@ export default function DisabilityPensionPage() {
           if (basic.monthsWife) setMonthsWife(basic.monthsWife);
           if (basic.useMinashi300Wife !== undefined) setUseMinashi300Wife(basic.useMinashi300Wife);
 
+          // 夫の情報
           if (basic.ageHusband) setAgeHusband(basic.ageHusband);
           if (basic.annualIncomeHusband) {
             setAvgStdMonthlyHusband(Math.round(basic.annualIncomeHusband / 12));
@@ -629,15 +637,38 @@ export default function DisabilityPensionPage() {
           if (basic.monthsHusband) setMonthsHusband(basic.monthsHusband);
           if (basic.useMinashi300Husband !== undefined) setUseMinashi300Husband(basic.useMinashi300Husband);
 
-          // Single profile mapping
-          if (basic.spouseType === 'single') {
-            // Map husband/wife/self depending on logic, but use defaults for now or map from self
-            if (basic.ageSelf) setAgeSingle(basic.ageSelf); // if exists
-            else if (basic.ageHusband) setAgeSingle(basic.ageHusband);
-            if (basic.annualIncomeHusband) {
+          // 独身の場合の本人情報
+          if (basic.spouseType === 'single' || basic.spouseType === 'none') {
+            // 年齢: age > ageHusband の優先順位
+            if (basic.age) {
+              setAgeSingle(basic.age);
+            } else if (basic.ageHusband) {
+              setAgeSingle(basic.ageHusband);
+            }
+            
+            // 年収/平均標準報酬月額: annualIncome > avgStdMonthly > annualIncomeHusband > avgStdMonthlyHusband の優先順位
+            if (basic.annualIncome) {
+              setAvgStdMonthlySingle(Math.round(basic.annualIncome / 12));
+            } else if (basic.avgStdMonthly) {
+              setAvgStdMonthlySingle(basic.avgStdMonthly);
+            } else if (basic.annualIncomeHusband) {
               setAvgStdMonthlySingle(Math.round(basic.annualIncomeHusband / 12));
             } else if (basic.avgStdMonthlyHusband) {
               setAvgStdMonthlySingle(basic.avgStdMonthlyHusband);
+            }
+            
+            // 加入月数: employeePensionMonths > monthsHusband の優先順位
+            if (basic.employeePensionMonths !== undefined) {
+              setMonthsSingle(basic.employeePensionMonths);
+            } else if (basic.monthsHusband) {
+              setMonthsSingle(basic.monthsHusband);
+            }
+            
+            // みなし300月: useMinashi300 > useMinashi300Husband の優先順位
+            if (basic.useMinashi300 !== undefined) {
+              setUseMinashi300Single(basic.useMinashi300);
+            } else if (basic.useMinashi300Husband !== undefined) {
+              setUseMinashi300Single(basic.useMinashi300Husband);
             }
           }
 
@@ -661,6 +692,7 @@ export default function DisabilityPensionPage() {
   // 計算ロジック & タイムライン生成 (妻が障害状態)
   // -----------------------------------------------------------
   const timelineDataWife = useMemo(() => {
+    if (spouseType !== 'couple') return null;
     // 1. 金額計算
     const eligibleChildren = calculateEligibleChildrenCount(childrenAges);
 
@@ -1001,12 +1033,13 @@ export default function DisabilityPensionPage() {
       block2_65plus,
       ageAfterChange: startAge
     };
-  }, [levelWife, childrenAges, ageWife, ageHusband, avgStdMonthlyWife, monthsWife, useMinashi300Wife]);
+  }, [spouseType, levelWife, childrenAges, ageWife, ageHusband, avgStdMonthlyWife, monthsWife, useMinashi300Wife]);
 
   // -----------------------------------------------------------
   // 計算ロジック & タイムライン生成 (夫が障害状態)
   // -----------------------------------------------------------
   const timelineDataHusband = useMemo(() => {
+    if (spouseType !== 'couple') return null;
     // 1. 金額計算
     const eligibleChildren = calculateEligibleChildrenCount(childrenAges);
 
@@ -1329,9 +1362,272 @@ export default function DisabilityPensionPage() {
       block2_65plus,
       ageAfterChange: startAge
     };
-  }, [levelHusband, childrenAges, ageHusband, ageWife, avgStdMonthlyHusband, monthsHusband, useMinashi300Husband]);
+  }, [spouseType, levelHusband, childrenAges, ageHusband, ageWife, avgStdMonthlyHusband, monthsHusband, useMinashi300Husband]);
 
-  // ... (Single case logic omitted for brevity but structure is ready for extension if needed)
+  // -----------------------------------------------------------
+  // 計算ロジック & タイムライン生成 (独身の場合)
+  // -----------------------------------------------------------
+  const timelineDataSingle = useMemo(() => {
+    if (spouseType !== 'none') return null;
+    
+    // 1. 金額計算
+    const eligibleChildren = calculateEligibleChildrenCount(childrenAges);
+    const hasSpouse = false; // 独身なので配偶者なし
+
+    const { basicPension, employeePension, total, spouseBonus } = calculateDisabilityPensionAmounts({
+      level: levelSingle,
+      hasSpouse,
+      ageSpouse: 0,
+      childrenAges,
+      avgStdMonthly: avgStdMonthlySingle,
+      months: monthsSingle,
+      useMinashi300: useMinashi300Single
+    });
+
+    // 2. タイムライン構築
+    const yearsToSelf65 = Math.max(0, 65 - ageSingle);
+    const block1 = { segments: [] as Segment[], ticks: [] as Tick[] };
+    const block2 = { segments: [] as Segment[], ticks: [] as Tick[] };
+    const block2_65plus = {
+      segments: [] as Segment[],
+      ticks: [] as Tick[],
+      optimizedAmount: 0,
+      optimizedPattern: null as 'A' | 'B' | null,
+      switchAge: null as number | null,
+      breakEvenAge: null as number | null
+    };
+    const widen = (y: number) => Math.max(y, 5);
+
+    // Block 1: 子がいる期間（子の加算対象期間）または受給期間（子がいない場合）
+    const yearsTo18List = childrenAges
+      .map(age => Math.max(0, 18 - age))
+      .filter(y => y > 0)
+      .sort((a, b) => a - b);
+
+    const pointsArr = [0, ...yearsTo18List];
+    const cappedPoints = pointsArr.map(y => Math.min(y, yearsToSelf65));
+    const points = Array.from(new Set(cappedPoints)).sort((a, b) => a - b);
+    const maxChangeYears = points[points.length - 1] || 0;
+
+    if (maxChangeYears > 0 || childrenAges.length === 0) {
+      // 子がいない場合は65歳まで、子がいる場合は子が18歳になるまで
+      const endYear = childrenAges.length === 0 ? yearsToSelf65 : maxChangeYears;
+      
+      // 初期Ticks
+      const initialLines: string[] = [];
+      if (childrenAges.length === 0) {
+        initialLines.push(`本人${ageSingle}`);
+      } else {
+        initialLines.push(`本人${ageSingle}`);
+        childrenAges.forEach(age => { if (age <= 18) initialLines.push(`子${age}`); });
+      }
+      block1.ticks.push({ edgeIndex: 0, labelLines: initialLines });
+
+      if (endYear > 0) {
+        const currentChildrenAges = childrenAges.map(a => a + 0);
+        const currentEligible = calculateEligibleChildrenCount(currentChildrenAges);
+        
+        const { basicPension: currentBasic, employeePension: currentEmployee, total: currentTotal } = calculateDisabilityPensionAmounts({
+          level: levelSingle,
+          hasSpouse: false,
+          ageSpouse: 0,
+          childrenAges: currentChildrenAges,
+          avgStdMonthly: avgStdMonthlySingle,
+          months: monthsSingle,
+          useMinashi300: useMinashi300Single
+        });
+
+        let label = `障害${levelSingle}級`;
+        if (currentEligible > 0) label += `+子${currentEligible}`;
+
+        const startAges: string[] = [`本人${ageSingle}`];
+        childrenAges.forEach((age) => {
+          startAges.push(`子${age}`);
+        });
+
+        const endAges: string[] = [];
+        if (childrenAges.length === 0) {
+          endAges.push(`本人${ageSingle + endYear}`);
+        } else {
+          endAges.push(`本人${ageSingle + endYear}`);
+          childrenAges.forEach((age) => {
+            const currentAge = age + endYear;
+            endAges.push(`子${currentAge}`);
+          });
+        }
+
+        block1.segments.push({
+          label,
+          years: endYear,
+          widthYears: widen(endYear),
+          className: 'ring-1 ring-white/20',
+          style: { backgroundColor: getGradientColor('amber', 0) },
+          amountYear: currentTotal,
+          startAge: ageSingle,
+          endAge: ageSingle + endYear,
+          startAges,
+          endAges
+        });
+
+        const lines: string[] = [];
+        if (childrenAges.length === 0) {
+          lines.push(`本人${ageSingle + endYear}`);
+        } else {
+          lines.push(`本人${ageSingle + endYear}`);
+          childrenAges.forEach((age) => {
+            const currentAge = age + endYear;
+            lines.push(`子${currentAge}`);
+          });
+        }
+        block1.ticks.push({ edgeIndex: 1, labelLines: lines });
+      }
+    }
+
+    // Block 2: 子がいなくなった後〜65歳まで（子がいる場合のみ）
+    const startAge = ageSingle + maxChangeYears;
+    if (childrenAges.length > 0 && startAge < 65) {
+      const endAge = 65;
+      const duration = endAge - startAge;
+      
+      if (duration > 0) {
+        const { basicPension: basic2, employeePension: emp2 } = calculateDisabilityPensionAmounts({
+          level: levelSingle,
+          hasSpouse: false,
+          ageSpouse: 0,
+          childrenAges: [],
+          avgStdMonthly: avgStdMonthlySingle,
+          months: monthsSingle,
+          useMinashi300: useMinashi300Single
+        });
+
+        block2.segments.push({
+          label: `障害${levelSingle}級`,
+          years: duration,
+          widthYears: widen(duration),
+          className: 'ring-1 ring-white/20',
+          style: { backgroundColor: getGradientColor('sky', 0) },
+          amountYear: basic2 + emp2,
+          startAge,
+          endAge,
+          startAges: [`本人${startAge}`],
+          endAges: [`本人${endAge}`]
+        });
+        block2.ticks.push({ edgeIndex: 0, labelLines: [`本人${startAge}`] });
+        block2.ticks.push({ edgeIndex: 1, labelLines: [`本人${endAge}`] });
+      }
+    }
+
+    // Block 2_65plus: 65歳以降
+    const startAge65 = 65;
+    const endAge100 = 100;
+    const oldAgeBasicBase = calculateOldAgeBasicPension();
+    const oldAgeEmployeeBase = calculateOldAgeEmployeePension(avgStdMonthlySingle, monthsSingle);
+    const disabilityTotal = basicPension + employeePension;
+
+    // 切り替えポイントを計算
+    let switchAge: number | null = null;
+    let switchAmount = 0;
+    for (let age = startAge65; age <= endAge100; age++) {
+      const deferralMonths = (age - startAge65) * 12;
+      const multiplier = 1 + (deferralMonths * 0.007);
+      const oldAgeAmount = (oldAgeBasicBase + oldAgeEmployeeBase) * multiplier;
+      if (oldAgeAmount > disabilityTotal) {
+        switchAge = age;
+        switchAmount = oldAgeAmount;
+        break;
+      }
+    }
+
+    if (switchAge !== null) {
+      block2_65plus.optimizedPattern = 'B';
+      block2_65plus.optimizedAmount = switchAmount;
+      block2_65plus.switchAge = switchAge;
+      block2_65plus.breakEvenAge = switchAge;
+
+      const durationBeforeSwitch = switchAge - startAge65;
+      const durationAfterSwitch = endAge100 - switchAge;
+
+      if (durationBeforeSwitch > 0) {
+        block2_65plus.segments.push({
+          label: '障害年金',
+          years: durationBeforeSwitch,
+          widthYears: widen(durationBeforeSwitch),
+          className: 'ring-1 ring-white/20',
+          style: { backgroundColor: getGradientColor('sky', 0) },
+          amountYear: disabilityTotal,
+          startAge: startAge65,
+          endAge: switchAge,
+          startAges: [`本人${startAge65}`],
+          endAges: undefined
+        });
+      }
+
+      if (durationAfterSwitch > 0) {
+        const deferralMonths = (switchAge - startAge65) * 12;
+        const multiplier = 1 + (deferralMonths * 0.007);
+        const switchAmountFinal = (oldAgeBasicBase + oldAgeEmployeeBase) * multiplier;
+
+        block2_65plus.segments.push({
+          label: `${switchAge}歳繰下げ`,
+          years: durationAfterSwitch,
+          widthYears: widen(durationAfterSwitch),
+          className: 'ring-1 ring-white/20',
+          style: { backgroundColor: getGradientColor('sky', 1) },
+          amountYear: switchAmountFinal,
+          startAge: switchAge,
+          endAge: endAge100,
+          startAges: [`本人${switchAge}`],
+          endAges: [`本人${endAge100}`]
+        });
+      }
+    } else {
+      block2_65plus.optimizedPattern = 'A';
+      block2_65plus.optimizedAmount = disabilityTotal;
+      block2_65plus.switchAge = null;
+      block2_65plus.breakEvenAge = null;
+
+      const duration = endAge100 - startAge65;
+      block2_65plus.segments.push({
+        label: '障害年金（継続）',
+        years: duration,
+        widthYears: widen(duration),
+        className: 'ring-1 ring-white/20',
+        style: { backgroundColor: getGradientColor('sky', 0) },
+        amountYear: disabilityTotal,
+        startAge: startAge65,
+        endAge: endAge100,
+        startAges: [`本人${startAge65}`],
+        endAges: [`本人${endAge100}`]
+      });
+    }
+
+    block2_65plus.ticks.push({ edgeIndex: 0, labelLines: [`本人${startAge65}`] });
+    if (block2_65plus.switchAge !== null && block2_65plus.segments.length > 1) {
+      const seg1Years = block2_65plus.segments[0].years;
+      const switchAge = block2_65plus.switchAge;
+      block2_65plus.ticks.push({
+        posYears: seg1Years,
+        labelLines: [`本人${switchAge}`, `⤴ ${switchAge}歳で老齢年金の方が高くなるため切替`]
+      });
+    }
+    block2_65plus.ticks.push({ edgeIndex: block2_65plus.segments.length, labelLines: [`本人${endAge100}`] });
+
+    const pensionTypes = ['障害基礎年金', '障害厚生年金'];
+    if (eligibleChildren > 0) pensionTypes.push('子の加算');
+
+    const ageAfterChange = childrenAges.length === 0 ? 65 : ageSingle + maxChangeYears;
+
+    return {
+      total,
+      basicPension,
+      employeePension,
+      pensionTypes,
+      block1: (maxChangeYears > 0 || childrenAges.length === 0) ? block1 : null,
+      block2,
+      block2_65plus,
+      ageAfterChange
+    };
+  }, [spouseType, levelSingle, childrenAges, ageSingle, avgStdMonthlySingle, monthsSingle, useMinashi300Single]);
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-amber-500/30 pb-20">
@@ -1420,6 +1716,17 @@ export default function DisabilityPensionPage() {
             }}
           >
             <div className="space-y-6">
+              <div>
+                <Label>家族構成</Label>
+                <Select
+                  value={spouseType ?? 'couple'}
+                  onChange={(e) => setSpouseType(e.target.value === 'couple' ? 'couple' : 'none')}
+                  options={[
+                    { value: 'couple', label: '夫婦' },
+                    { value: 'none', label: '独身' }
+                  ]}
+                />
+              </div>
               <div>
                 <Label>子の人数</Label>
                 <Select
@@ -1562,10 +1869,57 @@ export default function DisabilityPensionPage() {
                   </div>
                 </>
               )}
+
+              {spouseType === 'none' && (
+                <div className="pt-4 border-t border-slate-700">
+                  <h3 className="text-sm font-bold text-amber-400 mb-3">本人の情報</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <Label>障害等級</Label>
+                      <Select
+                        value={levelSingle}
+                        onChange={(e) => setLevelSingle(Number(e.target.value) as DisabilityLevel)}
+                        options={[{ value: 1, label: '1級' }, { value: 2, label: '2級' }, { value: 3, label: '3級' }]}
+                      />
+                    </div>
+                    <div>
+                      <Label>年齢</Label>
+                      <Select
+                        value={ageSingle}
+                        onChange={(e) => setAgeSingle(Number(e.target.value))}
+                        options={Array.from({ length: 83 }, (_, i) => ({ value: 18 + i, label: `${18 + i}歳` }))}
+                      />
+                    </div>
+                    <div>
+                      <Label>昨年の年収（額面）</Label>
+                      <Select
+                        value={getAnnualDropdownValue(avgStdMonthlySingle)}
+                        onChange={(e) => {
+                          if (e.target.value === '') {
+                            setAvgStdMonthlySingle(0);
+                            return;
+                          }
+                          const man = Number(e.target.value);
+                          const annualYen = man * 10000;
+                          setAvgStdMonthlySingle(Math.round(annualYen / 12));
+                        }}
+                        options={ANNUAL_INCOME_SELECT_OPTIONS}
+                      />
+                    </div>
+                    <div>
+                      <Label>
+                        厚生年金加入月数
+                        <span className="text-[10px] font-normal text-slate-500 ml-2">（一度でも厚生年金に加入していた方は月数を記入ください）</span>
+                      </Label>
+                      <Input value={monthsSingle} onChange={(e) => setMonthsSingle(Number(e.target.value))} />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </Accordion>
 
-          {spouseType === 'couple' && (
+          {spouseType === 'couple' && timelineDataWife && timelineDataHusband && (
             <>
               {/* 妻が障害状態になった場合 */}
               <section>
@@ -1856,6 +2210,167 @@ export default function DisabilityPensionPage() {
                   </Accordion>
                 )}
               </section>
+            </>
+          )}
+
+          {spouseType === 'none' && (
+            <>
+              {timelineDataSingle ? (
+                <section>
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center border border-amber-500/30">
+                      <span className="text-2xl">👤</span>
+                    </div>
+                    <div className="flex-1">
+                      <h2 className="text-2xl font-bold text-slate-100">本人の受給額</h2>
+                      <p className="text-sm text-slate-400 mt-0.5">本人が障害状態になった場合</p>
+                    </div>
+                <div className="flex items-center gap-2">
+                  <PeriodCard
+                    title={childrenAges.length === 0 ? "受給期間" : "加算あり期間"}
+                    amount={timelineDataSingle.total}
+                    period={timelineDataSingle.block1 ? `${ageSingle}歳 - ${timelineDataSingle.ageAfterChange}歳` : '---'}
+                    colorClass="border-amber-500/30"
+                    icon="🏥"
+                    pensionTypes={timelineDataSingle.pensionTypes}
+                  />
+                  {timelineDataSingle.block2.segments.length > 0 && (
+                    <PeriodCard
+                      title="加算終了後"
+                      amount={timelineDataSingle.basicPension + calculateDisabilityEmployeePension(levelSingle, 0, 0, avgStdMonthlySingle, monthsSingle, useMinashi300Single)}
+                      period={`${timelineDataSingle.ageAfterChange}歳 - 65歳`}
+                      colorClass="border-sky-500/30"
+                      icon="💼"
+                      pensionTypes={['障害基礎年金', '障害厚生年金']}
+                    />
+                  )}
+                  {timelineDataSingle.block2_65plus.segments.length > 0 && (
+                    <PeriodCard
+                      title="65歳以降（最適給付）"
+                      amount={timelineDataSingle.block2_65plus.optimizedAmount}
+                      period="65歳 - 100歳"
+                      colorClass="border-emerald-500/30"
+                      icon="✨"
+                      pensionTypes={timelineDataSingle.block2_65plus.optimizedPattern === 'A'
+                        ? ['障害基礎年金', '障害厚生年金']
+                        : timelineDataSingle.block2_65plus.switchAge
+                          ? [`老齢基礎年金（${timelineDataSingle.block2_65plus.switchAge}歳繰下げ）`, `老齢厚生年金（${timelineDataSingle.block2_65plus.switchAge}歳繰下げ）`]
+                          : ['老齢基礎年金', '老齢厚生年金']}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {timelineDataSingle.block1 && (
+                <Accordion
+                  title={childrenAges.length === 0 ? "① 🏥 受給期間" : "① 👶 子がいる期間（加算あり期間）"}
+                  defaultOpen={true}
+                >
+                  <TimelineBlock
+                    title=""
+                    color="amber"
+                    segments={timelineDataSingle.block1.segments}
+                    ticks={timelineDataSingle.block1.ticks}
+                    blockNumber={1}
+                    hasLogic={true}
+                  />
+                  <CalculationLogic
+                    color="amber"
+                    details={[
+                      { label: `障害基礎年金（${levelSingle}級）`, value: `${(calculateDisabilityBasicPension(levelSingle, 0) / 10000).toFixed(1)}万円` },
+                      { label: '　79.5万円 × 等級倍率（1級1.25, 2級1.0）', value: levelSingle === 1 ? '79.5万円 × 1.25 = 99.4万円' : '79.5万円 × 1.0 = 79.5万円' },
+                      ...(childrenAges.length > 0 ? [{ label: '子の加算', value: `${((calculateDisabilityBasicPension(levelSingle, calculateEligibleChildrenCount(childrenAges)) - calculateDisabilityBasicPension(levelSingle, 0)) / 10000).toFixed(1)}万円` }] : []),
+                      { label: '障害厚生年金', value: `${(calculateDisabilityEmployeePension(levelSingle, 0, 0, avgStdMonthlySingle, monthsSingle, useMinashi300Single) / 10000).toFixed(1)}万円` },
+                      { label: '　平均標準報酬月額 × 厚生年金加入月数 × 5.481/1000 × 等級倍率', value: `${(avgStdMonthlySingle / 10000).toFixed(1)}万 × ${useMinashi300Single ? Math.max(monthsSingle, 300) : monthsSingle}月 × 5.481/1000 × ${levelSingle === 1 ? '1.25' : '1.0'} = ${(calculateDisabilityEmployeePension(levelSingle, 0, 0, avgStdMonthlySingle, monthsSingle, useMinashi300Single) / 10000).toFixed(1)}万円` },
+                    ]}
+                  />
+                </Accordion>
+              )}
+
+              {timelineDataSingle.block2.segments.length > 0 && (
+                <Accordion
+                  title="② 💼 加算終了後 〜"
+                  defaultOpen={true}
+                >
+                  <div className="mt-8">
+                    <TimelineBlock
+                      title=""
+                      color="sky"
+                      segments={timelineDataSingle.block2.segments}
+                      ticks={timelineDataSingle.block2.ticks}
+                      blockNumber={2}
+                      hasLogic={true}
+                    />
+                  </div>
+                  <CalculationLogic
+                    color="sky"
+                    details={[
+                      { label: '障害基礎年金', value: `${(calculateDisabilityBasicPension(levelSingle, 0) / 10000).toFixed(1)}万円` },
+                      { label: '障害厚生年金', value: `${(calculateDisabilityEmployeePension(levelSingle, 0, 0, avgStdMonthlySingle, monthsSingle, true) / 10000).toFixed(1)}万円` },
+                    ]}
+                  />
+                </Accordion>
+              )}
+
+              {timelineDataSingle.block2_65plus.segments.length > 0 && (
+                <Accordion
+                  title={`${timelineDataSingle.block2.segments.length > 0 ? '③' : '②'} ✨ 65歳以降（最適給付）${timelineDataSingle.block2_65plus.breakEvenAge ? ` [損益分岐点: ${timelineDataSingle.block2_65plus.breakEvenAge}歳]` : ' [障害年金の方が有利]'}`}
+                  defaultOpen={true}
+                >
+                  <div className="mt-8">
+                    <TimelineBlock
+                      title=""
+                      color="sky"
+                      segments={timelineDataSingle.block2_65plus.segments}
+                      ticks={timelineDataSingle.block2_65plus.ticks}
+                      blockNumber={2}
+                      hasLogic={true}
+                    />
+                  </div>
+                  <CalculationLogic
+                    color="sky"
+                    details={[
+                      { label: '65歳以降の受給イメージ', value: '' },
+                      {
+                        label: timelineDataSingle.block2_65plus.optimizedPattern === 'A'
+                          ? '　障害年金の方が有利（老齢年金への切替不要）'
+                          : `　${timelineDataSingle.block2_65plus.switchAge}歳で老齢年金の方が高くなるため切替`,
+                        value: ''
+                      },
+                      ...(timelineDataSingle.block2_65plus.optimizedPattern === 'A' ? [
+                        { label: '障害基礎年金', value: `${(calculateDisabilityBasicPension(levelSingle, 0) / 10000).toFixed(1)}万円` },
+                        { label: '障害厚生年金', value: `${(calculateDisabilityEmployeePension(levelSingle, 0, 0, avgStdMonthlySingle, monthsSingle, useMinashi300Single) / 10000).toFixed(1)}万円` },
+                        { label: '　平均標準報酬月額 × 厚生年金加入月数 × 5.481/1000 × 等級倍率', value: `${(avgStdMonthlySingle / 10000).toFixed(1)}万 × ${useMinashi300Single ? Math.max(monthsSingle, 300) : monthsSingle}月 × 5.481/1000 × ${levelSingle === 1 ? '1.25' : '1.0'} = ${(calculateDisabilityEmployeePension(levelSingle, 0, 0, avgStdMonthlySingle, monthsSingle, useMinashi300Single) / 10000).toFixed(1)}万円` },
+                      ] : (() => {
+                        const switchAge = timelineDataSingle.block2_65plus.switchAge!;
+                        const deferralMonths = (switchAge - 65) * 12;
+                        const multiplier = 1 + (deferralMonths * 0.007);
+                        const multiplierPercent = ((multiplier - 1) * 100).toFixed(1);
+                        return [
+                          { label: `老齢基礎年金（${switchAge}歳繰下げ +${multiplierPercent}%）`, value: `${(calculateOldAgeBasicPension() * multiplier / 10000).toFixed(1)}万円` },
+                          { label: `　79.5万円 × ${multiplier.toFixed(3)}`, value: `${(calculateOldAgeBasicPension() * multiplier / 10000).toFixed(1)}万円` },
+                          { label: `老齢厚生年金（${switchAge}歳繰下げ +${multiplierPercent}%）`, value: `${(calculateOldAgeEmployeePension(avgStdMonthlySingle, monthsSingle) * multiplier / 10000).toFixed(1)}万円` },
+                          { label: `　平均標準報酬月額 × 厚生年金加入月数 × 5.481/1000 × ${multiplier.toFixed(3)}`, value: `${(avgStdMonthlySingle / 10000).toFixed(1)}万 × ${monthsSingle}月 × 5.481/1000 × ${multiplier.toFixed(3)} = ${(calculateOldAgeEmployeePension(avgStdMonthlySingle, monthsSingle) * multiplier / 10000).toFixed(1)}万円` },
+                        ];
+                      })()),
+                    ].flat()}
+                  />
+                </Accordion>
+              )}
+            </section>
+              ) : (
+                <section className="mt-8">
+                  <div className="rounded-2xl border border-slate-700 bg-slate-900/50 p-8 text-center">
+                    <div className="w-16 h-16 rounded-full bg-slate-700/50 flex items-center justify-center mx-auto mb-4">
+                      <span className="text-3xl">ℹ️</span>
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-100 mb-2">計算中...</h2>
+                    <p className="text-slate-400 leading-relaxed">
+                      情報を入力してください。
+                    </p>
+                  </div>
+                </section>
+              )}
             </>
           )}
         </div>

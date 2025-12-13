@@ -933,11 +933,11 @@ export default function CustomerProfilePage() {
       <div className="bg-slate-900/50 border-b border-slate-800 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-4xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between mb-3">
-            <h1 className="text-xl font-bold flex items-center gap-2">
-              <span className="w-2 h-8 bg-sky-500 rounded-full"></span>
-              Customer Profile
-            </h1>
-            <div className="flex items-center gap-2">
+          <h1 className="text-xl font-bold flex items-center gap-2">
+            <span className="w-2 h-8 bg-sky-500 rounded-full"></span>
+            Customer Profile
+          </h1>
+          <div className="flex items-center gap-2">
             <button
               onClick={() => {
                 const clearedProfile = {

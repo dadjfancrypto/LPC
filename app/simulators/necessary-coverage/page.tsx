@@ -411,24 +411,52 @@ function StackedAreaChart({
                             const yearsSinceStart = age - startAge;
                             const childrenAges = profile.basicInfo.childrenAges || [];
                             
-                            if (scenarioType === 'husbandDeath' || scenarioType === 'husbandDisability') {
-                                // 夫のシナリオ：妻と子供を表示
+                            if (scenarioType === 'husbandDeath') {
+                                // 夫死亡シナリオ：妻と子供を表示
                                 const wifeAge = (profile.basicInfo.ageWife || 0) + yearsSinceStart;
                                 familyLabels.push(`妻${wifeAge}`);
                                 childrenAges.forEach((childAge) => {
                                     const currentChildAge = childAge + yearsSinceStart;
                                     familyLabels.push(`子${currentChildAge}`);
                                 });
-                            } else if (scenarioType === 'wifeDeath' || scenarioType === 'wifeDisability') {
-                                // 妻のシナリオ：夫と子供を表示
+                            } else if (scenarioType === 'husbandDisability') {
+                                // 夫障害シナリオ：夫、妻と子供を表示
+                                const husbandAge = (profile.basicInfo.ageHusband || 0) + yearsSinceStart;
+                                familyLabels.push(`夫${husbandAge}`);
+                                const wifeAge = (profile.basicInfo.ageWife || 0) + yearsSinceStart;
+                                familyLabels.push(`妻${wifeAge}`);
+                                childrenAges.forEach((childAge) => {
+                                    const currentChildAge = childAge + yearsSinceStart;
+                                    familyLabels.push(`子${currentChildAge}`);
+                                });
+                            } else if (scenarioType === 'wifeDeath') {
+                                // 妻死亡シナリオ：夫と子供を表示
                                 const husbandAge = (profile.basicInfo.ageHusband || 0) + yearsSinceStart;
                                 familyLabels.push(`夫${husbandAge}`);
                                 childrenAges.forEach((childAge) => {
                                     const currentChildAge = childAge + yearsSinceStart;
                                     familyLabels.push(`子${currentChildAge}`);
                                 });
-                            } else {
-                                // 独身のシナリオ：子供のみ表示
+                            } else if (scenarioType === 'wifeDisability') {
+                                // 妻障害シナリオ：妻、夫と子供を表示
+                                const wifeAge = (profile.basicInfo.ageWife || 0) + yearsSinceStart;
+                                familyLabels.push(`妻${wifeAge}`);
+                                const husbandAge = (profile.basicInfo.ageHusband || 0) + yearsSinceStart;
+                                familyLabels.push(`夫${husbandAge}`);
+                                childrenAges.forEach((childAge) => {
+                                    const currentChildAge = childAge + yearsSinceStart;
+                                    familyLabels.push(`子${currentChildAge}`);
+                                });
+                            } else if (scenarioType === 'singleDeath') {
+                                // 独身死亡シナリオ：子供のみ表示
+                                childrenAges.forEach((childAge) => {
+                                    const currentChildAge = childAge + yearsSinceStart;
+                                    familyLabels.push(`子${currentChildAge}`);
+                                });
+                            } else if (scenarioType === 'singleDisability') {
+                                // 独身障害シナリオ：本人と子供を表示
+                                const selfAge = (profile.basicInfo.age || profile.basicInfo.ageHusband || 0) + yearsSinceStart;
+                                familyLabels.push(`本人${selfAge}`);
                                 childrenAges.forEach((childAge) => {
                                     const currentChildAge = childAge + yearsSinceStart;
                                     familyLabels.push(`子${currentChildAge}`);
@@ -2088,7 +2116,157 @@ export default function NecessaryCoveragePage() {
                             </>
                         ) : (
                             <>
-                                {/* 独身の場合、遺族年金がないため死亡時シナリオは非表示 */}
+                                {/* 独身：死亡時シナリオ用の条件設定 */}
+                                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 pb-2 shadow-lg mb-4">
+                                    <button
+                                        onClick={() => setShowDeathSettings((prev) => !prev)}
+                                        className="w-full flex items-center justify-between mb-2"
+                                    >
+                                        <h2 className="text-lg font-bold flex items-center gap-2">
+                                            <span>⚙️</span> 死亡時シナリオの条件設定
+                    </h2>
+                                        <span className={`text-slate-400 transition-transform ${showDeathSettings ? 'rotate-180' : ''}`}>
+                                            ⌃
+                                        </span>
+                                    </button>
+
+                                    {showDeathSettings && (
+                        <div>
+                                            <div className="space-y-2">
+                                                <div className="mb-1">
+                                                    <label className="block text-sm font-medium text-slate-400 mb-1">
+                                                        遺族の生活費率: <span className="text-emerald-400 font-bold">{expenseRatioSurvivor}%</span>
+                            </label>
+                            <input
+                                type="range" min="50" max="100" step="5"
+                                value={expenseRatioSurvivor}
+                                onChange={(e) => setExpenseRatioSurvivor(Number(e.target.value))}
+                                                        className="w-1/4 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                            />
+                                                    <p className="text-xs text-slate-500 mt-1">現在の生活費を100%として、本人が亡くなった後の遺族の生活費が何%になるかを設定します。一般的には60〜80%程度です。</p>
+                        </div>
+                                                <div className="flex items-center gap-2 mb-1">
+                                <label className="block text-sm font-medium text-slate-400">現在の貯蓄・既存保険総額</label>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSavingsInfo((prev) => !prev)}
+                                                        className="inline-flex items-center gap-1 text-xs font-semibold text-amber-300 hover:text-amber-200 transition-colors"
+                                >
+                                    <span role="img" aria-label="hint">💡</span>
+                                    入力しなくても問題ありません。
+                                    <span className={`text-xs transition-transform ${showSavingsInfo ? 'rotate-180' : ''}`}>⌃</span>
+                                </button>
+                                        </div>
+                                                <div className="p-0 max-w-md bg-slate-950/60 border border-slate-800 rounded-lg">
+                                                    <div className="px-[2px] py-0.5">
+                            <div className="relative">
+                                <select
+                                    value={currentSavingsMan}
+                                    onChange={(e) => setCurrentSavingsMan(Number(e.target.value))}
+                                                                className="w-full rounded-xl px-2 py-1 bg-slate-800/50 border border-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-slate-100 font-mono text-sm appearance-none"
+                                >
+                                    {SAVINGS_OPTIONS_MAN.map((option) => (
+                                        <option key={option} value={option}>
+                                            {option.toLocaleString()}万円
+                                        </option>
+                                    ))}
+                                </select>
+                                                            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-500">
+                                    ▼
+                                </span>
+                                                        </div>
+                                                    </div>
+                                        </div>
+                            {showSavingsInfo && (
+                                <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 text-xs leading-relaxed space-y-2 animate-fade-in">
+                                    <p className="text-slate-300 font-semibold">【現在の貯蓄・既存保険総額】について</p>
+                                    <p className="text-slate-400">この項目は、お客様の<strong className="text-white font-semibold">「今の備え（貯金や学資保険、既存の死亡保険など）」</strong>をシミュレーションに反映させ、<strong className="text-emerald-300">本当に必要な保険額</strong>を正確に計算するためにあります。</p>
+                                    <p className="text-slate-400"><strong className="text-white">入力しなくても問題ありません。</strong></p>
+                                    <ul className="text-slate-400 space-y-1 pl-4 list-disc">
+                                        <li>入力しない場合（0万円のまま）は、「貯蓄が全くない状態で、公的年金とご家族の収入だけで生活した場合の<strong className="text-rose-300">最大の不足額</strong>」として算出します。</li>
+                                        <li>FPとしての責任として、お客様が<strong className="text-white">「保険で確保したい」</strong>金額を優先し、あえて貯蓄を入れずに計算することも可能です。後ほどFPにご相談の際に、貯蓄の使い道を一緒に検討します。</li>
+                                    </ul>
+                            </div>
+                        )}
+                                        </div>
+                                        </div>
+                                    )}
+                                    </div>
+
+                                {/* 死亡シナリオ */}
+                                <ScenarioSection
+                                    result={scenarios.singleDeath}
+                                    profile={profile}
+                                    color="emerald"
+                                    icon="💀"
+                                    description="本人が死亡した場合、家庭から本人の収入がなくなる。公的保障による補填額を確認します"
+                                    scenarioKey="singleDeath"
+                                    displayPeriodModes={displayPeriodModes}
+                                    setDisplayPeriodModes={setDisplayPeriodModes}
+                                    customEndAges={customEndAges}
+                                    setCustomEndAges={setCustomEndAges}
+                                            expenseRatioSurvivor={expenseRatioSurvivor}
+                                            setExpenseRatioSurvivor={setExpenseRatioSurvivor}
+                                            exportId="scenario-single-death"
+                                />
+
+                                {/* 死亡時シナリオの懸念点カード */}
+                                <div id="concern-single-death" className="bg-emerald-950/20 border border-emerald-800/50 rounded-2xl p-6 shadow-lg mb-6">
+                                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-emerald-300">
+                                        <span>⚠️</span> 懸念点
+                                    </h3>
+                                    <div className="space-y-3 text-sm text-slate-300 leading-relaxed">
+                                        <div>
+                                            <strong className="text-emerald-400">・教育費が継続してかかる</strong>：
+                                            本人が亡くなっても、子供の教育費は継続してかかります。
+                                        </div>
+                                        <ul className="space-y-2 pl-4 list-disc">
+                                            <li>
+                                                <strong className="text-emerald-400">葬式代で貯蓄が減る可能性</strong>：葬儀代と火葬式の費用がかかります。
+                                                <div className="mt-2 ml-4 space-y-2">
+                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={funeralCost === 2000000}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    setFuneralCost(2000000);
+                                                                } else {
+                                                                    setFuneralCost(0);
+                                                                }
+                                                            }}
+                                                            className="w-4 h-4 text-emerald-500 bg-slate-800 border-slate-700 rounded focus:ring-emerald-500 focus:ring-2"
+                                                        />
+                                                        <span className="text-xs text-slate-400">
+                                                            一般的な葬儀（葬儀代＋火葬式）の平均相場：<strong className="text-emerald-300">約150万円〜300万円</strong>（平均：225万円）→ 中間値<strong className="text-emerald-300">200万円</strong>を保障に追加
+                                                        </span>
+                                                    </label>
+                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={funeralCost === 750000}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    setFuneralCost(750000);
+                                                                } else {
+                                                                    setFuneralCost(0);
+                                                                }
+                                                            }}
+                                                            className="w-4 h-4 text-emerald-500 bg-slate-800 border-slate-700 rounded focus:ring-emerald-500 focus:ring-2"
+                                                        />
+                                                        <span className="text-xs text-slate-400">
+                                                            最近増えている家族葬（葬儀代＋火葬式）の相場：<strong className="text-emerald-300">約50万円〜100万円</strong>（平均：75万円）→ 中間値<strong className="text-emerald-300">75万円</strong>を保障に追加
+                                                        </span>
+                                                    </label>
+                                                </div>
+                                            </li>
+                                            <li><strong className="text-emerald-400">外食や雑費が増える可能性</strong>：家事の負担増により、外食や家事代行サービスの利用が増え、生活費が想定より増加する可能性があります。</li>
+                                        </ul>
+                                        <p className="mt-4 text-emerald-300 font-semibold">
+                                            これらの要因を考慮すると、実際に必要な保障額は上記の計算結果よりも<strong className="text-white">さらに大きくなる可能性が高い</strong>ことをご理解ください。
+                                        </p>
+                                    </div>
+                                </div>
 
                                 {/* 独身：障害時シナリオ用の条件設定 */}
                                 <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 pb-4 shadow-lg mb-6">

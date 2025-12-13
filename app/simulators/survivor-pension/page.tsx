@@ -583,6 +583,13 @@ export default function SurvivorPensionPage() {
   const [useMinashi300Husband, setUseMinashi300Husband] = useState<boolean>(true);
   const [oldAgeStartHusband, setOldAgeStartHusband] = useState<number>(65);
 
+  // 独身の場合の本人情報
+  const [age, setAge] = useState<number>(35);
+  const [avgStdMonthly, setAvgStdMonthly] = useState<number>(Math.round(3_000_000 / 12));
+  const [months, setMonths] = useState<number>(120);
+  const [useMinashi300, setUseMinashi300] = useState<boolean>(true);
+  const [oldAgeStart, setOldAgeStart] = useState<number>(65);
+
   const [showNotes, setShowNotes] = useState(false);
 
   useEffect(() => {
@@ -615,7 +622,52 @@ export default function SurvivorPensionPage() {
           if (basicInfo.useMinashi300Husband !== undefined) setUseMinashi300Husband(basicInfo.useMinashi300Husband);
           if (basicInfo.oldAgeStartHusband) setOldAgeStartHusband(basicInfo.oldAgeStartHusband);
 
-          if (basicInfo.spouseType) setSpouseType(basicInfo.spouseType);
+          // 家族構成: 'none' を 'single' に変換
+          if (basicInfo.spouseType) {
+            setSpouseType(basicInfo.spouseType === 'none' ? 'single' : basicInfo.spouseType);
+          }
+
+          // 独身の場合の本人情報
+          if (basicInfo.spouseType === 'single' || basicInfo.spouseType === 'none') {
+            // 年齢: age > ageHusband の優先順位
+            if (basicInfo.age) {
+              setAge(basicInfo.age);
+            } else if (basicInfo.ageHusband) {
+              setAge(basicInfo.ageHusband);
+            }
+            
+            // 年収/平均標準報酬月額: annualIncome > avgStdMonthly > annualIncomeHusband > avgStdMonthlyHusband の優先順位
+            if (basicInfo.annualIncome) {
+              setAvgStdMonthly(Math.round(basicInfo.annualIncome / 12));
+            } else if (basicInfo.avgStdMonthly) {
+              setAvgStdMonthly(basicInfo.avgStdMonthly);
+            } else if (basicInfo.annualIncomeHusband) {
+              setAvgStdMonthly(Math.round(basicInfo.annualIncomeHusband / 12));
+            } else if (basicInfo.avgStdMonthlyHusband) {
+              setAvgStdMonthly(basicInfo.avgStdMonthlyHusband);
+            }
+            
+            // 加入月数: employeePensionMonths > monthsHusband の優先順位
+            if (basicInfo.employeePensionMonths !== undefined) {
+              setMonths(basicInfo.employeePensionMonths);
+            } else if (basicInfo.monthsHusband) {
+              setMonths(basicInfo.monthsHusband);
+            }
+            
+            // みなし300月: useMinashi300 > useMinashi300Husband の優先順位
+            if (basicInfo.useMinashi300 !== undefined) {
+              setUseMinashi300(basicInfo.useMinashi300);
+            } else if (basicInfo.useMinashi300Husband !== undefined) {
+              setUseMinashi300(basicInfo.useMinashi300Husband);
+            }
+            
+            // 老齢開始年齢: oldAgeStart > oldAgeStartHusband の優先順位
+            if (basicInfo.oldAgeStart) {
+              setOldAgeStart(basicInfo.oldAgeStart);
+            } else if (basicInfo.oldAgeStartHusband) {
+              setOldAgeStart(basicInfo.oldAgeStartHusband);
+            }
+          }
 
         } catch (e) {
           console.error('Failed to load basic info', e);
@@ -637,7 +689,34 @@ export default function SurvivorPensionPage() {
     }
   }, [childrenCount]);
 
+  // 独身の場合の計算（本人が死亡、子が受給）
+  const caseSingleDeath = useMemo(() => {
+    if (spouseType !== 'single') return null;
+    // 子がいない場合は null を返す
+    if (childrenAges.length === 0) return null;
+    // 独身の場合、子が受給するので、ownSourceは子の情報ではなく、計算上は0とする
+    // 実際には子は老齢年金を受給しないので、ownSourceは空でOK
+    return calculateSurvivorPensionAmounts({
+      ageWife: 0, // 使用しない
+      ageHusband: 0, // 使用しない
+      childrenAges,
+      survivorSource: {
+        avgStdMonthly: avgStdMonthly,
+        months: months,
+        useMinashi300: useMinashi300
+      },
+      ownSource: {
+        avgStdMonthly: 0, // 子は老齢年金を受給しない
+        months: 0
+      },
+      oldAgeStart: 65, // 子の老齢年金開始年齢（使用しない）
+      isWifeDeath: false, // 使用しない
+      mode
+    });
+  }, [mode, childrenAges, avgStdMonthly, months, useMinashi300, spouseType]);
+
   const caseHusbandDeath = useMemo(() => {
+    if (spouseType === 'single') return null;
     return calculateSurvivorPensionAmounts({
       ageWife,
       ageHusband,
@@ -655,9 +734,10 @@ export default function SurvivorPensionPage() {
       isWifeDeath: false,
       mode
     });
-  }, [mode, childrenAges, avgStdMonthlyHusband, monthsHusband, useMinashi300Husband, ageWife, oldAgeStartWife, avgStdMonthlyWife, monthsWife]);
+  }, [mode, childrenAges, avgStdMonthlyHusband, monthsHusband, useMinashi300Husband, ageWife, oldAgeStartWife, avgStdMonthlyWife, monthsWife, spouseType]);
 
   const caseWifeDeath = useMemo(() => {
+    if (spouseType === 'single') return null;
     return calculateSurvivorPensionAmounts({
       ageWife,
       ageHusband,
@@ -675,9 +755,12 @@ export default function SurvivorPensionPage() {
       isWifeDeath: true,
       mode
     });
-  }, [mode, childrenAges, avgStdMonthlyWife, monthsWife, useMinashi300Wife, ageHusband, oldAgeStartHusband, avgStdMonthlyHusband, monthsHusband]);
+  }, [mode, childrenAges, avgStdMonthlyWife, monthsWife, useMinashi300Wife, ageHusband, oldAgeStartHusband, avgStdMonthlyHusband, monthsHusband, spouseType]);
 
   const timelineDataHusband = useMemo(() => {
+    if (!caseHusbandDeath) {
+      return { block1: null, block2: null };
+    }
     const block1 = { segments: [] as Segment[], ticks: [] as Tick[] };
     const block2 = { segments: [] as Segment[], ticks: [] as Tick[] };
     const widen = (y: number) => Math.max(y, 5);
@@ -925,6 +1008,9 @@ export default function SurvivorPensionPage() {
   }, [ageWife, childrenAges, caseHusbandDeath, oldAgeStartWife]);
 
   const timelineDataWife = useMemo(() => {
+    if (!caseWifeDeath) {
+      return { block1: null, block2: null };
+    }
     const block1 = { segments: [] as Segment[], ticks: [] as Tick[] };
     const block2 = { segments: [] as Segment[], ticks: [] as Tick[] };
     const widen = (y: number) => Math.max(y, 5);
@@ -1190,6 +1276,94 @@ export default function SurvivorPensionPage() {
     return { block1: maxYearsWithChild > 0 ? block1 : null, block2 };
   }, [ageHusband, childrenAges, caseWifeDeath, oldAgeStartHusband]);
 
+  // シングル世帯の場合の年齢バー生成（子の年齢のみ表示）
+  const timelineDataSingle = useMemo(() => {
+    if (spouseType !== 'single' || !caseSingleDeath || childrenAges.length === 0) {
+      return { block1: null, block2: null };
+    }
+    const block1 = { segments: [] as Segment[], ticks: [] as Tick[] };
+    const block2 = { segments: [] as Segment[], ticks: [] as Tick[] };
+    const widen = (y: number) => Math.max(y, 5);
+
+    // Block 1: 子がいる期間（子の年齢による変動を反映）
+    const yearsTo18List = childrenAges
+      .map(age => Math.max(0, 18 - age))
+      .filter(y => y > 0)
+      .sort((a, b) => a - b);
+
+    const points = [0, ...yearsTo18List];
+    const maxYearsWithChild = points[points.length - 1] || 0;
+
+    if (maxYearsWithChild > 0) {
+      // 初期表示：子の年齢のみ
+      const initialLines: string[] = [];
+      childrenAges.forEach((age) => {
+        if (age <= 18) {
+          initialLines.push(`子${age}`);
+        }
+      });
+      block1.ticks.push({
+        edgeIndex: 0,
+        labelLines: initialLines
+      });
+
+      for (let i = 0; i < points.length - 1; i++) {
+        const startY = points[i];
+        const endY = points[i + 1];
+        const duration = endY - startY;
+
+        // その期間の支給額計算
+        const agesAtStart = childrenAges.map(a => a + startY);
+        const eligibleCount = calculateEligibleChildrenCount(agesAtStart);
+        const basicPension = calculateSurvivorBasicPension(eligibleCount);
+        const amount = basicPension + caseSingleDeath.employeePension;
+
+        // 開始時点の家族年齢リスト（子のみ）
+        const startAges: string[] = [];
+        childrenAges.forEach((age) => {
+          const currentAge = age + startY;
+          startAges.push(`子${currentAge}`);
+        });
+
+        // 終了時点の家族年齢リスト（最後のセグメントのみ、子のみ）
+        const endAges: string[] | undefined = i === points.length - 2 ? [] : undefined;
+        if (endAges) {
+          childrenAges.forEach((age) => {
+            const currentAge = age + endY;
+            endAges!.push(`子${currentAge}`);
+          });
+        }
+
+        block1.segments.push({
+          label: `子${eligibleCount}人`,
+          years: duration,
+          widthYears: widen(duration),
+          className: `ring-1 ring-white/20`,
+          style: { backgroundColor: getGradientColor('emerald', i) },
+          amountYear: amount,
+          startAges,
+          endAges
+        });
+
+        // Ticks for Block 1（子のみ）
+        const lines: string[] = [];
+        childrenAges.forEach((age) => {
+          const currentAge = age + endY;
+          lines.push(`子${currentAge}`);
+        });
+        block1.ticks.push({
+          edgeIndex: i + 1,
+          labelLines: lines
+        });
+      }
+    }
+
+    // Block 2: 子がいなくなった後（シングル世帯の場合、子が18歳になったら遺族年金は終了）
+    // シングル世帯の場合、子がいなくなった後は遺族年金は支給されないので、block2は空
+
+    return { block1: maxYearsWithChild > 0 ? block1 : null, block2: null };
+  }, [spouseType, childrenAges, caseSingleDeath]);
+
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-emerald-500/30 pb-20">
       <div className="bg-slate-900/50 border-b border-slate-800 backdrop-blur-md sticky top-0 z-50">
@@ -1280,6 +1454,17 @@ export default function SurvivorPensionPage() {
             onClear={() => { setChildrenCount(null); setChildrenAges([]); }}
           >
             <div className="space-y-6">
+              <div>
+                <Label>家族構成</Label>
+                <Select
+                  value={spouseType}
+                  onChange={(e) => setSpouseType(e.target.value as 'couple' | 'single')}
+                  options={[
+                    { value: 'couple', label: '夫婦' },
+                    { value: 'single', label: '独身' }
+                  ]}
+                />
+              </div>
               <div>
                 <Label>子の人数</Label>
                 <Select
@@ -1426,6 +1611,85 @@ export default function SurvivorPensionPage() {
             </div>
           </Accordion>
 
+          {spouseType === 'single' && !caseSingleDeath ? (
+            <section className="mt-8">
+              <div className="rounded-2xl border border-slate-700 bg-slate-900/50 p-8 text-center">
+                <div className="w-16 h-16 rounded-full bg-slate-700/50 flex items-center justify-center mx-auto mb-4">
+                  <span className="text-3xl">ℹ️</span>
+                </div>
+                <h2 className="text-2xl font-bold text-slate-100 mb-2">遺族年金は支給されません</h2>
+                <p className="text-slate-400 leading-relaxed">
+                  独身で子がいない場合、遺族基礎年金・遺族厚生年金ともに受給資格者がいないため、遺族年金は支給されません。
+                  <br />
+                  <span className="text-sm text-slate-500 mt-2 block">
+                    ※遺族厚生年金は理論上、父母（60歳以上）や祖父母（60歳以上）が受給できる可能性がありますが、実際にはほとんどありません。
+                  </span>
+                </p>
+              </div>
+            </section>
+          ) : spouseType === 'single' && caseSingleDeath ? (
+            <section>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/30">
+                  <span className="text-2xl">👶</span>
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-2xl font-bold text-slate-100">子の受給額</h2>
+                  <p className="text-sm text-slate-400 mt-0.5">本人が死亡した場合</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <PeriodCard
+                    title="子がいる期間"
+                    amount={caseSingleDeath.withChildrenAmount}
+                    period={`現在 - 18歳到達年度末`}
+                    colorClass="border-emerald-500/30"
+                    icon="👶"
+                    pensionTypes={caseSingleDeath.pensionTypesWithChildren}
+                  />
+                </div>
+              </div>
+
+              {timelineDataSingle.block1 && (
+                <Accordion
+                  title="① 👶 子がいる期間（加算あり期間）"
+                  defaultOpen={true}
+                >
+                  <TimelineBlock
+                    title=""
+                    color="emerald"
+                    segments={timelineDataSingle.block1.segments}
+                    ticks={timelineDataSingle.block1.ticks}
+                    blockNumber={1}
+                    hasLogic={true}
+                  />
+                  <CalculationLogic
+                    color="emerald"
+                    details={[
+                      { label: '遺族基礎年金（基本額）', value: '83.2万円' },
+                      { label: '子の加算（第1子・第2子）', value: '各23.9万円' },
+                      { label: '子の加算（第3子以降）', value: '各8.0万円' },
+                      { label: '遺族厚生年金（年額）', value: `${(caseSingleDeath.employeePension / 10000).toFixed(1)}万円` },
+                      { label: '　平均標準報酬月額 × 厚生年金加入月数 × 5.481/1000 × 3/4', value: `${(avgStdMonthly / 10000).toFixed(1)}万 × ${useMinashi300 ? Math.max(months, 300) : months}月 × 5.481/1000 × 3/4 = ${(caseSingleDeath.employeePension / 10000).toFixed(1)}万円` },
+                    ]}
+                  />
+                </Accordion>
+              )}
+
+              <div className="rounded-2xl border border-slate-700 bg-slate-900/50 p-6 mt-6">
+                <p className="text-slate-400 text-sm">
+                  シングル世帯（独身子あり）の場合、本人が死亡すると子が遺族年金を受給します。
+                  <br />
+                  遺族基礎年金と遺族厚生年金は、子が18歳到達年度末まで受給できます。
+                  <br />
+                  <span className="text-slate-500 text-xs mt-2 block">
+                    ※親の性別によって子の遺族年金受給額は変動しません。
+                  </span>
+                </p>
+              </div>
+            </section>
+          ) : spouseType === 'couple' ? (
+            <>
+          {caseHusbandDeath && (
           <section>
             <div className="flex items-center gap-3 mb-6">
               <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/30">
@@ -1489,6 +1753,7 @@ export default function SurvivorPensionPage() {
               </Accordion>
             )}
 
+            {timelineDataHusband.block2 && (
             <Accordion
               title="② 💼 子がいなくなった後 〜 老後"
               defaultOpen={true}
@@ -1531,8 +1796,11 @@ export default function SurvivorPensionPage() {
               ]}
             />
             </Accordion>
+            )}
           </section>
+          )}
 
+          {caseWifeDeath && (
           <section className="pt-12 border-t border-slate-800">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-12 h-12 rounded-xl bg-rose-500/10 flex items-center justify-center border border-rose-500/30">
@@ -1596,6 +1864,7 @@ export default function SurvivorPensionPage() {
               </Accordion>
             )}
 
+            {timelineDataWife.block2 && (
             <Accordion
               title="② 💼 子がいなくなった後 〜 老後"
               defaultOpen={true}
@@ -1635,7 +1904,11 @@ export default function SurvivorPensionPage() {
               ]}
             />
             </Accordion>
+            )}
           </section>
+          )}
+            </>
+          ) : null}
         </div>
       </div>
     </main>
