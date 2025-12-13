@@ -29,66 +29,18 @@ export default function WorkPage() {
   const params = useParams();
   const router = useRouter();
   const sessionId = params?.sessionId as string;
-  // 初期パネルデータを計算する関数（リスクマトリクスコンテナを基準に）
-  const getInitialPanels = (): Omit<Panel, 'id'>[] => {
-    if (!matrixRef.current) {
-      // フォールバック: デフォルト位置
-      return [
-        { text: 'ステージの進んだがん', x: 20, y: 100, width: 200, height: 40 },
-        { text: '長期の入院', x: 20, y: 140, width: 200, height: 40 },
-        { text: 'パートナーの早期死亡', x: 20, y: 180, width: 200, height: 40 },
-        { text: 'パートナーの介護や障害', x: 20, y: 220, width: 200, height: 40 },
-        { text: '介護費用 (将来的に)', x: 20, y: 260, width: 200, height: 40 },
-        { text: '交通事故による高額賠償', x: 20, y: 300, width: 200, height: 40 },
-        { text: '火災などの住宅損傷', x: 20, y: 340, width: 200, height: 40 },
-        { text: '風邪やインフルエンザ', x: 20, y: 380, width: 200, height: 40 },
-        { text: '短期の入院', x: 20, y: 420, width: 200, height: 40 },
-        { text: '骨折', x: 20, y: 460, width: 200, height: 40 },
-        { text: '上皮内がん', x: 20, y: 500, width: 200, height: 40 },
-        { text: '自動車の軽微な物損事故', x: 20, y: 540, width: 200, height: 40 },
-        { text: '旅行のキャンセル費用', x: 20, y: 580, width: 200, height: 40 },
-      ];
-    }
-    
-    const matrixRect = matrixRef.current.getBoundingClientRect();
-    const boardRect = boardRef.current?.getBoundingClientRect();
-    if (!boardRect) {
-      return [];
-    }
-    
-    // リスクマトリクスコンテナを基準にした相対位置
-    const baseX = 20; // 左マージン
-    const baseY = 100; // 上マージン
-    const panelSpacing = 40;
-    
-    return [
-      { text: 'ステージの進んだがん', x: baseX, y: baseY, width: 200, height: 40 },
-      { text: '長期の入院', x: baseX, y: baseY + panelSpacing * 1, width: 200, height: 40 },
-      { text: 'パートナーの早期死亡', x: baseX, y: baseY + panelSpacing * 2, width: 200, height: 40 },
-      { text: 'パートナーの介護や障害', x: baseX, y: baseY + panelSpacing * 3, width: 200, height: 40 },
-      { text: '介護費用 (将来的に)', x: baseX, y: baseY + panelSpacing * 4, width: 200, height: 40 },
-      { text: '交通事故による高額賠償', x: baseX, y: baseY + panelSpacing * 5, width: 200, height: 40 },
-      { text: '火災などの住宅損傷', x: baseX, y: baseY + panelSpacing * 6, width: 200, height: 40 },
-      { text: '風邪やインフルエンザ', x: baseX, y: baseY + panelSpacing * 7, width: 200, height: 40 },
-      { text: '短期の入院', x: baseX, y: baseY + panelSpacing * 8, width: 200, height: 40 },
-      { text: '骨折', x: baseX, y: baseY + panelSpacing * 9, width: 200, height: 40 },
-      { text: '上皮内がん', x: baseX, y: baseY + panelSpacing * 10, width: 200, height: 40 },
-      { text: '自動車の軽微な物損事故', x: baseX, y: baseY + panelSpacing * 11, width: 200, height: 40 },
-      { text: '旅行のキャンセル費用', x: baseX, y: baseY + panelSpacing * 12, width: 200, height: 40 },
-    ];
-  };
 
   const [panels, setPanels] = useState<Panel[]>([]);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
+  const [selectedPanelId, setSelectedPanelId] = useState<string | null>(null);
   const [draggingToZone, setDraggingToZone] = useState<string | null>(null);
   const [userName, setUserName] = useState('');
   const [userId, setUserId] = useState('');
   const [connectedUsers, setConnectedUsers] = useState<ConnectedUser[]>([]);
   const [isConnected, setIsConnected] = useState(false);
-  const [initialPanelsLoaded, setInitialPanelsLoaded] = useState(false);
   const [offlineMode, setOfflineMode] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
   const matrixRef = useRef<HTMLDivElement>(null);
@@ -123,64 +75,21 @@ export default function WorkPage() {
         try {
           const parsedPanels = JSON.parse(localPanels);
           setPanels(parsedPanels);
-          // 初期パネルが存在するかチェック
-          const hasInitialPanels = parsedPanels.some((p: Panel) => p.id.startsWith('initial-panel-'));
-          setInitialPanelsLoaded(hasInitialPanels);
         } catch (e) {
           console.error('Failed to parse local panels:', e);
-          setInitialPanelsLoaded(false);
         }
-      } else {
-        // ローカルストレージにパネルがない場合、初期パネルを追加する準備
-        setInitialPanelsLoaded(false);
       }
     }
   }, [sessionId]);
   
-  // オフラインモードで初期パネルを追加
+  // オフラインモードの初期化
   useEffect(() => {
-    if (!offlineMode || !sessionId || initialPanelsLoaded || !userId) return;
-    
-    // リスクマトリクスコンテナが準備できているか確認
-    if (matrixRef.current) {
-      const initialPanelsData = getInitialPanels();
-      const panelsToAdd = initialPanelsData.map((panel, index) => ({
-        ...panel,
-        id: `initial-panel-${Date.now()}-${index}`,
-        userId,
-        userName: userName || 'ユーザー',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      }));
-      
-      setPanels(panelsToAdd);
-      const localPanelsKey = `work-panels-${sessionId}`;
-      localStorage.setItem(localPanelsKey, JSON.stringify(panelsToAdd));
-      setInitialPanelsLoaded(true);
-    } else {
-      // リスクマトリクスコンテナが準備できていない場合、少し待ってから再試行
-      const timer = setTimeout(() => {
-        if (matrixRef.current && !initialPanelsLoaded) {
-          const initialPanelsData = getInitialPanels();
-          const panelsToAdd = initialPanelsData.map((panel, index) => ({
-            ...panel,
-            id: `initial-panel-${Date.now()}-${index}`,
-            userId,
-            userName: userName || 'ユーザー',
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          }));
-          
-          setPanels(panelsToAdd);
-          const localPanelsKey = `work-panels-${sessionId}`;
-          localStorage.setItem(localPanelsKey, JSON.stringify(panelsToAdd));
-          setInitialPanelsLoaded(true);
-        }
-      }, 100);
-      
-      return () => clearTimeout(timer);
+    if (offlineMode) {
+      // オフラインモードのときは接続状態として表示（Firebaseは使わない）
+      setIsConnected(true);
+      setConnectedUsers([]);
     }
-  }, [offlineMode, sessionId, initialPanelsLoaded, userId, userName]);
+  }, [offlineMode]);
 
   // Firebase Realtime Databaseとの接続
   useEffect(() => {
@@ -199,148 +108,9 @@ export default function WorkPage() {
           ...panelsData[key],
         }));
         
-        // 初期パネルが存在するかチェック（初期パネルのIDパターンで判定）
-        const hasInitialPanels = panelsArray.some(p => p.id.startsWith('initial-panel-'));
-        
-        // 初期パネルが存在しない場合、追加する
-        if (!hasInitialPanels && !initialPanelsLoaded && database && sessionId) {
-          // リスクマトリクスコンテナが準備できているか確認
-          if (matrixRef.current) {
-            const initialPanelsData = getInitialPanels();
-            const panelsToAdd = initialPanelsData.map((panel, index) => ({
-              ...panel,
-              id: `initial-panel-${Date.now()}-${index}`,
-              userId,
-              userName: userName || 'ユーザー',
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-            }));
-            
-            // Firebaseに初期パネルを追加（既存のパネルとマージ）
-            panelsToAdd.forEach(panel => {
-              if (database) {
-                const panelRef = ref(database, `work/${sessionId}/panels/${panel.id}`);
-                set(panelRef, {
-                  text: panel.text,
-                  x: panel.x,
-                  y: panel.y,
-                  width: panel.width,
-                  height: panel.height,
-                  userId: panel.userId,
-                  userName: panel.userName,
-                  createdAt: panel.createdAt,
-                  updatedAt: panel.updatedAt,
-                });
-              }
-            });
-            setInitialPanelsLoaded(true);
-          } else {
-            // リスクマトリクスコンテナが準備できていない場合、少し待ってから再試行
-            setTimeout(() => {
-              if (matrixRef.current && !initialPanelsLoaded) {
-                const initialPanelsData = getInitialPanels();
-                const panelsToAdd = initialPanelsData.map((panel, index) => ({
-                  ...panel,
-                  id: `initial-panel-${Date.now()}-${index}`,
-                  userId,
-                  userName: userName || 'ユーザー',
-                  createdAt: Date.now(),
-                  updatedAt: Date.now(),
-                }));
-                
-                panelsToAdd.forEach(panel => {
-                  if (database) {
-                    const panelRef = ref(database, `work/${sessionId}/panels/${panel.id}`);
-                    set(panelRef, {
-                      text: panel.text,
-                      x: panel.x,
-                      y: panel.y,
-                      width: panel.width,
-                      height: panel.height,
-                      userId: panel.userId,
-                      userName: panel.userName,
-                      createdAt: panel.createdAt,
-                      updatedAt: panel.updatedAt,
-                    });
-                  }
-                });
-                setInitialPanelsLoaded(true);
-              }
-            }, 100);
-          }
-        }
-        
         // 既存のパネルを表示
         setPanels(panelsArray);
-        setInitialPanelsLoaded(true);
       } else {
-        // データが存在しない場合、初期パネルを追加
-        if (!initialPanelsLoaded && database && sessionId) {
-          // リスクマトリクスコンテナが準備できているか確認
-          if (matrixRef.current) {
-            const initialPanelsData = getInitialPanels();
-            const panelsToAdd = initialPanelsData.map((panel, index) => ({
-              ...panel,
-              id: `initial-panel-${Date.now()}-${index}`,
-              userId,
-              userName: userName || 'ユーザー',
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-            }));
-            
-            // Firebaseに初期パネルを追加
-            panelsToAdd.forEach(panel => {
-              if (database) {
-                const panelRef = ref(database, `work/${sessionId}/panels/${panel.id}`);
-                set(panelRef, {
-                  text: panel.text,
-                  x: panel.x,
-                  y: panel.y,
-                  width: panel.width,
-                  height: panel.height,
-                  userId: panel.userId,
-                  userName: panel.userName,
-                  createdAt: panel.createdAt,
-                  updatedAt: panel.updatedAt,
-                });
-              }
-            });
-            setInitialPanelsLoaded(true);
-          } else {
-            // リスクマトリクスコンテナが準備できていない場合、少し待ってから再試行
-            setTimeout(() => {
-              if (matrixRef.current && !initialPanelsLoaded) {
-                const initialPanelsData = getInitialPanels();
-                const panelsToAdd = initialPanelsData.map((panel, index) => ({
-                  ...panel,
-                  id: `initial-panel-${Date.now()}-${index}`,
-                  userId,
-                  userName: userName || 'ユーザー',
-                  createdAt: Date.now(),
-                  updatedAt: Date.now(),
-                }));
-                
-                panelsToAdd.forEach(panel => {
-                  if (database) {
-                    const panelRef = ref(database, `work/${sessionId}/panels/${panel.id}`);
-                    set(panelRef, {
-                      text: panel.text,
-                      x: panel.x,
-                      y: panel.y,
-                      width: panel.width,
-                      height: panel.height,
-                      userId: panel.userId,
-                      userName: panel.userName,
-                      createdAt: panel.createdAt,
-                      updatedAt: panel.updatedAt,
-                    });
-                  }
-                });
-                setInitialPanelsLoaded(true);
-              }
-            }, 100);
-          }
-        }
         setPanels([]);
       }
       setIsConnected(true);
@@ -391,7 +161,7 @@ export default function WorkPage() {
         remove(userRef);
       }
     };
-  }, [sessionId, userId, userName, initialPanelsLoaded, offlineMode]);
+  }, [sessionId, userId, userName, offlineMode]);
 
   // パネルを追加
   const addPanel = () => {
@@ -448,10 +218,12 @@ export default function WorkPage() {
       setResizingId(panelId);
       setResizeStartX(e.clientX);
       setResizeStartWidth(panel.width);
+      setSelectedPanelId(panelId);
       e.stopPropagation();
       return;
     }
 
+    setSelectedPanelId(panelId);
     setDraggingId(panelId);
     setDragOffset({
       x: e.clientX - rect.left,
@@ -617,65 +389,10 @@ export default function WorkPage() {
     setEditingId(null);
   };
 
-  // 全てのパネルをクリアして初期パネルを初期位置に戻す
-  const clearAllPanels = () => {
-    if (!sessionId || !userId) return;
-    
-    // リスクマトリクスコンテナが準備できているか確認
-    if (!matrixRef.current) {
-      // 少し待ってから再試行
-      setTimeout(() => clearAllPanels(), 100);
-      return;
-    }
-    if (!confirm('全てのパネルを削除して、初期パネルを初期位置に戻しますか？')) return;
-    
-    // 初期パネルを取得（リスクマトリクスコンテナを基準に）
-    const initialPanels = getInitialPanels();
-    
-    // 初期パネルを追加
-    const panelsToAdd = initialPanels.map((panel, index) => ({
-      ...panel,
-      id: `initial-panel-${Date.now()}-${index}`,
-      userId,
-      userName: userName || 'ユーザー',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    }));
-
-    // オフラインモードの場合、ローカルストレージに保存
-    if (offlineMode) {
-      setPanels(panelsToAdd);
-      const localPanelsKey = `work-panels-${sessionId}`;
-      localStorage.setItem(localPanelsKey, JSON.stringify(panelsToAdd));
-      setEditingId(null);
-      return;
-    }
-
-    // オンラインモードの場合、Firebaseに保存
-    if (!database) return;
-    const panelsRef = ref(database, `work/${sessionId}/panels`);
-    const db = database; // TypeScript用の変数
-    remove(panelsRef).then(() => {
-      panelsToAdd.forEach(panel => {
-        const panelRef = ref(db, `work/${sessionId}/panels/${panel.id}`);
-        set(panelRef, {
-          text: panel.text,
-          x: panel.x,
-          y: panel.y,
-          width: panel.width,
-          height: panel.height,
-          userId: panel.userId,
-          userName: panel.userName,
-          createdAt: panel.createdAt,
-          updatedAt: panel.updatedAt,
-        });
-      });
-    });
-    setEditingId(null);
-  };
 
   // 編集開始
   const startEditing = (panel: Panel) => {
+    setSelectedPanelId(panel.id);
     setEditingId(panel.id);
     setEditingText(panel.text);
   };
@@ -693,6 +410,7 @@ export default function WorkPage() {
       const localPanelsKey = `work-panels-${sessionId}`;
       localStorage.setItem(localPanelsKey, JSON.stringify(updatedPanels));
       setEditingId(null);
+      setSelectedPanelId(null);
       return;
     }
     
@@ -704,6 +422,7 @@ export default function WorkPage() {
       updatedAt: Date.now(),
     });
     setEditingId(null);
+    setSelectedPanelId(null);
   };
   
   // オフラインモードの切り替え
@@ -722,6 +441,7 @@ export default function WorkPage() {
   // 編集キャンセル
   const cancelEditing = () => {
     setEditingId(null);
+    setSelectedPanelId(null);
   };
 
   // セッションIDがない場合は新規セッションを作成
@@ -755,8 +475,8 @@ export default function WorkPage() {
     }
   };
 
-  // Firebaseが設定されていない場合の警告表示
-  if (typeof window !== 'undefined' && !isFirebaseConfigured()) {
+  // Firebaseが設定されていない場合の警告表示（オフラインモードの場合はスキップ）
+  if (typeof window !== 'undefined' && !isFirebaseConfigured() && !offlineMode) {
     return (
       <div className="min-h-screen bg-white text-slate-900 font-sans">
         <main className="max-w-4xl mx-auto px-6 py-20">
@@ -778,6 +498,20 @@ export default function WorkPage() {
                 <li>開発サーバーを再起動</li>
               </ol>
             </div>
+            <div className="mt-4">
+              <p className="text-slate-700 mb-2">
+                または、オフラインモードで使用することもできます（ローカルストレージのみ、リアルタイム同期なし）:
+              </p>
+              <button
+                onClick={() => {
+                  setOfflineMode(true);
+                  localStorage.setItem('work-offline-mode', 'true');
+                }}
+                className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors font-medium"
+              >
+                ⚡ オフラインモードで使用
+              </button>
+            </div>
           </div>
         </main>
       </div>
@@ -789,23 +523,46 @@ export default function WorkPage() {
       <main className="h-screen flex flex-col">
         {/* Header */}
         <header className="flex-shrink-0 bg-white border-b-2 border-blue-800 py-2 md:py-4 relative">
-          {/* 左側の余白スペースの中央に編集・削除ゾーンを配置 */}
+          {/* 左側の余白スペースの中央に編集・削除ボタンを配置 */}
           <div className="absolute left-0 top-0 bottom-0 hidden md:flex items-center justify-center" style={{ width: '208px' }}>
             <div className="flex items-center gap-2">
-              <div
-                className={`w-20 h-10 md:w-24 md:h-12 border-2 border-dashed rounded-lg flex items-center justify-center transition-all ${
-                  draggingId ? 'border-blue-500 bg-blue-50' : 'border-slate-300 bg-slate-50'
+              <button
+                onClick={() => {
+                  // 最初のパネルを選択する
+                  if (panels.length > 0) {
+                    const firstPanel = panels[0];
+                    setSelectedPanelId(firstPanel.id);
+                    startEditing(firstPanel);
+                  }
+                }}
+                disabled={panels.length === 0}
+                className={`w-20 h-10 md:w-24 md:h-12 border-2 rounded-lg flex items-center justify-center transition-all font-semibold text-xs ${
+                  panels.length > 0
+                    ? 'border-blue-500 bg-blue-50 hover:bg-blue-100 text-blue-700 cursor-pointer'
+                    : 'border-slate-300 bg-slate-50 text-slate-400 cursor-not-allowed'
                 }`}
               >
-                <span className="text-xs font-semibold text-slate-700">編集</span>
-              </div>
-              <div
-                className={`w-20 h-10 md:w-24 md:h-12 border-2 border-dashed rounded-lg flex items-center justify-center transition-all ${
-                  draggingId ? 'border-red-500 bg-red-50' : 'border-slate-300 bg-slate-50'
+                編集
+              </button>
+              <button
+                onClick={() => {
+                  // 最初のパネルを選択して削除する
+                  if (panels.length > 0) {
+                    const firstPanel = panels[0];
+                    setSelectedPanelId(firstPanel.id);
+                    deletePanel(firstPanel.id);
+                    setSelectedPanelId(null);
+                  }
+                }}
+                disabled={panels.length === 0}
+                className={`w-20 h-10 md:w-24 md:h-12 border-2 rounded-lg flex items-center justify-center transition-all font-semibold text-xs ${
+                  panels.length > 0
+                    ? 'border-red-500 bg-red-50 hover:bg-red-100 text-red-700 cursor-pointer'
+                    : 'border-slate-300 bg-slate-50 text-slate-400 cursor-not-allowed'
                 }`}
               >
-                <span className="text-xs font-semibold text-slate-700">削除</span>
-              </div>
+                削除
+              </button>
             </div>
           </div>
           <div className="max-w-6xl mx-auto flex items-center justify-between flex-wrap gap-2 md:gap-4 px-2 md:px-6 md:ml-[208px]">
@@ -842,12 +599,6 @@ export default function WorkPage() {
                 className="px-2 py-1 md:px-4 md:py-2 text-xs md:text-base bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
               >
                 + 追加
-              </button>
-              <button
-                onClick={clearAllPanels}
-                className="px-2 py-1 md:px-4 md:py-2 text-xs md:text-base bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium"
-              >
-                クリア
               </button>
               {sessionId && !offlineMode && (
                 <button
@@ -927,6 +678,7 @@ export default function WorkPage() {
               className={`absolute bg-gradient-to-br from-yellow-50 to-yellow-100 border-2 rounded-lg shadow-md transition-all ${
                 draggingId === panel.id ? 'border-blue-500 z-50 shadow-xl opacity-90 cursor-move scale-105' : 
                 resizingId === panel.id ? 'border-green-500 z-50 cursor-ew-resize' : 
+                selectedPanelId === panel.id ? 'border-blue-500 ring-2 ring-blue-300 z-40 shadow-lg' :
                 'border-yellow-300 hover:border-yellow-400 hover:shadow-lg z-10 cursor-move'
               } ${editingId === panel.id ? 'ring-2 ring-emerald-500' : ''} ${
                 panel.userId !== userId ? 'border-purple-300' : ''
@@ -991,22 +743,6 @@ export default function WorkPage() {
             </div>
           ))}
 
-          {/* パネルがない場合のメッセージ */}
-          {panels.length === 0 && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <p className="text-slate-500 text-lg mb-4">
-                  パネルを追加してリスクを配置してください
-                </p>
-                <button
-                  onClick={addPanel}
-                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
-                >
-                  + 最初のパネルを追加
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </main>
     </div>
