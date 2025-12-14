@@ -201,11 +201,17 @@ function StackedAreaChart({
         .filter((entry) => entry.age < retirementAge)
         .map((entry) => {
             // Layer 1: 遺族年金（濃い緑）
-            const pensionMonthly = Math.min(entry.pension / 12, currentSalaryMonthly);
+            // 0万円の場合でも年金は表示される
+            const pensionMonthly = currentSalaryMonthly > 0 
+                ? Math.min(entry.pension / 12, currentSalaryMonthly)
+                : entry.pension / 12;
             
             // Layer 2: 児童手当・児童扶養手当（薄緑、トグルで表示/非表示）
+            // 0万円の場合でも手当は表示される
             const allowancesMonthly = showAllowancesToggle 
-                ? Math.min((entry.childAllowanceMonthly || 0) + (entry.childSupportAllowanceMonthly || 0), currentSalaryMonthly - pensionMonthly)
+                ? (currentSalaryMonthly > 0 
+                    ? Math.min((entry.childAllowanceMonthly || 0) + (entry.childSupportAllowanceMonthly || 0), currentSalaryMonthly - pensionMonthly)
+                    : (entry.childAllowanceMonthly || 0) + (entry.childSupportAllowanceMonthly || 0))
                 : 0;
             
             // Layer 3: 不要な支出（グレー）
@@ -231,7 +237,7 @@ function StackedAreaChart({
             };
         });
 
-    if (!filtered.length || currentSalaryMonthly <= 0) {
+    if (!filtered.length) {
     return (
             <div className="h-48 flex items-center justify-center rounded-2xl border border-slate-800 bg-slate-950/40 text-sm text-slate-500">
                 表示できる期間がありません
@@ -311,7 +317,10 @@ function StackedAreaChart({
     const getX = (age: number) => ((age - minAge) / ageRange) * graphWidth;
 
     // Y軸は現在の月額給料に固定（満水基準）+ 10万円の余裕
-    const maxAmount = Math.max(currentSalaryMonthly + 100000, 1);
+    // 0万円の場合でも、年金や手当がある場合は最低値を設定
+    const maxPensionMonthly = data.length > 0 ? Math.max(...data.map(d => (d.pension || 0) / 12 + (d.childAllowanceMonthly || 0) + (d.childSupportAllowanceMonthly || 0))) : 0;
+    const baseSalary = currentSalaryMonthly > 0 ? currentSalaryMonthly : Math.max(maxPensionMonthly, 200000 / 12);
+    const maxAmount = Math.max(baseSalary + 100000, 1);
     const getY = (value: number) => graphHeight - (value / maxAmount) * graphHeight;
 
     // 障害年金シナリオの場合はオレンジ、遺族年金シナリオの場合は緑
