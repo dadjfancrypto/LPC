@@ -308,9 +308,15 @@ function StackedAreaChart({
     });
 
     // 描画エリア設定
+    // 障害シナリオでは夫と妻の年齢も表示されるため、ラベルが多くなる可能性があるので、高さを調整
+    // 遺族シナリオでも子が複数いる場合はラベルが多くなる可能性があるので、高さを調整
+    const hasManyLabels = profile && scenarioType && (
+        (scenarioType.includes('Disability') || scenarioType.includes('disability')) ||
+        (profile.basicInfo.childrenAges && profile.basicInfo.childrenAges.length > 1)
+    );
     const width = 820;
-    const height = 480;
-    const padding = { top: 40, right: 40, bottom: 40, left: 60 };
+    const height = hasManyLabels ? 520 : 480; // ラベルが多い場合は高さを増やす
+    const padding = { top: 40, right: 40, bottom: hasManyLabels ? 80 : 40, left: 60 }; // ラベルが多い場合は下の余白を増やす
     const graphWidth = width - padding.left - padding.right;
     const graphHeight = height - padding.top - padding.bottom;
 
