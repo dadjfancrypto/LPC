@@ -1733,7 +1733,7 @@ export default function NecessaryCoveragePage() {
                                     profile={profile}
                                             color="emerald"
                                             icon="💀"
-                                            description="妻が死亡した場合、残された夫と子の生活費不足額"
+                                            description="妻が死亡した場合、家庭から妻の収入がなくなる。公的保障による補填額を確認します"
                                             scenarioKey="wifeDeath"
                                     displayPeriodModes={displayPeriodModes}
                                     setDisplayPeriodModes={setDisplayPeriodModes}
@@ -2630,6 +2630,11 @@ function ScenarioSection({
                         {isHusbandScenario && (
                             <span className="text-xl font-bold text-slate-100">
                                 （夫の月収: {(husbandAnnual / 12 / 10000).toFixed(1)}万円）
+                            </span>
+                        )}
+                        {isWifeScenario && (
+                            <span className="text-xl font-bold text-slate-100">
+                                （妻の月収: {(wifeAnnual / 12 / 10000).toFixed(1)}万円）
                             </span>
                         )}
                     </h3>
