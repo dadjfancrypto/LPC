@@ -12,7 +12,10 @@ import {
     DisabilityLevel,
     KISO_BASE_ANNUAL,
     SPOUSE_BONUS,
+    calculateOldAgeEmployeePension,
+    calculateOldAgeBasicPension,
 } from '../../utils/pension-calc';
+import { calculateOldAgePensionAdjustment } from '../../utils/survivor-pension-logic';
 
 /* ===================== 型定義 ===================== */
 type CustomerProfileBasicInfo = {
@@ -1295,17 +1298,22 @@ export default function NecessaryCoveragePage() {
                             if (eligibleChildren18 > 0) {
                                 kiso = kisoAnnualByCount(eligibleChildren18);
                             }
-                            const kousei = proportionAnnual(basicInfo.avgStdMonthlyHusband, basicInfo.monthsHusband, basicInfo.useMinashi300Husband);
+                            const survivorKousei = proportionAnnual(basicInfo.avgStdMonthlyHusband, basicInfo.monthsHusband, basicInfo.useMinashi300Husband);
             let chukorei = 0;
                             if (eligibleChildren18 === 0 && currentAge >= 40 && currentAge < oldAgeStart) {
                 chukorei = CHUKOREI_KASAN;
             }
                             if (currentAge >= oldAgeStart) {
-                                // 老齢年金開始後：老齢基礎年金 + 遺族厚生年金
-                                pension = kousei + KISO_BASE_ANNUAL;
+                                // 老齢年金開始後：老齢基礎年金（繰上げ・繰下げ調整済み）+ max(遺族厚生年金, 自身の老齢厚生年金（繰上げ・繰下げ調整済み）)
+                                const ownKouseiBase = calculateOldAgeEmployeePension(basicInfo.avgStdMonthlyWife, basicInfo.monthsWife);
+                                const ownKisoBase = calculateOldAgeBasicPension();
+                                const adjustedOwnKiso = calculateOldAgePensionAdjustment(ownKisoBase, oldAgeStart);
+                                const adjustedOwnKousei = calculateOldAgePensionAdjustment(ownKouseiBase, oldAgeStart);
+                                const maxKousei = Math.max(survivorKousei, adjustedOwnKousei);
+                                pension = adjustedOwnKiso + maxKousei;
                             } else {
                                 // 老齢年金開始前：遺族基礎年金（子がいる場合）+ 遺族厚生年金 + 中高齢寡婦加算（条件を満たす場合）
-                                pension = kiso + kousei + chukorei;
+                                pension = kiso + survivorKousei + chukorei;
                             }
                         }
                         else if (targetPerson === 'wife') {
@@ -1315,13 +1323,18 @@ export default function NecessaryCoveragePage() {
                             if (eligibleChildren18 > 0) {
                                 kiso = kisoAnnualByCount(eligibleChildren18);
                             }
-                            const kousei = proportionAnnual(basicInfo.avgStdMonthlyWife, basicInfo.monthsWife, basicInfo.useMinashi300Wife);
+                            const survivorKousei = proportionAnnual(basicInfo.avgStdMonthlyWife, basicInfo.monthsWife, basicInfo.useMinashi300Wife);
                             if (currentAge >= oldAgeStart) {
-                                // 老齢年金開始後：老齢基礎年金 + 遺族厚生年金
-                                pension = kousei + KISO_BASE_ANNUAL;
+                                // 老齢年金開始後：老齢基礎年金（繰上げ・繰下げ調整済み）+ max(遺族厚生年金, 自身の老齢厚生年金（繰上げ・繰下げ調整済み）)
+                                const ownKouseiBase = calculateOldAgeEmployeePension(basicInfo.avgStdMonthlyHusband, basicInfo.monthsHusband);
+                                const ownKisoBase = calculateOldAgeBasicPension();
+                                const adjustedOwnKiso = calculateOldAgePensionAdjustment(ownKisoBase, oldAgeStart);
+                                const adjustedOwnKousei = calculateOldAgePensionAdjustment(ownKouseiBase, oldAgeStart);
+                                const maxKousei = Math.max(survivorKousei, adjustedOwnKousei);
+                                pension = adjustedOwnKiso + maxKousei;
                             } else {
                                 // 老齢年金開始前：遺族基礎年金（子がいる場合）+ 遺族厚生年金
-                            pension = kiso + kousei;
+                            pension = kiso + survivorKousei;
                         }
                         }
                     } else if (basicInfo.spouseType !== undefined && basicInfo.spouseType === 'none') {
@@ -1341,11 +1354,32 @@ export default function NecessaryCoveragePage() {
 
                     let kousei = 0;
                     if (targetPerson === 'husband') {
-                        kousei = calculateDisabilityEmployeePension(level, spouseBonus, 0, basicInfo.avgStdMonthlyHusband, basicInfo.monthsHusband, true);
+                        const disabilityKousei = calculateDisabilityEmployeePension(level, spouseBonus, 0, basicInfo.avgStdMonthlyHusband, basicInfo.monthsHusband, true);
+                        if (currentAge >= 65) {
+                            // 65歳以降：障害厚生年金と老齢厚生年金（65歳時点）の最大値を取る
+                            const oldAgeKouseiAt65 = calculateOldAgeEmployeePension(basicInfo.avgStdMonthlyHusband, basicInfo.monthsHusband);
+                            kousei = Math.max(disabilityKousei, oldAgeKouseiAt65);
+                        } else {
+                            kousei = disabilityKousei;
+                        }
                     } else if (targetPerson === 'wife') {
-                        kousei = calculateDisabilityEmployeePension(level, spouseBonus, 0, basicInfo.avgStdMonthlyWife, basicInfo.monthsWife, true);
+                        const disabilityKousei = calculateDisabilityEmployeePension(level, spouseBonus, 0, basicInfo.avgStdMonthlyWife, basicInfo.monthsWife, true);
+                        if (currentAge >= 65) {
+                            // 65歳以降：障害厚生年金と老齢厚生年金（65歳時点）の最大値を取る
+                            const oldAgeKouseiAt65 = calculateOldAgeEmployeePension(basicInfo.avgStdMonthlyWife, basicInfo.monthsWife);
+                            kousei = Math.max(disabilityKousei, oldAgeKouseiAt65);
+                        } else {
+                            kousei = disabilityKousei;
+                        }
                     } else {
-                        kousei = calculateDisabilityEmployeePension(level, 0, 0, basicInfo.avgStdMonthly, basicInfo.employeePensionMonths, false);
+                        const disabilityKousei = calculateDisabilityEmployeePension(level, 0, 0, basicInfo.avgStdMonthly, basicInfo.employeePensionMonths, false);
+                        if (currentAge >= 65) {
+                            // 65歳以降：障害厚生年金と老齢厚生年金（65歳時点）の最大値を取る
+                            const oldAgeKouseiAt65 = calculateOldAgeEmployeePension(basicInfo.avgStdMonthly, basicInfo.employeePensionMonths);
+                            kousei = Math.max(disabilityKousei, oldAgeKouseiAt65);
+                        } else {
+                            kousei = disabilityKousei;
+                        }
                     }
                     pension = kiso + kousei;
                 }
