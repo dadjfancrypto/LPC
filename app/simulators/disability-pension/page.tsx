@@ -1997,7 +1997,7 @@ export default function DisabilityPensionPage() {
                 {timelineDataWife.block2.segments.length > 0 && (
                   <Accordion
                     title="② 💼 加算終了後 〜"
-                    defaultOpen={true}
+                    defaultOpen={false}
                   >
                     <div className="mt-8">
                       <TimelineBlock
@@ -2022,7 +2022,7 @@ export default function DisabilityPensionPage() {
                 {timelineDataWife.block2_65plus.segments.length > 0 && (
                   <Accordion
                     title={`${timelineDataWife.block2.segments.length > 0 ? '③' : '②'} ✨ 65歳以降（最適給付）${timelineDataWife.block2_65plus.breakEvenAge ? ` [損益分岐点: ${timelineDataWife.block2_65plus.breakEvenAge}歳]` : ' [障害年金の方が有利]'}`}
-                    defaultOpen={true}
+                    defaultOpen={false}
                   >
                     <div className="mt-8">
                       <TimelineBlock
@@ -2142,7 +2142,7 @@ export default function DisabilityPensionPage() {
                 {timelineDataHusband.block2.segments.length > 0 && (
                   <Accordion
                     title="② 💼 加算終了後 〜"
-                    defaultOpen={true}
+                    defaultOpen={false}
                   >
                     <div className="mt-8">
                       <TimelineBlock
@@ -2167,7 +2167,7 @@ export default function DisabilityPensionPage() {
                 {timelineDataHusband.block2_65plus.segments.length > 0 && (
                   <Accordion
                     title={`${timelineDataHusband.block2.segments.length > 0 ? '③' : '②'} ✨ 65歳以降（最適給付）${timelineDataHusband.block2_65plus.breakEvenAge ? ` [損益分岐点: ${timelineDataHusband.block2_65plus.breakEvenAge}歳]` : ' [障害年金の方が有利]'}`}
-                    defaultOpen={true}
+                    defaultOpen={false}
                   >
                     <div className="mt-8">
                       <TimelineBlock
@@ -2290,7 +2290,7 @@ export default function DisabilityPensionPage() {
               {timelineDataSingle.block2.segments.length > 0 && (
                 <Accordion
                   title="② 💼 加算終了後 〜"
-                  defaultOpen={true}
+                  defaultOpen={false}
                 >
                   <div className="mt-8">
                     <TimelineBlock
@@ -2315,7 +2315,7 @@ export default function DisabilityPensionPage() {
               {timelineDataSingle.block2_65plus.segments.length > 0 && (
                 <Accordion
                   title={`${timelineDataSingle.block2.segments.length > 0 ? '③' : '②'} ✨ 65歳以降（最適給付）${timelineDataSingle.block2_65plus.breakEvenAge ? ` [損益分岐点: ${timelineDataSingle.block2_65plus.breakEvenAge}歳]` : ' [障害年金の方が有利]'}`}
-                  defaultOpen={true}
+                  defaultOpen={false}
                 >
                   <div className="mt-8">
                     <TimelineBlock

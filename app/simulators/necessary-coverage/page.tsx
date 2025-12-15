@@ -431,10 +431,10 @@ function StackedAreaChart({
                             
                             if (scenarioType === 'husbandDeath') {
                                 // 夫死亡シナリオ：妻と子供を表示
-                                const wifeAge = (profile.basicInfo.ageWife || 0) + yearsSinceStart;
+                                const wifeAge = idx === 0 ? (profile.basicInfo.ageWife || 0) + yearsSinceStart : (profile.basicInfo.ageWife || 0) + yearsSinceStart - 1;
                                 familyLabels.push(`妻${wifeAge}`);
                                 childrenAges.forEach((childAge) => {
-                                    const currentChildAge = childAge + yearsSinceStart;
+                                    const currentChildAge = idx === 0 ? childAge + yearsSinceStart : childAge + yearsSinceStart - 1;
                                     familyLabels.push(`子${currentChildAge}`);
                                 });
                             } else if (scenarioType === 'husbandDisability') {
@@ -449,10 +449,10 @@ function StackedAreaChart({
                                 });
                             } else if (scenarioType === 'wifeDeath') {
                                 // 妻死亡シナリオ：夫と子供を表示
-                                const husbandAge = (profile.basicInfo.ageHusband || 0) + yearsSinceStart;
+                                const husbandAge = idx === 0 ? (profile.basicInfo.ageHusband || 0) + yearsSinceStart : (profile.basicInfo.ageHusband || 0) + yearsSinceStart - 1;
                                 familyLabels.push(`夫${husbandAge}`);
                                 childrenAges.forEach((childAge) => {
-                                    const currentChildAge = childAge + yearsSinceStart;
+                                    const currentChildAge = idx === 0 ? childAge + yearsSinceStart : childAge + yearsSinceStart - 1;
                                     familyLabels.push(`子${currentChildAge}`);
                                 });
                             } else if (scenarioType === 'wifeDisability') {
@@ -468,7 +468,7 @@ function StackedAreaChart({
                             } else if (scenarioType === 'singleDeath') {
                                 // 独身死亡シナリオ：子供のみ表示
                                 childrenAges.forEach((childAge) => {
-                                    const currentChildAge = childAge + yearsSinceStart;
+                                    const currentChildAge = idx === 0 ? childAge + yearsSinceStart : childAge + yearsSinceStart - 1;
                                     familyLabels.push(`子${currentChildAge}`);
                                 });
                             } else if (scenarioType === 'singleDisability') {
@@ -1360,7 +1360,7 @@ export default function NecessaryCoveragePage() {
 
                     let kousei = 0;
                     if (targetPerson === 'husband') {
-                        const disabilityKousei = calculateDisabilityEmployeePension(level, spouseBonus, 0, basicInfo.avgStdMonthlyHusband, basicInfo.monthsHusband, true);
+                        const disabilityKousei = calculateDisabilityEmployeePension(level, spouseBonus, 0, basicInfo.avgStdMonthlyHusband, basicInfo.monthsHusband, basicInfo.useMinashi300Husband);
                         if (currentAge >= 65) {
                             // 65歳以降：障害厚生年金と老齢厚生年金（65歳時点）の最大値を取る
                             const oldAgeKouseiAt65 = calculateOldAgeEmployeePension(basicInfo.avgStdMonthlyHusband, basicInfo.monthsHusband);
@@ -1369,7 +1369,7 @@ export default function NecessaryCoveragePage() {
                             kousei = disabilityKousei;
                         }
                     } else if (targetPerson === 'wife') {
-                        const disabilityKousei = calculateDisabilityEmployeePension(level, spouseBonus, 0, basicInfo.avgStdMonthlyWife, basicInfo.monthsWife, true);
+                        const disabilityKousei = calculateDisabilityEmployeePension(level, spouseBonus, 0, basicInfo.avgStdMonthlyWife, basicInfo.monthsWife, basicInfo.useMinashi300Wife);
                         if (currentAge >= 65) {
                             // 65歳以降：障害厚生年金と老齢厚生年金（65歳時点）の最大値を取る
                             const oldAgeKouseiAt65 = calculateOldAgeEmployeePension(basicInfo.avgStdMonthlyWife, basicInfo.monthsWife);
@@ -1378,7 +1378,7 @@ export default function NecessaryCoveragePage() {
                             kousei = disabilityKousei;
                         }
                     } else {
-                        const disabilityKousei = calculateDisabilityEmployeePension(level, 0, 0, basicInfo.avgStdMonthly, basicInfo.employeePensionMonths, false);
+                        const disabilityKousei = calculateDisabilityEmployeePension(level, 0, 0, basicInfo.avgStdMonthly, basicInfo.employeePensionMonths, basicInfo.useMinashi300);
                         if (currentAge >= 65) {
                             // 65歳以降：障害厚生年金と老齢厚生年金（65歳時点）の最大値を取る
                             const oldAgeKouseiAt65 = calculateOldAgeEmployeePension(basicInfo.avgStdMonthly, basicInfo.employeePensionMonths);
@@ -2165,7 +2165,8 @@ export default function NecessaryCoveragePage() {
                             </>
                         ) : (
                             <>
-                                {/* 独身：死亡時シナリオ用の条件設定 */}
+                                {/* 独身：死亡時シナリオ用の条件設定（遺族シナリオ非表示のため非表示） */}
+                                {profile.basicInfo.spouseType !== 'none' && (
                                 <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 pb-2 shadow-lg mb-4">
                                     <button
                                         onClick={() => setShowDeathSettings((prev) => !prev)}
@@ -2241,26 +2242,29 @@ export default function NecessaryCoveragePage() {
                                         </div>
                                     )}
                                     </div>
+                                )}
 
-                                {/* 死亡シナリオ */}
-                                <ScenarioSection
-                                    result={scenarios.singleDeath}
-                                    profile={profile}
-                                    color="emerald"
-                                    icon="💀"
-                                    description="本人が死亡した場合、家庭から本人の収入がなくなる。公的保障による補填額を確認します"
-                                    scenarioKey="singleDeath"
-                                    displayPeriodModes={displayPeriodModes}
-                                    setDisplayPeriodModes={setDisplayPeriodModes}
-                                    customEndAges={customEndAges}
-                                    setCustomEndAges={setCustomEndAges}
+                                {/* 死亡シナリオ（独身の場合は非表示） */}
+                                {profile.basicInfo.spouseType !== 'none' && (
+                                    <>
+                                        <ScenarioSection
+                                            result={scenarios.singleDeath}
+                                            profile={profile}
+                                            color="emerald"
+                                            icon="💀"
+                                            description="本人が死亡した場合、家庭から本人の収入がなくなる。公的保障による補填額を確認します"
+                                            scenarioKey="singleDeath"
+                                            displayPeriodModes={displayPeriodModes}
+                                            setDisplayPeriodModes={setDisplayPeriodModes}
+                                            customEndAges={customEndAges}
+                                            setCustomEndAges={setCustomEndAges}
                                             expenseRatioSurvivor={expenseRatioSurvivor}
                                             setExpenseRatioSurvivor={setExpenseRatioSurvivor}
                                             exportId="scenario-single-death"
-                                />
+                                        />
 
-                                {/* 死亡時シナリオの懸念点カード */}
-                                <div id="concern-single-death" className="bg-emerald-950/20 border border-emerald-800/50 rounded-2xl p-6 shadow-lg mb-6">
+                                        {/* 死亡時シナリオの懸念点カード */}
+                                        <div id="concern-single-death" className="bg-emerald-950/20 border border-emerald-800/50 rounded-2xl p-6 shadow-lg mb-6">
                                     <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-emerald-300">
                                         <span>⚠️</span> 懸念点
                                     </h3>
@@ -2316,6 +2320,8 @@ export default function NecessaryCoveragePage() {
                                         </p>
                                     </div>
                                 </div>
+                                    </>
+                                )}
 
                                 {/* 独身：障害時シナリオ用の条件設定 */}
                                 <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 pb-4 shadow-lg mb-6">

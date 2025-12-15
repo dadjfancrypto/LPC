@@ -1756,7 +1756,7 @@ export default function SurvivorPensionPage() {
             {timelineDataHusband.block2 && (
             <Accordion
               title="② 💼 子がいなくなった後 〜 老後"
-              defaultOpen={true}
+              defaultOpen={false}
             >
               <div className="mt-8">
                 <TimelineBlock
@@ -1867,7 +1867,7 @@ export default function SurvivorPensionPage() {
             {timelineDataWife.block2 && (
             <Accordion
               title="② 💼 子がいなくなった後 〜 老後"
-              defaultOpen={true}
+              defaultOpen={false}
             >
               <div className="mt-8">
                 <TimelineBlock
