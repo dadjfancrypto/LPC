@@ -549,8 +549,8 @@ function StackedAreaChart({
     const shortfallStroke = '#B91C1C'; // Red-700
 
     // ラベルを表示するための最小視覚的高さ（金額換算）
-    // 4万円分の高さがあれば2行ラベル（約25-30px）が収まると仮定
-    const MIN_VISUAL_AMOUNT = 40000;
+    // 3万円分の高さがあれば2行ラベル（約25-30px）が収まると仮定
+    const MIN_VISUAL_AMOUNT = 30000;
 
 
 
@@ -733,7 +733,7 @@ function StackedAreaChart({
                             : 0;
                         
                         // Layer 3: 不要な支出（グレー）
-                        // 不足額レイヤーが最小サイズ（4万円）で表示される場合、グレーレイヤーを満水基準から4万円を引いた値までに制限
+                        // 不足額レイヤーが最小サイズ（3万円）で表示される場合、グレーレイヤーを満水基準から3万円を引いた値までに制限
                         const maxGrayAmount = visualShortfallAmount >= MIN_VISUAL_AMOUNT
                             ? currentSalaryMonthly - MIN_VISUAL_AMOUNT
                             : currentSalaryMonthly;
@@ -782,7 +782,7 @@ function StackedAreaChart({
                         const fullWaterAmount = currentSalaryMonthly; // 満水基準（月収）
                         const fullWaterY = getY(fullWaterAmount);
                         
-                        // 不足額レイヤーが最小サイズ（4万円）で表示される場合、グレーレイヤーの上端を満水基準から4万円を引いた値までに制限
+                        // 不足額レイヤーが最小サイズ（3万円）で表示される場合、グレーレイヤーの上端を満水基準から3万円を引いた値までに制限
                         const maxGrayTopAmount = visualShortfallAmount >= MIN_VISUAL_AMOUNT
                             ? currentSalaryMonthly - MIN_VISUAL_AMOUNT
                             : currentSalaryMonthly;
@@ -917,7 +917,7 @@ function StackedAreaChart({
                                     const fullWaterAmount = currentSalaryMonthly; // 満水基準（月収）
                                     const fullWaterY = getY(fullWaterAmount);
                                     
-                                    // 不足額レイヤーが最小サイズ（4万円）で表示される場合、グレーレイヤーを満水基準から4万円を引いた値までに制限
+                                    // 不足額レイヤーが最小サイズ（3万円）で表示される場合、グレーレイヤーを満水基準から3万円を引いた値までに制限
                                     const maxGrayY = visualShortfallAmount >= MIN_VISUAL_AMOUNT
                                         ? getY(currentSalaryMonthly - MIN_VISUAL_AMOUNT)
                                         : fullWaterY;
