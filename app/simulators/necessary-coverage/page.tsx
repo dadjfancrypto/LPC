@@ -91,6 +91,204 @@ const SAVINGS_OPTIONS_MAN = Array.from({ length: 101 }, (_, i) => i * 50); // 0�
 const RETIREMENT_AGE = 65;
 const RESERVE_RATIO = 0.1; // 基本生活費の10%を老後・予備費として積み立てる想定
 
+/* ===================== 手取り月収計算関数 ===================== */
+
+/**
+ * 年収から手取り係数を計算（表示専用）
+ * @param annualIncome 年収（円）
+ * @returns 手取り係数（0.55〜0.77）
+ */
+function calculateTakeHomeRatio(annualIncome: number): number {
+    if (annualIncome <= 4_000_000) {
+        return 0.770; // 〜400万円: 税率8.0%
+    } else if (annualIncome <= 8_000_000) {
+        return 0.750; // 400〜800万円: 税率10.0%
+    } else if (annualIncome <= 12_000_000) {
+        return 0.750; // 800〜1200万円: 税率10.0%
+    } else {
+        return 0.700; // 1200万円超: 税率15.0%
+    }
+}
+
+/**
+ * 額面月収から手取り月収を計算（表示専用）
+ * @param grossMonthly 額面月収（円）
+ * @param annualIncome 年収（円）
+ * @returns 手取り月収（円）
+ */
+function calculateTakeHomeMonthly(grossMonthly: number, annualIncome: number): number {
+    const ratio = calculateTakeHomeRatio(annualIncome);
+    return grossMonthly * ratio;
+}
+
+/* ===================== 手取り計算説明モーダル ===================== */
+
+function TakeHomeCalculationModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+            <div 
+                className="bg-slate-900 border border-slate-800 rounded-2xl p-6 md:p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-2xl font-bold text-slate-100">手取り月収の計算について</h2>
+                    <button
+                        onClick={onClose}
+                        className="text-slate-400 hover:text-slate-200 transition-colors p-2 hover:bg-slate-800 rounded-lg"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div className="space-y-6 text-slate-300">
+                    {/* 概要 */}
+                    <section>
+                        <h3 className="text-xl font-bold text-slate-100 mb-3">📊 手取り月収の計算方法</h3>
+                        <p className="text-sm leading-relaxed mb-4">
+                            このシミュレーションでは、「手取り月収」を以下の計算式で算出しています：
+                        </p>
+                        <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-4 mb-4">
+                            <div className="text-sm font-mono text-sky-400 mb-2">手取り月収 = 額面月収 × 手取り係数</div>
+                            <div className="text-xs text-slate-400 mt-2">
+                                手取り係数 = 1 - 社会保険料率 - 所得税・住民税率
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* 社会保険料について */}
+                    <section>
+                        <h3 className="text-xl font-bold text-slate-100 mb-3">🏥 社会保険料について</h3>
+                        <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-4 mb-4">
+                            <p className="text-sm leading-relaxed mb-3">
+                                社会保険料率は<strong className="text-emerald-400">一律15.0%</strong>として概算しています。
+                                これは、計算の複雑化を防ぎ、分かりやすい目安をお伝えするための措置です。
+                            </p>
+                            <div className="bg-slate-900/60 border border-slate-700 rounded-lg p-3 mt-3">
+                                <p className="text-xs text-slate-300 leading-relaxed">
+                                    <strong className="text-amber-400">重要なポイント：</strong>日本の社会保険料（厚生年金保険と健康保険が主な構成要素）には、
+                                    <strong className="text-emerald-400">「上限（キャップ）」</strong>が設定されています。
+                                    所得税が年収に応じて青天井で税率が上がるのに対し、社会保険料は一定の金額で頭打ちになるという特性があるのです。
+                                </p>
+                                <p className="text-xs text-slate-400 mt-2">
+                                    具体的には、厚生年金保険料は標準報酬月額が65万円（年収約780万円）を超えるとそれ以上は上がらず、
+                                    健康保険料も同様に上限が設定されています。
+                                </p>
+                                <p className="text-xs text-slate-300 mt-2">
+                                    このため、年収が780万円を超えて1,000万円、1,500万円と上がっていくにつれて、
+                                    保険料の絶対額はほぼ固定されるため、
+                                    <strong className="text-emerald-400">「年収全体に占める社会保険料の割合（実質的な負担率）は徐々に下がっていきます」</strong>。
+                                </p>
+                                <p className="text-xs text-slate-300 mt-2">
+                                    つまり、このシミュレーションで一律15.0%として表示しているのは、多くの年収帯で妥当な
+                                    <strong className="text-emerald-400">「最大公約数的な目安」</strong>であり、
+                                    お客様の実際の社会保険料の実質的な負担率は、この15.0%よりも低くなっている可能性が高いということです。
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* 所得税・住民税について */}
+                    <section>
+                        <h3 className="text-xl font-bold text-slate-100 mb-3">💰 所得税・住民税について</h3>
+                        <p className="text-sm leading-relaxed mb-4">
+                            所得税・住民税は超過累進課税制度を採用しており、年収が上がるにつれて税金が引かれる割合（実効税率）が高くなります。
+                        </p>
+                        <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-4 mb-4">
+                            <h4 className="text-sm font-bold text-slate-200 mb-3">年収帯ごとの税率</h4>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-xs">
+                                    <thead>
+                                        <tr className="border-b border-slate-700">
+                                            <th className="text-left py-2 px-3 text-slate-300">年収帯</th>
+                                            <th className="text-right py-2 px-3 text-slate-300">税率</th>
+                                            <th className="text-right py-2 px-3 text-slate-300">手取り係数</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr className="border-b border-slate-800">
+                                            <td className="py-2 px-3">〜400万円</td>
+                                            <td className="text-right py-2 px-3 text-emerald-400">8.0%</td>
+                                            <td className="text-right py-2 px-3 text-sky-400">0.770</td>
+                                        </tr>
+                                        <tr className="border-b border-slate-800">
+                                            <td className="py-2 px-3">400万円超 〜 800万円</td>
+                                            <td className="text-right py-2 px-3 text-emerald-400">10.0%</td>
+                                            <td className="text-right py-2 px-3 text-sky-400">0.750</td>
+                                        </tr>
+                                        <tr className="border-b border-slate-800">
+                                            <td className="py-2 px-3">800万円超 〜 1,200万円</td>
+                                            <td className="text-right py-2 px-3 text-emerald-400">10.0%</td>
+                                            <td className="text-right py-2 px-3 text-sky-400">0.750</td>
+                                        </tr>
+                                        <tr>
+                                            <td className="py-2 px-3">1,200万円超</td>
+                                            <td className="text-right py-2 px-3 text-emerald-400">15.0%</td>
+                                            <td className="text-right py-2 px-3 text-sky-400">0.700</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div className="mt-4 text-xs text-slate-400">
+                                <p className="mb-2">
+                                    <strong className="text-slate-300">計算例：</strong>
+                                </p>
+                                <ul className="list-disc list-inside space-y-1 ml-2">
+                                    <li>年収400万円の場合：手取り係数 = 1 - 15.0% - 8.0% = 0.770（77.0%）</li>
+                                    <li>年収800万円の場合：手取り係数 = 1 - 15.0% - 10.0% = 0.750（75.0%）</li>
+                                    <li>年収1,200万円超の場合：手取り係数 = 1 - 15.0% - 15.0% = 0.700（70.0%）</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* 注意事項 */}
+                    <section>
+                        <h3 className="text-xl font-bold text-slate-100 mb-3">⚠️ ご注意事項</h3>
+                        <div className="bg-amber-950/20 border border-amber-800/50 rounded-lg p-4">
+                            <ul className="text-sm space-y-2 text-slate-300">
+                                <li className="flex items-start gap-2">
+                                    <span className="text-amber-400 mt-1">•</span>
+                                    <span>
+                                        この「手取り月収」は、<strong className="text-amber-400">全国一律の固定係数で計算した概算の目安</strong>です。
+                                        実際の手取り額は、扶養親族の数、医療費控除、生命保険料控除など、数百種類の要素で変動します。
+                                    </span>
+                                </li>
+                                <li className="flex items-start gap-2">
+                                    <span className="text-amber-400 mt-1">•</span>
+                                    <span>
+                                        シミュレーションの安定性を優先し、控除を標準的なものと見なした概算の実効税率を採用しています。
+                                    </span>
+                                </li>
+                                <li className="flex items-start gap-2">
+                                    <span className="text-amber-400 mt-1">•</span>
+                                    <span>
+                                        年収帯によって手取り率が明確に下がることを示すことで、
+                                        「保障額を確保しても、税金で手元に残る額はこれくらい」という将来の現実に即した感覚を顧客に訴求できます。
+                                    </span>
+                                </li>
+                            </ul>
+                        </div>
+                    </section>
+
+                    {/* 閉じるボタン */}
+                    <div className="flex justify-end pt-4 border-t border-slate-800">
+                        <button
+                            onClick={onClose}
+                            className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-lg transition-colors"
+                        >
+                            閉じる
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 /* ===================== 児童手当・児童扶養手当の計算関数 ===================== */
 
 /**
@@ -138,7 +336,8 @@ function calculateChildAllowance(childrenAges: number[]): number {
  */
 function calculateChildSupportAllowance(
     childrenAges: number[],
-    survivorAnnualIncome: number
+    survivorAnnualIncome: number,
+    survivorPensionMonthly: number = 0 // 遺族年金の月額（円）
 ): number {
     if (childrenAges.length === 0) return 0;
     
@@ -146,20 +345,28 @@ function calculateChildSupportAllowance(
     const eligibleChildren = childrenAges.filter(age => age < 19).length;
     if (eligibleChildren === 0) return 0;
     
+    // 児童扶養手当の満額を計算
+    const firstChild = 46690; // 46,690円（第1子）
+    const additionalChildren = (eligibleChildren - 1) * 11030; // 11,030円（第2子以降）
+    const fullAmount = firstChild + additionalChildren;
+    
+    // 遺族年金が発生している場合、その額が児童扶養手当の満額を超えていれば、児童扶養手当は0円
+    if (survivorPensionMonthly > 0 && survivorPensionMonthly >= fullAmount) {
+        return 0;
+    }
+    
     const annualIncomeYen = survivorAnnualIncome; // 年収（円）
     
     if (annualIncomeYen < 1600000) {
         // 全部支給（令和7年4月分から）
-        const firstChild = 46690; // 46,690円
-        const additionalChildren = (eligibleChildren - 1) * 11030; // 11,030円
-        return firstChild + additionalChildren;
+        return fullAmount;
     } else if (annualIncomeYen < 3650000) {
         // 一部支給（中間値：最大値と最小値の中間）
         // 第1子：46,680円～11,010円 → 中間値 28,845円
         // 第2子以降：11,020円～5,520円 → 中間値 8,270円
-        const firstChild = 28845; // (46680 + 11010) / 2
-        const additionalChildren = (eligibleChildren - 1) * 8270; // (11020 + 5520) / 2
-        return firstChild + additionalChildren;
+        const firstChildPartial = 28845; // (46680 + 11010) / 2
+        const additionalChildrenPartial = (eligibleChildren - 1) * 8270; // (11020 + 5520) / 2
+        return firstChildPartial + additionalChildrenPartial;
     } else {
         // 支給停止
         return 0;
@@ -355,13 +562,8 @@ function StackedAreaChart({
 
                     {/* Y軸のグリッド */}
                     {(() => {
-                        const ticks = [0, 0.5, 1.0];
-                        const tenManYen = 100000; // 10万円
-                        const tenManYenTick = tenManYen / maxAmount;
-                        if (tenManYenTick > 0 && tenManYenTick < 1) {
-                            ticks.push(tenManYenTick);
-                        }
-                        ticks.sort((a, b) => a - b);
+                        // 0と最大値のみ表示（途中の数字は削除）
+                        const ticks = [0, 1.0];
                         return ticks.map((tick) => {
                             const y = graphHeight * (1 - tick);
                             const val = maxAmount * tick;
@@ -1428,9 +1630,12 @@ export default function NecessaryCoveragePage() {
                     // 児童扶養手当（ひとり親・所得制限あり）
                     // 遺族となる配偶者の年収を使用
                     const survivorAnnualIncome = survivorBaseIncome;
+                    // 遺族年金の月額を計算（年額を12で割る）
+                    const survivorPensionMonthly = pension / 12;
                     childSupportAllowanceMonthly = calculateChildSupportAllowance(
                         childrenCurrentAges,
-                        survivorAnnualIncome
+                        survivorAnnualIncome,
+                        survivorPensionMonthly
                     );
                 }
 
@@ -2558,6 +2763,8 @@ function ScenarioSection({
     // トグルボタンの状態管理（各シナリオごとに独立）
     const [showAllowancesToggle, setShowAllowancesToggle] = useState(true);
     const [showGrayAreaCalculation, setShowGrayAreaCalculation] = useState(false);
+    const [showTakeHomeSalary, setShowTakeHomeSalary] = useState(false); // 手取り月収表示トグル（デフォルトOFF）
+    const [showTakeHomeModal, setShowTakeHomeModal] = useState(false); // 手取り計算説明モーダル
     
     // 児童手当・児童扶養手当の合計額を計算（最初のデータから取得）
     const firstDataEntry = result.data.length > 0 ? result.data[0] : null;
@@ -2567,7 +2774,6 @@ function ScenarioSection({
     // 事故発生前の現在の月額給料を計算
     // 生き残った配偶者の給料を満水基準とする
     // 年収を12で割った値を月額給料とする
-    let currentSalaryMonthly = 0;
     const husbandAnnual =
         profile.basicInfo.annualIncomeHusband ||
         (profile.basicInfo.avgStdMonthlyHusband ? profile.basicInfo.avgStdMonthlyHusband * 12 : 0) ||
@@ -2584,22 +2790,39 @@ function ScenarioSection({
     const isHusbandScenario = result.title.includes('夫死亡') || result.title.includes('夫障害');
     const isWifeScenario = result.title.includes('妻死亡') || result.title.includes('妻障害');
 
+    // 額面月収を計算
+    let grossSalaryMonthly = 0;
+    let annualIncome = 0;
     if (isHusbandScenario) {
-        currentSalaryMonthly = husbandAnnual / 12;
+        grossSalaryMonthly = husbandAnnual / 12;
+        annualIncome = husbandAnnual;
     } else if (isWifeScenario) {
-        currentSalaryMonthly = wifeAnnual / 12;
+        grossSalaryMonthly = wifeAnnual / 12;
+        annualIncome = wifeAnnual;
     } else {
-        currentSalaryMonthly = singleAnnual / 12;
+        grossSalaryMonthly = singleAnnual / 12;
+        annualIncome = singleAnnual;
     }
 
+    // トグルON時は手取り月収、OFF時は額面月収
+    const currentSalaryMonthly = showTakeHomeSalary
+        ? calculateTakeHomeMonthly(grossSalaryMonthly, annualIncome)
+        : grossSalaryMonthly;
+
     // ラベル生成
-    let salaryLabelText = '現在の月額給料（満水基準）';
+    let salaryLabelText = showTakeHomeSalary ? '手取り月収（満水基準）' : '現在の月額給料（満水基準）';
     if (isHusbandScenario) {
-        salaryLabelText = '家庭から亡くなる夫の給料（満水基準）';
+        salaryLabelText = showTakeHomeSalary
+            ? '家庭から亡くなる夫の手取り月収（満水基準）'
+            : '家庭から亡くなる夫の給料（満水基準）';
     } else if (isWifeScenario) {
-        salaryLabelText = '家庭から亡くなる妻の給料（満水基準）';
+        salaryLabelText = showTakeHomeSalary
+            ? '家庭から亡くなる妻の手取り月収（満水基準）'
+            : '家庭から亡くなる妻の給料（満水基準）';
     } else if (result.title.includes('本人死亡') || result.title.includes('本人障害')) {
-        salaryLabelText = '家庭から亡くなる本人の給料（満水基準）';
+        salaryLabelText = showTakeHomeSalary
+            ? '家庭から亡くなる本人の手取り月収（満水基準）'
+            : '家庭から亡くなる本人の給料（満水基準）';
     }
 
     // 障害年金シナリオかどうかを判定
@@ -2633,8 +2856,13 @@ function ScenarioSection({
         });
     }
     
-    // 貯蓄を控除
-    const netShortfall = Math.max(0, totalShortfallFromGraph - result.savingsApplied);
+    // 貯蓄を控除（死亡時シナリオの場合、葬儀代も追加）
+    // result.netShortfallには既に葬儀代が含まれているが、表示期間が異なる場合に備えて再計算
+    // ただし、死亡時シナリオで葬儀代が選択されている場合は葬儀代を追加する必要がある
+    const baseNetShortfall = Math.max(0, totalShortfallFromGraph - result.savingsApplied);
+    const netShortfall = result.category === 'survivor' && result.funeralCost > 0
+        ? baseNetShortfall + result.funeralCost
+        : baseNetShortfall;
     const shortfallText = (netShortfall / 10000).toFixed(0);
     const sicknessDeduction = result.sicknessDeduction;
     const savingsApplied = result.savingsApplied;
@@ -2647,7 +2875,7 @@ function ScenarioSection({
         deductionMessages.push(`貯蓄から ${(savingsApplied / 10000).toFixed(0)}万円 控除`);
     }
     if (funeralCost > 0) {
-        deductionMessages.push(`葬儀代 ${(funeralCost / 10000).toFixed(0)}万円 を考慮済み`);
+        deductionMessages.push(`葬儀代 ${(funeralCost / 10000).toFixed(0)}万円 を考慮`);
     }
 
     // ラジオボタン選択時にcustomEndAgeを更新する関数
@@ -2684,18 +2912,31 @@ function ScenarioSection({
                         {result.title}
                         {isHusbandScenario && (
                             <span className="text-xl font-bold text-slate-100">
-                                （夫の月収: {(husbandAnnual / 12 / 10000).toFixed(1)}万円）
+                                （夫の月収: {showTakeHomeSalary ? `${(calculateTakeHomeMonthly(husbandAnnual / 12, husbandAnnual) / 10000).toFixed(1)}万円` : `${(husbandAnnual / 12 / 10000).toFixed(1)}万円`}）
                             </span>
                         )}
                         {isWifeScenario && (
                             <span className="text-xl font-bold text-slate-100">
-                                （妻の月収: {(wifeAnnual / 12 / 10000).toFixed(1)}万円）
+                                （妻の月収: {showTakeHomeSalary ? `${(calculateTakeHomeMonthly(wifeAnnual / 12, wifeAnnual) / 10000).toFixed(1)}万円` : `${(wifeAnnual / 12 / 10000).toFixed(1)}万円`}）
                             </span>
                         )}
                     </h3>
                     <p className="text-slate-400 text-sm mt-1">{description}</p>
                 </div>
-                <div className="text-right bg-slate-950/50 px-6 py-3 rounded-xl border border-slate-800">
+                <div className="flex items-center gap-4">
+                    {/* 手取り月収表示トグルボタン */}
+                    <div className="flex items-center gap-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={showTakeHomeSalary}
+                                onChange={(e) => setShowTakeHomeSalary(e.target.checked)}
+                                className="w-4 h-4 text-emerald-500 rounded focus:ring-2 focus:ring-emerald-500"
+                            />
+                            <span className="text-sm font-medium text-slate-400">手取り月収</span>
+                        </label>
+                    </div>
+                    <div className="text-right bg-slate-950/50 px-6 py-3 rounded-xl border border-slate-800">
                     <div className="text-xs text-slate-400 mb-1">{headline}</div>
                     <div className={`text-3xl font-bold ${netShortfall > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
                         {netShortfall > 0 ? `${shortfallText}万円` : '不足なし'}
@@ -2705,6 +2946,7 @@ function ScenarioSection({
                             {deductionMessages.join(' / ')} を控除済み
                         </div>
                     )}
+                    </div>
                 </div>
             </div>
 
@@ -2853,6 +3095,18 @@ function ScenarioSection({
                     profile={profile}
                     scenarioType={scenarioKey as 'husbandDeath' | 'wifeDeath' | 'singleDeath' | 'husbandDisability' | 'wifeDisability' | 'singleDisability'}
                 />
+                {showTakeHomeSalary && (
+                    <div className="mt-2 text-xs text-slate-500 text-center">
+                        ※この「手取り月収」は、全国一律の固定係数で計算した<strong>概算の目安</strong>です。
+                        <button
+                            onClick={() => setShowTakeHomeModal(true)}
+                            className="ml-2 text-sky-400 hover:text-sky-300 underline transition-colors"
+                        >
+                            手取り月収の計算とは
+                        </button>
+                    </div>
+                )}
+                <TakeHomeCalculationModal isOpen={showTakeHomeModal} onClose={() => setShowTakeHomeModal(false)} />
             </div>
 
             {/* トグルボタンと説明文（グラフ表示期間の直上） */}
