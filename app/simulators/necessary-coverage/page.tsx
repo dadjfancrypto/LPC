@@ -121,6 +121,156 @@ function calculateTakeHomeMonthly(grossMonthly: number, annualIncome: number): n
     return grossMonthly * ratio;
 }
 
+/* ===================== 児童扶養手当計算説明モーダル ===================== */
+
+function ChildSupportAllowanceModal({ 
+    isOpen, 
+    onClose, 
+    childSupportAllowanceMonthly,
+    survivorAnnualIncome,
+    survivorPensionMonthly
+}: { 
+    isOpen: boolean; 
+    onClose: () => void;
+    childSupportAllowanceMonthly: number;
+    survivorAnnualIncome: number;
+    survivorPensionMonthly: number;
+}) {
+    if (!isOpen) return null;
+
+    // 満額計算
+    const fullAmount = 46690; // 第1子の満額（簡易表示用）
+    
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+            <div 
+                className="bg-slate-900 border border-slate-800 rounded-2xl p-6 md:p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-2xl font-bold text-slate-100">児童扶養手当の計算について</h2>
+                    <button
+                        onClick={onClose}
+                        className="text-slate-400 hover:text-slate-200 transition-colors p-2 hover:bg-slate-800 rounded-lg"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div className="space-y-6 text-slate-300">
+                    {/* 現在の計算結果 */}
+                    <section>
+                        <h3 className="text-xl font-bold text-slate-100 mb-3">📊 現在の計算結果</h3>
+                        <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-4 mb-4">
+                            <div className="text-sm space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-slate-400">児童扶養手当（月額）:</span>
+                                    <span className="text-emerald-400 font-bold text-lg">{(childSupportAllowanceMonthly / 10000).toFixed(1)}万円</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-slate-400">遺族となる配偶者の年収:</span>
+                                    <span className="text-slate-200">{(survivorAnnualIncome / 10000).toFixed(1)}万円</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-slate-400">遺族年金（月額）:</span>
+                                    <span className="text-slate-200">{(survivorPensionMonthly / 10000).toFixed(1)}万円</span>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* 計算ロジック */}
+                    <section>
+                        <h3 className="text-xl font-bold text-slate-100 mb-3">🔢 計算ロジック</h3>
+                        <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-4 mb-4">
+                            <div className="text-sm space-y-3">
+                                <div>
+                                    <h4 className="font-bold text-slate-200 mb-2">1. 満額の計算</h4>
+                                    <div className="pl-2 text-xs text-slate-400 space-y-1">
+                                        <div>・第1子: 46,690円/月</div>
+                                        <div>・第2子以降: 11,030円/月（1人あたり）</div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-slate-200 mb-2">2. 遺族年金との併給調整</h4>
+                                    <div className="pl-2 text-xs text-slate-400 space-y-1">
+                                        <div>・遺族年金が満額以上の場合: 児童扶養手当は0円</div>
+                                        <div>・遺族年金が満額未満の場合: 年収に基づいて計算</div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-slate-200 mb-2">3. 所得制限による支給額の決定</h4>
+                                    <div className="pl-2 text-xs text-slate-400 space-y-1">
+                                        <div>・年収160万円未満: 全部支給（満額）</div>
+                                        <div>・年収160万円以上365万円未満: 一部支給（中間値）</div>
+                                        <div className="pl-2 text-slate-500">
+                                            - 第1子: 28,845円（中間値）<br/>
+                                            - 第2子以降: 8,270円（中間値）
+                                        </div>
+                                        <div>・年収365万円以上: 支給停止（0円）</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* 公的給付の内訳 */}
+                    <section>
+                        <h3 className="text-xl font-bold text-slate-100 mb-3">📋 公的給付の内訳</h3>
+                        <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-4 mb-4">
+                            <div className="text-sm space-y-2">
+                                <div className="font-semibold text-emerald-300 mb-3">児童扶養手当</div>
+                                <div className="pl-2 text-xs text-slate-400 space-y-1">
+                                    <div>【支給対象】</div>
+                                    <div>・18歳到達年度末までの子を養育するひとり親</div>
+                                    <div className="mt-2">【支給額（令和7年4月分から）】</div>
+                                    <div>・全部支給: 第1子 46,690円、第2子以降 11,030円/月</div>
+                                    <div>・一部支給: 第1子 28,845円、第2子以降 8,270円/月（中間値）</div>
+                                    <div className="mt-2">【所得制限】</div>
+                                    <div>・全部支給: 年収160万円未満</div>
+                                    <div>・一部支給: 年収160万円以上365万円未満</div>
+                                    <div>・支給停止: 年収365万円以上</div>
+                                    <div className="mt-2 text-emerald-300">【遺族年金との併給】</div>
+                                    <div>・遺族年金が児童扶養手当の満額以上の場合、児童扶養手当は支給されません</div>
+                                    <div>・遺族年金が満額未満の場合、年収に基づいて計算された額が支給されます</div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* 参考リンク */}
+                    <section>
+                        <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-4">
+                            <div className="text-sm">
+                                <a 
+                                    href="https://www.cfa.go.jp/policies/hitori-oya/fuyou-teate" 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-blue-400 hover:text-blue-300 underline"
+                                >
+                                    児童扶養手当制度の詳細（厚生労働省）
+                                </a>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* 閉じるボタン */}
+                    <div className="flex justify-end pt-4 border-t border-slate-800">
+                        <button
+                            onClick={onClose}
+                            className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-lg transition-colors"
+                        >
+                            閉じる
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 /* ===================== 手取り計算説明モーダル ===================== */
 
 function TakeHomeCalculationModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
@@ -289,7 +439,7 @@ function TakeHomeCalculationModal({ isOpen, onClose }: { isOpen: boolean; onClos
     );
 }
 
-/* ===================== 児童手当・児童扶養手当の計算関数 ===================== */
+/* ===================== 児童扶養手当の計算関数 ===================== */
 
 /**
  * 児童手当の計算（月額）
@@ -337,7 +487,7 @@ function calculateChildAllowance(childrenAges: number[]): number {
 function calculateChildSupportAllowance(
     childrenAges: number[],
     survivorAnnualIncome: number,
-    survivorPensionMonthly: number = 0 // 遺族年金の月額（円）
+    survivorKouseiMonthly: number = 0 // 遺族厚生年金の月額（円）。遺族基礎年金は併給調整の対象外
 ): number {
     if (childrenAges.length === 0) return 0;
     
@@ -350,8 +500,9 @@ function calculateChildSupportAllowance(
     const additionalChildren = (eligibleChildren - 1) * 11030; // 11,030円（第2子以降）
     const fullAmount = firstChild + additionalChildren;
     
-    // 遺族年金が発生している場合、その額が児童扶養手当の満額を超えていれば、児童扶養手当は0円
-    if (survivorPensionMonthly > 0 && survivorPensionMonthly >= fullAmount) {
+    // 遺族厚生年金が発生している場合、その額が児童扶養手当の満額を超えていれば、児童扶養手当は0円
+    // 遺族基礎年金は併給調整の対象外（併給される）
+    if (survivorKouseiMonthly > 0 && survivorKouseiMonthly >= fullAmount) {
         return 0;
     }
     
@@ -394,7 +545,6 @@ function StackedAreaChart({
     currentSalaryMonthly,
     retirementAge = RETIREMENT_AGE,
     salaryLabel,
-    showAllowancesToggle = false,
     profile,
     scenarioType
 }: {
@@ -402,7 +552,6 @@ function StackedAreaChart({
     currentSalaryMonthly: number; // 事故発生前の現在の月額給料（手取り）
     retirementAge?: number;
     salaryLabel?: string;
-    showAllowancesToggle?: boolean; // 児童手当・児童扶養手当の表示/非表示
     profile?: CustomerProfile; // 顧客プロフィール（家族構成表示用）
     scenarioType?: 'husbandDeath' | 'wifeDeath' | 'singleDeath' | 'husbandDisability' | 'wifeDisability' | 'singleDisability'; // シナリオタイプ
 }) {
@@ -416,13 +565,16 @@ function StackedAreaChart({
                 ? Math.min(entry.pension / 12, currentSalaryMonthly)
                 : entry.pension / 12;
             
-            // Layer 2: 児童手当・児童扶養手当（薄緑、トグルで表示/非表示）
-            // 0万円の場合でも手当は表示される
-            const allowancesMonthly = showAllowancesToggle 
-                ? (currentSalaryMonthly > 0 
-                    ? Math.min((entry.childAllowanceMonthly || 0) + (entry.childSupportAllowanceMonthly || 0), currentSalaryMonthly - pensionMonthly)
-                    : (entry.childAllowanceMonthly || 0) + (entry.childSupportAllowanceMonthly || 0))
-                : 0;
+            // Layer 2: 児童扶養手当（薄緑、該当する場合は自動表示）
+            // 障害シナリオでは常に0（基礎と厚生はLayer 1に統合）
+            const isDisability = scenarioType && (scenarioType.includes('Disability') || scenarioType.includes('disability'));
+            const allowancesMonthly = isDisability 
+                ? 0 
+                : (entry.childSupportAllowanceMonthly > 0
+                    ? (currentSalaryMonthly > 0 
+                        ? Math.min(entry.childSupportAllowanceMonthly || 0, currentSalaryMonthly - pensionMonthly)
+                        : entry.childSupportAllowanceMonthly || 0)
+                    : 0);
             
             // Layer 3: 不要な支出（グレー）
             // grayAreaMonthlyの計算は表示用のallowancesMonthlyに依存せず、常に手当を含めない計算をする
@@ -431,7 +583,7 @@ function StackedAreaChart({
             
             // Layer 4: 真の不足額（赤）または Layer 5: 余剰額（青）
             // 不足額計算は常に手当を含めて計算（表示/非表示は見た目のみ）
-            const totalAllowancesMonthly = (entry.childAllowanceMonthly || 0) + (entry.childSupportAllowanceMonthly || 0);
+            const totalAllowancesMonthly = entry.childSupportAllowanceMonthly || 0;
             const totalIncomeMonthly = pensionMonthly + totalAllowancesMonthly;
             const targetMonthly = currentSalaryMonthly - grayAreaMonthly; // 給料 - 浮く支出
             const shortfallMonthly = Math.max(0, targetMonthly - totalIncomeMonthly); // 不足額
@@ -534,7 +686,7 @@ function StackedAreaChart({
 
     // Y軸は現在の月額給料に固定（満水基準）+ 10万円の余裕
     // 0万円の場合でも、年金や手当がある場合は最低値を設定
-    const maxPensionMonthly = data.length > 0 ? Math.max(...data.map(d => (d.pension || 0) / 12 + (d.childAllowanceMonthly || 0) + (d.childSupportAllowanceMonthly || 0))) : 0;
+    const maxPensionMonthly = data.length > 0 ? Math.max(...data.map(d => (d.pension || 0) / 12 + (d.childSupportAllowanceMonthly || 0))) : 0;
     const baseSalary = currentSalaryMonthly > 0 ? currentSalaryMonthly : Math.max(maxPensionMonthly, 200000 / 12);
     const maxAmount = Math.max(baseSalary + 100000, 1);
     const getY = (value: number) => graphHeight - (value / maxAmount) * graphHeight;
@@ -722,7 +874,7 @@ function StackedAreaChart({
                         // Layer 1: 遺族年金（濃い緑）
                         let visualPensionAmount = entry.pensionMonthly;
                         
-                        // Layer 2: 児童手当・児童扶養手当（薄緑、トグルで表示/非表示）
+                        // Layer 2: 児童扶養手当（薄緑、トグルで表示/非表示）
                         let visualAllowancesAmount = entry.allowancesMonthly > 0 
                             ? Math.max(entry.allowancesMonthly, MIN_VISUAL_AMOUNT) 
                             : 0;
@@ -874,14 +1026,14 @@ function StackedAreaChart({
                                         style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
                                     >
                                         <tspan x={currentX + width / 2} dy="-0.6em">
-                                            {scenarioType && (scenarioType.includes('Disability') || scenarioType.includes('disability')) ? '障害基礎年金' : '遺族年金'}
+                                            {scenarioType && (scenarioType.includes('Disability') || scenarioType.includes('disability')) ? '障害年金' : '遺族年金'}
                                         </tspan>
                                         <tspan x={currentX + width / 2} dy="1.2em">{(entry.pensionMonthly / 10000).toFixed(1)}万円</tspan>
                                     </text>
                                 )}
 
-                                {/* Layer 2: 児童手当・児童扶養手当（薄緑、トグルで表示/非表示） / 障害厚生年金（障害シナリオでは常に表示） */}
-                                {visualAllowancesAmount > 0 && (
+                                {/* Layer 2: 児童扶養手当（薄緑、トグルで表示/非表示） / 障害厚生年金（障害シナリオでは非表示） */}
+                                {visualAllowancesAmount > 0 && !(scenarioType && (scenarioType.includes('Disability') || scenarioType.includes('disability'))) && (
                                     <g>
                                         <rect
                                             x={currentX}
@@ -893,21 +1045,28 @@ function StackedAreaChart({
                                             strokeWidth="1"
                                         />
                                         {showAllowancesLabel && (
-                                            <text
-                                                x={currentX + width / 2}
-                                                y={allowancesY + (pensionY - allowancesY) / 2}
-                                                textAnchor="middle"
-                                                dominantBaseline="central"
-                                                fontSize="12"
-                                                fill="white"
-                                                fontWeight="bold"
-                                                style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.5)' }}
-                                            >
-                                                <tspan x={currentX + width / 2} dy="-0.6em">
-                                                    {scenarioType && (scenarioType.includes('Disability') || scenarioType.includes('disability')) ? '障害厚生年金' : '児童手当'}
-                                                </tspan>
-                                                <tspan x={currentX + width / 2} dy="1.2em">{(entry.allowancesMonthly / 10000).toFixed(1)}万円</tspan>
-                                            </text>
+                                            <g>
+                                                <text
+                                                    x={currentX + width / 2}
+                                                    y={allowancesY + (pensionY - allowancesY) / 2}
+                                                    textAnchor="middle"
+                                                    dominantBaseline="central"
+                                                    fontSize="12"
+                                                    fill="white"
+                                                    fontWeight="bold"
+                                                    style={{ 
+                                                        textShadow: '0px 1px 2px rgba(0,0,0,0.5)'
+                                                    }}
+                                                >
+                                                    <tspan 
+                                                        x={currentX + width / 2} 
+                                                        dy="-0.6em"
+                                                    >
+                                                        {scenarioType && (scenarioType.includes('Disability') || scenarioType.includes('disability')) ? '障害厚生年金' : '児童扶養手当'}
+                                                    </tspan>
+                                                    <tspan x={currentX + width / 2} dy="1.2em">{(entry.allowancesMonthly / 10000).toFixed(1)}万円</tspan>
+                                                </text>
+                                            </g>
                     )}
                                     </g>
                                 )}
@@ -923,8 +1082,8 @@ function StackedAreaChart({
                                         : fullWaterY;
                                     
                                     // 浮く支出レイヤーの下端を正しく計算
-                                    // showAllowancesToggleがfalseの時、allowancesYはpensionYと同じ値になる可能性がある
-                                    const grayAreaBottomY = showAllowancesToggle ? allowancesY : pensionY;
+                                    // 児童扶養手当が表示される場合、その下端を基準にする
+                                    const grayAreaBottomY = entry.allowancesMonthly > 0 ? allowancesY : pensionY;
                                     
                                     // 満水基準を超えているかどうか
                                     const grayAreaExceedsFullWater = entry.grayAreaMonthly > fullWaterAmount;
@@ -1492,6 +1651,7 @@ export default function NecessaryCoveragePage() {
                 const spouseAge = spouseStartAge > 0 ? spouseStartAge + i : 0;
 
                 let pension = 0;
+                let survivorKouseiAnnual = 0; // 遺族厚生年金（年額）を保持（児童扶養手当の併給調整用）
 
                 const childrenCurrentAges = basicInfo.childrenAges.map(age => age + i);
                 const eligibleChildren18 = childrenCurrentAges.filter(age => age < 19).length;
@@ -1507,6 +1667,7 @@ export default function NecessaryCoveragePage() {
                                 kiso = kisoAnnualByCount(eligibleChildren18);
                             }
                             const survivorKousei = proportionAnnual(basicInfo.avgStdMonthlyHusband, basicInfo.monthsHusband, basicInfo.useMinashi300Husband);
+                            survivorKouseiAnnual = survivorKousei; // 遺族厚生年金を保持
             let chukorei = 0;
                             if (eligibleChildren18 === 0 && currentAge >= 40 && currentAge < oldAgeStart) {
                 chukorei = CHUKOREI_KASAN;
@@ -1519,6 +1680,7 @@ export default function NecessaryCoveragePage() {
                                 const adjustedOwnKousei = calculateOldAgePensionAdjustment(ownKouseiBase, oldAgeStart);
                                 const maxKousei = Math.max(survivorKousei, adjustedOwnKousei);
                                 pension = adjustedOwnKiso + maxKousei;
+                                survivorKouseiAnnual = maxKousei; // 老齢年金開始後はmaxKouseiを使用
                             } else {
                                 // 老齢年金開始前：遺族基礎年金（子がいる場合）+ 遺族厚生年金 + 中高齢寡婦加算（条件を満たす場合）
                                 pension = kiso + survivorKousei + chukorei;
@@ -1532,6 +1694,7 @@ export default function NecessaryCoveragePage() {
                                 kiso = kisoAnnualByCount(eligibleChildren18);
                             }
                             const survivorKousei = proportionAnnual(basicInfo.avgStdMonthlyWife, basicInfo.monthsWife, basicInfo.useMinashi300Wife);
+                            survivorKouseiAnnual = survivorKousei; // 遺族厚生年金を保持
                             if (currentAge >= oldAgeStart) {
                                 // 老齢年金開始後：老齢基礎年金（繰上げ・繰下げ調整済み）+ max(遺族厚生年金, 自身の老齢厚生年金（繰上げ・繰下げ調整済み）)
                                 const ownKouseiBase = calculateOldAgeEmployeePension(basicInfo.avgStdMonthlyHusband, basicInfo.monthsHusband);
@@ -1540,6 +1703,7 @@ export default function NecessaryCoveragePage() {
                                 const adjustedOwnKousei = calculateOldAgePensionAdjustment(ownKouseiBase, oldAgeStart);
                                 const maxKousei = Math.max(survivorKousei, adjustedOwnKousei);
                                 pension = adjustedOwnKiso + maxKousei;
+                                survivorKouseiAnnual = maxKousei; // 老齢年金開始後はmaxKouseiを使用
                             } else {
                                 // 老齢年金開始前：遺族基礎年金（子がいる場合）+ 遺族厚生年金
                             pension = kiso + survivorKousei;
@@ -1552,6 +1716,7 @@ export default function NecessaryCoveragePage() {
                             kiso = kisoAnnualByCount(eligibleChildren18);
                         }
                         const kousei = proportionAnnual(basicInfo.avgStdMonthly, basicInfo.employeePensionMonths, basicInfo.useMinashi300);
+                        survivorKouseiAnnual = kousei; // 遺族厚生年金を保持
                         pension = kiso + kousei;
         }
 
@@ -1620,22 +1785,20 @@ export default function NecessaryCoveragePage() {
                 // 教育費は固定値（初期年齢の値）を使用（変動させないため）
                 const educationCost = fixedEducationCostAnnual;
 
-                // 児童手当・児童扶養手当の計算（遺族シナリオのみ）
-                let childAllowanceMonthly = 0;
+                // 児童扶養手当の計算（遺族シナリオのみ）
+                let childAllowanceMonthly = 0; // 児童手当は計算しない（常に0）
                 let childSupportAllowanceMonthly = 0;
                 if (type === 'survivor') {
-                    // 児童手当（全国共通・定額）
-                    childAllowanceMonthly = calculateChildAllowance(childrenCurrentAges);
-                    
                     // 児童扶養手当（ひとり親・所得制限あり）
-                    // 遺族となる配偶者の年収を使用
-                    const survivorAnnualIncome = survivorBaseIncome;
-                    // 遺族年金の月額を計算（年額を12で割る）
-                    const survivorPensionMonthly = pension / 12;
+                    // 遺族となる配偶者の年収を使用（就労率スライドバーで調整した年収を反映）
+                    const survivorAnnualIncome = survivorBaseIncome * (workIncomeRatio / 100);
+                    // 遺族厚生年金の月額を計算（年額を12で割る）
+                    // 遺族基礎年金は併給調整の対象外（併給される）
+                    const survivorKouseiMonthly = survivorKouseiAnnual / 12;
                     childSupportAllowanceMonthly = calculateChildSupportAllowance(
                         childrenCurrentAges,
                         survivorAnnualIncome,
-                        survivorPensionMonthly
+                        survivorKouseiMonthly
                     );
                 }
 
@@ -1692,9 +1855,9 @@ export default function NecessaryCoveragePage() {
                     grayArea = 0;
                 }
 
-                // 不足額計算：児童手当・児童扶養手当を含めた収入で計算
+                // 不足額計算：児童扶養手当を含めた収入で計算
                 // （トグルの表示/非表示に関わらず、常に手当を含めて計算）
-                const allowancesMonthly = (childAllowanceMonthly + childSupportAllowanceMonthly) * 12; // 年額換算
+                const allowancesMonthly = childSupportAllowanceMonthly * 12; // 年額換算
                 const totalIncomeWithAllowances = baseIncome + allowancesMonthly;
                 const baseShortfall = Math.max(0, totalTarget - totalIncomeWithAllowances);
 
@@ -1765,8 +1928,8 @@ export default function NecessaryCoveragePage() {
                 const entry = item.entry;
                 const sicknessAnnual = sicknessDistribution[idx];
                 const savingsAnnual = savingsDistribution[idx];
-                // 児童手当・児童扶養手当を含めた収入で計算（常に含める）
-                const allowancesAnnual = ((entry.childAllowanceMonthly || 0) + (entry.childSupportAllowanceMonthly || 0)) * 12;
+                // 児童扶養手当を含めた収入で計算（常に含める）
+                const allowancesAnnual = (entry.childSupportAllowanceMonthly || 0) * 12;
                 const adjustedIncome = Math.min(entry.totalTarget, entry.baseIncome + allowancesAnnual + sicknessAnnual + savingsAnnual);
                 entry.totalIncome = adjustedIncome;
                 entry.shortfall = Math.max(0, entry.totalTarget - adjustedIncome);
@@ -1979,6 +2142,7 @@ export default function NecessaryCoveragePage() {
                                             expenseRatioSurvivor={expenseRatioSurvivor}
                                             setExpenseRatioSurvivor={setExpenseRatioSurvivor}
                                             exportId="scenario-husband-death"
+                                    workIncomeRatio={workIncomeRatio}
                                 />
                                     </div>
                                     <div className="w-full">
@@ -1996,6 +2160,7 @@ export default function NecessaryCoveragePage() {
                                             expenseRatioSurvivor={expenseRatioSurvivor}
                                             setExpenseRatioSurvivor={setExpenseRatioSurvivor}
                                             exportId="scenario-wife-death"
+                                    workIncomeRatio={workIncomeRatio}
                                         />
                                     </div>
                                 </div>
@@ -2237,6 +2402,7 @@ export default function NecessaryCoveragePage() {
                                     customEndAges={customEndAges}
                                     setCustomEndAges={setCustomEndAges}
                                             exportId="scenario-husband-disability"
+                                    workIncomeRatio={workIncomeRatio}
                                 />
                                     </div>
                                     <div className="w-full">
@@ -2252,6 +2418,7 @@ export default function NecessaryCoveragePage() {
                                     customEndAges={customEndAges}
                                     setCustomEndAges={setCustomEndAges}
                                             exportId="scenario-wife-disability"
+                                    workIncomeRatio={workIncomeRatio}
                                 />
                                     </div>
                                 </div>
@@ -2466,6 +2633,7 @@ export default function NecessaryCoveragePage() {
                                             expenseRatioSurvivor={expenseRatioSurvivor}
                                             setExpenseRatioSurvivor={setExpenseRatioSurvivor}
                                             exportId="scenario-single-death"
+                                            workIncomeRatio={workIncomeRatio}
                                         />
 
                                         {/* 死亡時シナリオの懸念点カード */}
@@ -2561,6 +2729,7 @@ export default function NecessaryCoveragePage() {
                                     customEndAges={customEndAges}
                                     setCustomEndAges={setCustomEndAges}
                                     exportId="scenario-single-disability"
+                                    workIncomeRatio={workIncomeRatio}
                                 />
 
                                 {/* 独身：障害時シナリオの懸念点カード */}
@@ -2738,6 +2907,7 @@ function ScenarioSection({
     expenseRatioSurvivor,
     setExpenseRatioSurvivor,
     exportId,
+    workIncomeRatio,
 }: {
     result: ScenarioResult;
     profile: CustomerProfile;
@@ -2752,6 +2922,7 @@ function ScenarioSection({
     expenseRatioSurvivor?: number;
     setExpenseRatioSurvivor?: React.Dispatch<React.SetStateAction<number>>;
     exportId?: string;
+    workIncomeRatio: number;
 }) {
     const [isPeriodCardOpen, setIsPeriodCardOpen] = useState(false);
     const displayPeriodMode = displayPeriodModes[scenarioKey] || 'child23';
@@ -2761,14 +2932,13 @@ function ScenarioSection({
     const activeMonths = Math.max(result.activeMonths, 0);
     
     // トグルボタンの状態管理（各シナリオごとに独立）
-    const [showAllowancesToggle, setShowAllowancesToggle] = useState(true);
     const [showGrayAreaCalculation, setShowGrayAreaCalculation] = useState(false);
+    const [showChildSupportAllowanceCalculation, setShowChildSupportAllowanceCalculation] = useState(false);
     const [showTakeHomeSalary, setShowTakeHomeSalary] = useState(false); // 手取り月収表示トグル（デフォルトOFF）
     const [showTakeHomeModal, setShowTakeHomeModal] = useState(false); // 手取り計算説明モーダル
     
-    // 児童手当・児童扶養手当の合計額を計算（最初のデータから取得）
+    // 児童扶養手当の合計額を計算（最初のデータから取得）
     const firstDataEntry = result.data.length > 0 ? result.data[0] : null;
-    const childAllowanceTotal = firstDataEntry ? (firstDataEntry.childAllowanceMonthly || 0) : 0;
     const childSupportAllowanceTotal = firstDataEntry ? (firstDataEntry.childSupportAllowanceMonthly || 0) : 0;
 
     // 事故発生前の現在の月額給料を計算
@@ -2828,13 +2998,6 @@ function ScenarioSection({
     // 障害年金シナリオかどうかを判定
     const isDisabilityScenario = scenarioKey.includes('Disability') || scenarioKey.includes('disability');
     
-    // 障害年金シナリオの場合は、障害厚生年金を常に表示（showAllowancesToggleを常にtrueにする）
-    // useEffectで障害年金シナリオの場合にshowAllowancesToggleをtrueに設定
-    React.useEffect(() => {
-        if (isDisabilityScenario) {
-            setShowAllowancesToggle(true);
-        }
-    }, [isDisabilityScenario]);
 
     // 総保障不足額 = グラフの不足額（月額）× 12ヶ月 × 表示期間の年数
     // グラフのデータから直接不足額を計算（表示期間の末まで）
@@ -2845,7 +3008,7 @@ function ScenarioSection({
     if (activeEntries.length > 0) {
         // 各エントリの不足額（月額）を計算（グラフの表示ロジックと同じ）
         activeEntries.forEach(entry => {
-            const totalAllowancesMonthly = (entry.childAllowanceMonthly || 0) + (entry.childSupportAllowanceMonthly || 0);
+            const totalAllowancesMonthly = entry.childSupportAllowanceMonthly || 0;
             const totalIncomeMonthly = (entry.pension / 12) + totalAllowancesMonthly;
             const targetMonthly = result.category === 'disability' 
                 ? (entry.totalTarget / 12) // 障害シナリオ：生活費ベース
@@ -2956,11 +3119,7 @@ function ScenarioSection({
                         <>
                             <div className="flex items-center gap-1.5">
                                 <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#F59E0B' }}></span>
-                                <span className="text-amber-300">障害基礎年金（子の加算含む）</span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#F59E0B' }}></span>
-                                <span className="text-amber-200">障害厚生年金</span>
+                                <span className="text-amber-300">障害年金</span>
                             </div>
                         </>
                     ) : (
@@ -2969,11 +3128,17 @@ function ScenarioSection({
                                 <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#10B981' }}></span>
                                 <span className="text-emerald-300">遺族年金</span>
                             </div>
-                            {showAllowancesToggle && (
-                                <div className="flex items-center gap-1.5">
+                            {result.data.length > 0 && (result.data[0].childSupportAllowanceMonthly || 0) > 0 && (
+                                <button
+                                    onClick={() => setShowChildSupportAllowanceCalculation((prev) => !prev)}
+                                    className="flex items-center gap-1.5 text-left"
+                                >
                                     <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#34D399' }}></span>
-                                    <span className="text-emerald-200">児童手当・児童扶養手当</span>
-                                </div>
+                                    <span className="text-emerald-200 flex items-center gap-1">
+                                        児童扶養手当: {(result.data[0].childSupportAllowanceMonthly / 10000).toFixed(1)}万円/月
+                                        <span className={`text-xs transition-transform ${showChildSupportAllowanceCalculation ? 'rotate-180' : ''}`}>▼</span>
+                                    </span>
+                                </button>
                             )}
                         </>
                     )}
@@ -3070,13 +3235,90 @@ function ScenarioSection({
                                 </div>
                             );
                         })()}
+                        {showChildSupportAllowanceCalculation && result.category === 'survivor' && result.data.length > 0 && (result.data[0].childSupportAllowanceMonthly || 0) > 0 && (() => {
+                            // 遺族シナリオの場合のみ表示
+                            const isHusbandScenario = result.title.includes('夫死亡');
+                            const isWifeScenario = result.title.includes('妻死亡');
+                            const targetPerson = isHusbandScenario ? 'husband' : (isWifeScenario ? 'wife' : 'single');
+                            
+                            // 遺族となる配偶者の年収を計算
+                            let survivorBaseIncome = 0;
+                            if (targetPerson === 'husband') {
+                                survivorBaseIncome = (profile.basicInfo.annualIncomeWife || (profile.basicInfo.avgStdMonthlyWife * 12)) || 0;
+                            } else if (targetPerson === 'wife') {
+                                survivorBaseIncome = (profile.basicInfo.annualIncomeHusband || (profile.basicInfo.avgStdMonthlyHusband * 12)) || 0;
+                            }
+                            const survivorAnnualIncome = survivorBaseIncome * (workIncomeRatio / 100);
+                            
+                            // 遺族年金の月額
+                            const firstDataEntry = result.data[0];
+                            const survivorPensionMonthly = (firstDataEntry.pension || 0) / 12;
+                            
+                            // 児童扶養手当の月額
+                            const childSupportAllowanceMonthly = firstDataEntry.childSupportAllowanceMonthly || 0;
+                            
+                            // 対象児童数
+                            const childrenAges = profile.basicInfo.childrenAges || [];
+                            const eligibleChildren = childrenAges.filter(age => age < 19).length;
+                            
+                            // 満額計算
+                            const firstChild = 46690; // 第1子
+                            const additionalChildren = (eligibleChildren - 1) * 11030; // 第2子以降
+                            const fullAmount = firstChild + additionalChildren;
+                            
+                            return (
+                                <div className="mt-2 p-3 bg-slate-950/60 border border-slate-800 rounded-lg text-xs text-slate-300">
+                                    <div className="font-semibold text-slate-200">児童扶養手当の計算方法</div>
+                                    <div className="space-y-2 pl-2 mt-2">
+                                        <div>
+                                            <div>1. 満額の計算</div>
+                                            <div className="text-slate-400 text-[11px] pl-2 mt-1">
+                                                第1子: 46,690円/月<br/>
+                                                第2子以降: 11,030円/月（1人あたり）<br/>
+                                                満額: {eligibleChildren > 0 ? `${(fullAmount / 10000).toFixed(2)}万円/月` : '0円/月'}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div>2. 遺族年金との併給調整</div>
+                                            <div className="text-slate-400 text-[11px] pl-2 mt-1">
+                                                遺族年金（月額）: {(survivorPensionMonthly / 10000).toFixed(2)}万円<br/>
+                                                {survivorPensionMonthly >= fullAmount ? (
+                                                    <span className="text-amber-400">遺族年金が満額以上の場合、児童扶養手当は0円</span>
+                                                ) : (
+                                                    <span>遺族年金が満額未満の場合、年収に基づいて計算</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div>3. 所得制限による支給額の決定</div>
+                                            <div className="text-slate-400 text-[11px] pl-2 mt-1">
+                                                遺族となる配偶者の年収（就労率調整後）: {(survivorAnnualIncome / 10000).toFixed(1)}万円<br/>
+                                                {survivorAnnualIncome < 1600000 ? (
+                                                    <span className="text-emerald-400">年収160万円未満 → 全部支給（満額）</span>
+                                                ) : survivorAnnualIncome < 3650000 ? (
+                                                    <span className="text-amber-400">年収160万円以上365万円未満 → 一部支給（中間値）</span>
+                                                ) : (
+                                                    <span className="text-rose-400">年収365万円以上 → 支給停止（0円）</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div>4. 計算結果</div>
+                                            <div className="text-slate-400 text-[11px] pl-2 mt-1">
+                                                児童扶養手当（月額）: <span className="text-emerald-400 font-semibold">{(childSupportAllowanceMonthly / 10000).toFixed(2)}万円</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
                     </div>
                     <div className="flex items-center gap-1.5">
                         <span className="w-3 h-3 rounded-full bg-rose-500/80 border border-rose-400"></span>
                         <span className="text-rose-200">不足額（給料との差）</span>
                     </div>
                     {result.data.some(d => {
-                        const totalIncomeMonthly = (d.pension || 0) / 12 + (d.childAllowanceMonthly || 0) + (d.childSupportAllowanceMonthly || 0);
+                        const totalIncomeMonthly = (d.pension || 0) / 12 + (d.childSupportAllowanceMonthly || 0);
                         const targetMonthly = currentSalaryMonthly - (d.grayArea || 0) / 12;
                         return totalIncomeMonthly > targetMonthly;
                     }) && (
@@ -3091,7 +3333,6 @@ function ScenarioSection({
                     currentSalaryMonthly={currentSalaryMonthly}
                     retirementAge={calculatedEndAge}
                     salaryLabel={salaryLabelText}
-                    showAllowancesToggle={showAllowancesToggle}
                     profile={profile}
                     scenarioType={scenarioKey as 'husbandDeath' | 'wifeDeath' | 'singleDeath' | 'husbandDisability' | 'wifeDisability' | 'singleDisability'}
                 />
@@ -3109,22 +3350,8 @@ function ScenarioSection({
                 <TakeHomeCalculationModal isOpen={showTakeHomeModal} onClose={() => setShowTakeHomeModal(false)} />
             </div>
 
-            {/* トグルボタンと説明文（グラフ表示期間の直上） */}
+            {/* 説明文（グラフ表示期間の直上） */}
             <div className="mb-4 flex items-center gap-4">
-                {/* チェックボタン（表示/非表示） - 遺族年金シナリオのみ表示 */}
-                {!isDisabilityScenario && (
-                    <div className="flex items-center gap-2">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={showAllowancesToggle}
-                                onChange={(e) => setShowAllowancesToggle(e.target.checked)}
-                                className="w-4 h-4 text-emerald-500 rounded focus:ring-2 focus:ring-emerald-500"
-                            />
-                            <span className="text-sm font-medium text-slate-400">児童手当</span>
-                        </label>
-                    </div>
-                )}
 
                 {/* 開閉式説明文 */}
                 <div className="flex-1">
@@ -3135,41 +3362,119 @@ function ScenarioSection({
                                 <span className="text-xs transition-transform group-open:rotate-180">▼</span>
                             </span>
                         </summary>
-                        {isDisabilityScenario ? (
-                            <div className="mt-2 p-3 bg-slate-950/60 border border-slate-800 rounded-lg text-xs text-slate-300 space-y-2">
-                                <div className="space-y-1">
-                                    <div className="font-semibold text-amber-300">障害基礎年金（子の加算含む）+ 障害厚生年金</div>
-                                    <div className="pl-2 text-[10px] text-slate-400 space-y-0.5">
-                                        <div>【障害基礎年金（2級）】</div>
-                                        <div>・基本額: 月額 66,200円</div>
-                                        <div>・子の加算: 第1子・第2子 18,740円/月、第3子以降 6,250円/月</div>
-                                        <div className="text-amber-300 mt-1">※子の加算は障害基礎年金に含まれます</div>
-                                    </div>
-                                    <div className="pl-2 text-[10px] text-slate-400 space-y-0.5 mt-2">
-                                        <div>【障害厚生年金（2級）】</div>
-                                        <div>・若年層（25歳夫婦）: 月額 50,000円（簡略化のため定額）</div>
+                        {isDisabilityScenario ? (() => {
+                            // 障害シナリオの場合、実際の金額を計算
+                            const level = 2;
+                            const firstAge = firstDataEntry ? firstDataEntry.age : 0;
+                            const childrenCurrentAges = profile.basicInfo.childrenAges.map(age => age + (firstAge - (isHusbandScenario ? profile.basicInfo.ageHusband : (isWifeScenario ? profile.basicInfo.ageWife : profile.basicInfo.age))));
+                            const eligibleChildrenDisability = calculateEligibleChildrenCount(childrenCurrentAges, 2);
+                            const spouseAge = isHusbandScenario ? profile.basicInfo.ageWife : (isWifeScenario ? profile.basicInfo.ageHusband : 0);
+                            const spouseBonus = (spouseAge > 0 && spouseAge < 65) ? SPOUSE_BONUS : 0;
+                            
+                            const disabilityKisoAnnual = calculateDisabilityBasicPension(level, eligibleChildrenDisability);
+                            let disabilityKouseiAnnual = 0;
+                            if (isHusbandScenario) {
+                                disabilityKouseiAnnual = calculateDisabilityEmployeePension(level, spouseBonus, 0, profile.basicInfo.avgStdMonthlyHusband, profile.basicInfo.monthsHusband, profile.basicInfo.useMinashi300Husband);
+                            } else if (isWifeScenario) {
+                                disabilityKouseiAnnual = calculateDisabilityEmployeePension(level, spouseBonus, 0, profile.basicInfo.avgStdMonthlyWife, profile.basicInfo.monthsWife, profile.basicInfo.useMinashi300Wife);
+                            } else {
+                                disabilityKouseiAnnual = calculateDisabilityEmployeePension(level, 0, 0, profile.basicInfo.avgStdMonthly, profile.basicInfo.employeePensionMonths, profile.basicInfo.useMinashi300);
+                            }
+                            
+                            const disabilityKisoMonthly = disabilityKisoAnnual / 12;
+                            const disabilityKouseiMonthly = disabilityKouseiAnnual / 12;
+                            
+                            return (
+                                <div className="mt-2 p-3 bg-slate-950/60 border border-slate-800 rounded-lg text-xs text-slate-300 space-y-2">
+                                    <div className="space-y-1">
+                                        <div className="font-semibold text-amber-300">障害基礎年金（子の加算含む）+ 障害厚生年金</div>
+                                        <div className="pl-2 text-[10px] text-slate-400 space-y-0.5">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div>【障害基礎年金（2級）】</div>
+                                                <span className="text-slate-100 font-semibold text-right">月額 {(disabilityKisoMonthly / 10000).toFixed(1)}万円</span>
+                                            </div>
+                                            <div>・基本額: 月額 66,200円</div>
+                                            <div>・子の加算: 第1子・第2子 18,740円/月、第3子以降 6,250円/月</div>
+                                            <div className="text-amber-300 mt-1">※子の加算は障害基礎年金に含まれます</div>
+                                        </div>
+                                        <div className="pl-2 text-[10px] text-slate-400 space-y-0.5 mt-2">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div>【障害厚生年金（2級）】</div>
+                                                <span className="text-slate-100 font-semibold text-right">月額 {(disabilityKouseiMonthly / 10000).toFixed(1)}万円</span>
+                                            </div>
+                                            <div>・報酬比例部分: 厚生年金加入期間と平均標準報酬月額に基づき計算</div>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ) : (
-                            <div className="mt-2 p-3 bg-slate-950/60 border border-slate-800 rounded-lg text-xs text-slate-300 space-y-2">
-                                <div className="space-y-1">
-                                    <div className="font-semibold text-emerald-300">遺族基礎年金 + 遺族厚生年金 + 児童手当・児童扶養手当</div>
-                                    <div className="pl-2 text-[10px] text-slate-400 space-y-0.5">
-                                        <div>【遺族基礎年金】</div>
-                                        <div>・基本額: 月額 68,000円（年額 816,000円）</div>
-                                        <div>・子の加算: 第1子・第2子 18,740円/月、第3子以降 6,250円/月</div>
-                                        <div className="text-emerald-300 mt-1">※18歳到達年度末までの子がいる場合に支給</div>
+                            );
+                        })() : (() => {
+                            // 遺族シナリオの場合、実際の金額を計算
+                            const firstAge = firstDataEntry ? firstDataEntry.age : 0;
+                            const childrenCurrentAges = profile.basicInfo.childrenAges.map(age => age + (firstAge - (isHusbandScenario ? profile.basicInfo.ageWife : (isWifeScenario ? profile.basicInfo.ageHusband : profile.basicInfo.age))));
+                            const eligibleChildren18 = childrenCurrentAges.filter(age => age < 19).length;
+                            
+                            let survivorKisoAnnual = 0;
+                            let survivorKouseiAnnual = 0;
+                            let chukoreiAnnual = 0;
+                            
+                            if (isHusbandScenario) {
+                                // 夫死亡シナリオ：遺族（妻）の年金
+                                if (eligibleChildren18 > 0) {
+                                    survivorKisoAnnual = kisoAnnualByCount(eligibleChildren18);
+                                }
+                                survivorKouseiAnnual = proportionAnnual(profile.basicInfo.avgStdMonthlyHusband, profile.basicInfo.monthsHusband, profile.basicInfo.useMinashi300Husband);
+                                const oldAgeStart = profile.basicInfo.oldAgeStartWife || 65;
+                                if (eligibleChildren18 === 0 && firstAge >= 40 && firstAge < oldAgeStart) {
+                                    chukoreiAnnual = CHUKOREI_KASAN;
+                                }
+                            } else if (isWifeScenario) {
+                                // 妻死亡シナリオ：遺族（夫）の年金
+                                if (eligibleChildren18 > 0) {
+                                    survivorKisoAnnual = kisoAnnualByCount(eligibleChildren18);
+                                }
+                                survivorKouseiAnnual = proportionAnnual(profile.basicInfo.avgStdMonthlyWife, profile.basicInfo.monthsWife, profile.basicInfo.useMinashi300Wife);
+                            } else {
+                                // シングル世帯：親が死亡した場合、子に遺族基礎年金と遺族厚生年金が支給される
+                                if (eligibleChildren18 > 0) {
+                                    survivorKisoAnnual = kisoAnnualByCount(eligibleChildren18);
+                                }
+                                survivorKouseiAnnual = proportionAnnual(profile.basicInfo.avgStdMonthly, profile.basicInfo.employeePensionMonths, profile.basicInfo.useMinashi300);
+                            }
+                            
+                            const survivorKisoMonthly = survivorKisoAnnual / 12;
+                            const survivorKouseiMonthly = survivorKouseiAnnual / 12;
+                            const chukoreiMonthly = chukoreiAnnual / 12;
+                            
+                            return (
+                                <div className="mt-2 p-3 bg-slate-950/60 border border-slate-800 rounded-lg text-xs text-slate-300 space-y-2">
+                                    <div className="space-y-1">
+                                        <div className="font-semibold text-emerald-300">遺族基礎年金 + 遺族厚生年金 + 児童扶養手当</div>
+                                        <div className="pl-2 text-[10px] text-slate-400 space-y-0.5">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div>【遺族基礎年金】</div>
+                                                <span className="text-slate-100 font-semibold text-right">月額 {(survivorKisoMonthly / 10000).toFixed(1)}万円</span>
+                                            </div>
+                                            <div>・基本額: 月額 68,000円（年額 816,000円）</div>
+                                            <div>・子の加算: 第1子・第2子 18,740円/月、第3子以降 6,250円/月</div>
+                                            <div className="text-emerald-300 mt-1">※18歳到達年度末までの子がいる場合に支給</div>
+                                        </div>
+                                        <div className="pl-2 text-[10px] text-slate-400 space-y-0.5 mt-2">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div>【遺族厚生年金】</div>
+                                                <span className="text-slate-100 font-semibold text-right">月額 {(survivorKouseiMonthly / 10000).toFixed(1)}万円</span>
+                                            </div>
+                                            <div>・報酬比例部分: 故人の厚生年金加入期間と平均標準報酬月額に基づき計算</div>
+                                            {chukoreiMonthly > 0 && (
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <div>・中高齢寡婦加算: 40歳以上65歳未満で子のいない妻に月額 49,200円</div>
+                                                    <span className="text-slate-100 font-semibold text-right">月額 {(chukoreiMonthly / 10000).toFixed(1)}万円</span>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="pl-2 text-[10px] text-slate-400 space-y-0.5 mt-2">
-                                        <div>【遺族厚生年金】</div>
-                                        <div>・報酬比例部分: 故人の厚生年金加入期間と平均標準報酬月額に基づき計算</div>
-                                        <div>・中高齢寡婦加算: 40歳以上65歳未満で子のいない妻に月額 49,200円</div>
-                                    </div>
-                                </div>
                                 <div className="space-y-1 mt-2">
                                     <div className="flex items-center justify-between gap-2">
-                                        <div>児童手当合計額: {(childAllowanceTotal / 10000).toFixed(1)}万円/月</div>
+                                        <div>児童扶養手当合計額: {(childSupportAllowanceTotal / 10000).toFixed(1)}万円/月</div>
                                         <a 
                                             href="https://www.cfa.go.jp/policies/kokoseido/jidouteate/annai/" 
                                             target="_blank" 
@@ -3205,7 +3510,8 @@ function ScenarioSection({
                                     </div>
                                 </div>
                             </div>
-                        )}
+                            );
+                        })()}
                     </details>
                 </div>
             </div>
