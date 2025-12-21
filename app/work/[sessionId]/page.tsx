@@ -41,11 +41,61 @@ export default function WorkPage() {
   const [userId, setUserId] = useState('');
   const [connectedUsers, setConnectedUsers] = useState<ConnectedUser[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  const [initialPanelsLoaded, setInitialPanelsLoaded] = useState(false);
   const [offlineMode, setOfflineMode] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
   const matrixRef = useRef<HTMLDivElement>(null);
   const moveThrottleRef = useRef<NodeJS.Timeout | null>(null);
   const lastUpdateRef = useRef<{ [key: string]: number }>({});
+
+  // 初期パネルデータを計算する関数（リスクマトリクスコンテナを基準に）
+  const getInitialPanels = (): Omit<Panel, 'id'>[] => {
+    if (!matrixRef.current) {
+      // フォールバック: デフォルト位置
+      return [
+        { text: 'ステージの進んだがん', x: 20, y: 100, width: 200, height: 40 },
+        { text: '長期の入院', x: 20, y: 140, width: 200, height: 40 },
+        { text: 'パートナーの早期死亡', x: 20, y: 180, width: 200, height: 40 },
+        { text: 'パートナーの介護/障害', x: 20, y: 220, width: 200, height: 40 },
+        { text: '介護費用 (将来的)', x: 20, y: 260, width: 200, height: 40 },
+        { text: '交通事故による高額賠償', x: 20, y: 300, width: 200, height: 40 },
+        { text: '火災などの住宅損傷', x: 20, y: 340, width: 200, height: 40 },
+        { text: '風邪やインフルエンザ', x: 20, y: 380, width: 200, height: 40 },
+        { text: '短期の入院', x: 20, y: 420, width: 200, height: 40 },
+        { text: '骨折', x: 20, y: 460, width: 200, height: 40 },
+        { text: '上皮内がん', x: 20, y: 500, width: 200, height: 40 },
+        { text: '自動車の軽微な物損事故', x: 20, y: 540, width: 200, height: 40 },
+        { text: '旅行のキャンセル費用', x: 20, y: 580, width: 200, height: 40 },
+      ];
+    }
+    
+    const matrixRect = matrixRef.current.getBoundingClientRect();
+    const boardRect = boardRef.current?.getBoundingClientRect();
+    if (!boardRect) {
+      return [];
+    }
+    
+    // リスクマトリクスコンテナを基準にした相対位置
+    const baseX = 20; // 左マージン
+    const baseY = 100; // 上マージン
+    const panelSpacing = 40;
+    
+    return [
+      { text: 'ステージの進んだがん', x: baseX, y: baseY, width: 200, height: 40 },
+      { text: '長期の入院', x: baseX, y: baseY + panelSpacing * 1, width: 200, height: 40 },
+      { text: 'パートナーの早期死亡', x: baseX, y: baseY + panelSpacing * 2, width: 200, height: 40 },
+      { text: 'パートナーの介護/障害', x: baseX, y: baseY + panelSpacing * 3, width: 200, height: 40 },
+      { text: '介護費用 (将来的)', x: baseX, y: baseY + panelSpacing * 4, width: 200, height: 40 },
+      { text: '交通事故による高額賠償', x: baseX, y: baseY + panelSpacing * 5, width: 200, height: 40 },
+      { text: '火災などの住宅損傷', x: baseX, y: baseY + panelSpacing * 6, width: 200, height: 40 },
+      { text: '風邪やインフルエンザ', x: baseX, y: baseY + panelSpacing * 7, width: 200, height: 40 },
+      { text: '短期の入院', x: baseX, y: baseY + panelSpacing * 8, width: 200, height: 40 },
+      { text: '骨折', x: baseX, y: baseY + panelSpacing * 9, width: 200, height: 40 },
+      { text: '上皮内がん', x: baseX, y: baseY + panelSpacing * 10, width: 200, height: 40 },
+      { text: '自動車の軽微な物損事故', x: baseX, y: baseY + panelSpacing * 11, width: 200, height: 40 },
+      { text: '旅行のキャンセル費用', x: baseX, y: baseY + panelSpacing * 12, width: 200, height: 40 },
+    ];
+  };
 
   // ユーザーIDとユーザー名の初期化
   useEffect(() => {
@@ -75,12 +125,64 @@ export default function WorkPage() {
         try {
           const parsedPanels = JSON.parse(localPanels);
           setPanels(parsedPanels);
+          // 初期パネルが存在するかチェック
+          const hasInitialPanels = parsedPanels.some((p: Panel) => p.id.startsWith('initial-panel-'));
+          setInitialPanelsLoaded(hasInitialPanels);
         } catch (e) {
           console.error('Failed to parse local panels:', e);
+          setInitialPanelsLoaded(false);
         }
+      } else {
+        // ローカルストレージにパネルがない場合、初期パネルを追加する準備
+        setInitialPanelsLoaded(false);
       }
     }
   }, [sessionId]);
+
+  // オフラインモードで初期パネルを追加
+  useEffect(() => {
+    if (!offlineMode || !sessionId || initialPanelsLoaded || !userId) return;
+    
+    // リスクマトリクスコンテナが準備できているか確認
+    if (matrixRef.current) {
+      const initialPanelsData = getInitialPanels();
+      const panelsToAdd = initialPanelsData.map((panel, index) => ({
+        ...panel,
+        id: `initial-panel-${Date.now()}-${index}`,
+        userId,
+        userName: userName || 'ユーザー',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }));
+      
+      setPanels(panelsToAdd);
+      const localPanelsKey = `work-panels-${sessionId}`;
+      localStorage.setItem(localPanelsKey, JSON.stringify(panelsToAdd));
+      setInitialPanelsLoaded(true);
+    } else {
+      // リスクマトリクスコンテナが準備できていない場合、少し待ってから再試行
+      const timer = setTimeout(() => {
+        if (matrixRef.current && !initialPanelsLoaded) {
+          const initialPanelsData = getInitialPanels();
+          const panelsToAdd = initialPanelsData.map((panel, index) => ({
+            ...panel,
+            id: `initial-panel-${Date.now()}-${index}`,
+            userId,
+            userName: userName || 'ユーザー',
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          }));
+          
+          setPanels(panelsToAdd);
+          const localPanelsKey = `work-panels-${sessionId}`;
+          localStorage.setItem(localPanelsKey, JSON.stringify(panelsToAdd));
+          setInitialPanelsLoaded(true);
+        }
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [offlineMode, sessionId, initialPanelsLoaded, userId, userName]);
   
   // オフラインモードの初期化
   useEffect(() => {
@@ -108,10 +210,150 @@ export default function WorkPage() {
           ...panelsData[key],
         }));
         
+        // 初期パネルが存在するかチェック（初期パネルのIDパターンで判定）
+        const hasInitialPanels = panelsArray.some(p => p.id.startsWith('initial-panel-'));
+        
+        // 初期パネルが存在しない場合、追加する
+        if (!hasInitialPanels && !initialPanelsLoaded && database && sessionId) {
+          // リスクマトリクスコンテナが準備できているか確認
+          if (matrixRef.current) {
+            const initialPanelsData = getInitialPanels();
+            const panelsToAdd = initialPanelsData.map((panel, index) => ({
+              ...panel,
+              id: `initial-panel-${Date.now()}-${index}`,
+              userId,
+              userName: userName || 'ユーザー',
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            }));
+            
+            // Firebaseに初期パネルを追加（既存のパネルとマージ）
+            panelsToAdd.forEach(panel => {
+              if (database) {
+                const panelRef = ref(database, `work/${sessionId}/panels/${panel.id}`);
+                set(panelRef, {
+                  text: panel.text,
+                  x: panel.x,
+                  y: panel.y,
+                  width: panel.width,
+                  height: panel.height,
+                  userId: panel.userId,
+                  userName: panel.userName,
+                  createdAt: panel.createdAt,
+                  updatedAt: panel.updatedAt,
+                });
+              }
+            });
+            setInitialPanelsLoaded(true);
+          } else {
+            // リスクマトリクスコンテナが準備できていない場合、少し待ってから再試行
+            setTimeout(() => {
+              if (matrixRef.current && !initialPanelsLoaded) {
+                const initialPanelsData = getInitialPanels();
+                const panelsToAdd = initialPanelsData.map((panel, index) => ({
+                  ...panel,
+                  id: `initial-panel-${Date.now()}-${index}`,
+                  userId,
+                  userName: userName || 'ユーザー',
+                  createdAt: Date.now(),
+                  updatedAt: Date.now(),
+                }));
+                
+                panelsToAdd.forEach(panel => {
+                  if (database) {
+                    const panelRef = ref(database, `work/${sessionId}/panels/${panel.id}`);
+                    set(panelRef, {
+                      text: panel.text,
+                      x: panel.x,
+                      y: panel.y,
+                      width: panel.width,
+                      height: panel.height,
+                      userId: panel.userId,
+                      userName: panel.userName,
+                      createdAt: panel.createdAt,
+                      updatedAt: panel.updatedAt,
+                    });
+                  }
+                });
+                setInitialPanelsLoaded(true);
+              }
+            }, 100);
+          }
+        }
+        
         // 既存のパネルを表示
         setPanels(panelsArray);
+        setInitialPanelsLoaded(true);
       } else {
-        setPanels([]);
+        // データが存在しない場合、初期パネルを追加
+        if (!initialPanelsLoaded && database && sessionId) {
+          // リスクマトリクスコンテナが準備できているか確認
+          if (matrixRef.current) {
+            const initialPanelsData = getInitialPanels();
+            const panelsToAdd = initialPanelsData.map((panel, index) => ({
+              ...panel,
+              id: `initial-panel-${Date.now()}-${index}`,
+              userId,
+              userName: userName || 'ユーザー',
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            }));
+            
+            // Firebaseに初期パネルを追加
+            panelsToAdd.forEach(panel => {
+              if (database) {
+                const panelRef = ref(database, `work/${sessionId}/panels/${panel.id}`);
+                set(panelRef, {
+                  text: panel.text,
+                  x: panel.x,
+                  y: panel.y,
+                  width: panel.width,
+                  height: panel.height,
+                  userId: panel.userId,
+                  userName: panel.userName,
+                  createdAt: panel.createdAt,
+                  updatedAt: panel.updatedAt,
+                });
+              }
+            });
+            setInitialPanelsLoaded(true);
+          } else {
+            // リスクマトリクスコンテナが準備できていない場合、少し待ってから再試行
+            setTimeout(() => {
+              if (matrixRef.current && !initialPanelsLoaded) {
+                const initialPanelsData = getInitialPanels();
+                const panelsToAdd = initialPanelsData.map((panel, index) => ({
+                  ...panel,
+                  id: `initial-panel-${Date.now()}-${index}`,
+                  userId,
+                  userName: userName || 'ユーザー',
+                  createdAt: Date.now(),
+                  updatedAt: Date.now(),
+                }));
+                
+                panelsToAdd.forEach(panel => {
+                  if (database) {
+                    const panelRef = ref(database, `work/${sessionId}/panels/${panel.id}`);
+                    set(panelRef, {
+                      text: panel.text,
+                      x: panel.x,
+                      y: panel.y,
+                      width: panel.width,
+                      height: panel.height,
+                      userId: panel.userId,
+                      userName: panel.userName,
+                      createdAt: panel.createdAt,
+                      updatedAt: panel.updatedAt,
+                    });
+                  }
+                });
+                setInitialPanelsLoaded(true);
+              }
+            }, 100);
+          }
+        } else {
+          setPanels([]);
+        }
       }
       setIsConnected(true);
     });
@@ -389,6 +631,65 @@ export default function WorkPage() {
     setEditingId(null);
   };
 
+  // 全てのパネルをクリアして初期パネルを初期位置に戻す
+  const clearAllPanels = () => {
+    if (!sessionId || !userId) return;
+    
+    // リスクマトリクスコンテナが準備できているか確認
+    if (!matrixRef.current) {
+      // 少し待ってから再試行
+      setTimeout(() => clearAllPanels(), 100);
+      return;
+    }
+    if (!confirm('全てのパネルを削除して、初期パネルを初期位置に戻しますか？')) return;
+    
+    // 初期パネルを取得（リスクマトリクスコンテナを基準に）
+    const initialPanels = getInitialPanels();
+    
+    // 初期パネルを追加
+    const panelsToAdd = initialPanels.map((panel, index) => ({
+      ...panel,
+      id: `initial-panel-${Date.now()}-${index}`,
+      userId,
+      userName: userName || 'ユーザー',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }));
+
+    // オフラインモードの場合、ローカルストレージに保存
+    if (offlineMode) {
+      setPanels(panelsToAdd);
+      const localPanelsKey = `work-panels-${sessionId}`;
+      localStorage.setItem(localPanelsKey, JSON.stringify(panelsToAdd));
+      setInitialPanelsLoaded(true);
+      setEditingId(null);
+      return;
+    }
+
+    // オンラインモードの場合、Firebaseに保存
+    if (!database) return;
+    const panelsRef = ref(database, `work/${sessionId}/panels`);
+    const db = database; // TypeScript用の変数
+    remove(panelsRef).then(() => {
+      panelsToAdd.forEach(panel => {
+        const panelRef = ref(db, `work/${sessionId}/panels/${panel.id}`);
+        set(panelRef, {
+          text: panel.text,
+          x: panel.x,
+          y: panel.y,
+          width: panel.width,
+          height: panel.height,
+          userId: panel.userId,
+          userName: panel.userName,
+          createdAt: panel.createdAt,
+          updatedAt: panel.updatedAt,
+        });
+      });
+    });
+    setInitialPanelsLoaded(true);
+    setEditingId(null);
+  };
+
 
   // 編集開始
   const startEditing = (panel: Panel) => {
@@ -599,6 +900,12 @@ export default function WorkPage() {
                 className="px-2 py-1 md:px-4 md:py-2 text-xs md:text-base bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
               >
                 + 追加
+              </button>
+              <button
+                onClick={clearAllPanels}
+                className="px-2 py-1 md:px-4 md:py-2 text-xs md:text-base bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium"
+              >
+                🔄 クリア
               </button>
               {sessionId && !offlineMode && (
                 <button
