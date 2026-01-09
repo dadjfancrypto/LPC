@@ -216,30 +216,6 @@ function ChildSupportAllowanceModal({
                         </div>
                     </section>
 
-                    {/* 公的給付の内訳 */}
-                    <section>
-                        <h3 className="text-xl font-bold text-slate-100 mb-3">📋 公的給付の内訳</h3>
-                        <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-4 mb-4">
-                            <div className="text-sm space-y-2">
-                                <div className="font-semibold text-emerald-300 mb-3">児童扶養手当</div>
-                                <div className="pl-2 text-xs text-slate-400 space-y-1">
-                                    <div>【支給対象】</div>
-                                    <div>・18歳到達年度末までの子を養育するひとり親</div>
-                                    <div className="mt-2">【支給額（令和7年4月分から）】</div>
-                                    <div>・全部支給: 第1子 46,690円、第2子以降 11,030円/月</div>
-                                    <div>・一部支給: 第1子 28,845円、第2子以降 8,270円/月（中間値）</div>
-                                    <div className="mt-2">【所得制限】</div>
-                                    <div>・全部支給: 年収160万円未満</div>
-                                    <div>・一部支給: 年収160万円以上365万円未満</div>
-                                    <div>・支給停止: 年収365万円以上</div>
-                                    <div className="mt-2 text-emerald-300">【遺族年金との併給】</div>
-                                    <div>・遺族年金が児童扶養手当の満額以上の場合、児童扶養手当は支給されません</div>
-                                    <div>・遺族年金が満額未満の場合、年収に基づいて計算された額が支給されます</div>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-
                     {/* 参考リンク */}
                     <section>
                         <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-4">
@@ -487,7 +463,7 @@ function calculateChildAllowance(childrenAges: number[]): number {
 function calculateChildSupportAllowance(
     childrenAges: number[],
     survivorAnnualIncome: number,
-    survivorKouseiMonthly: number = 0 // 遺族厚生年金の月額（円）。遺族基礎年金は併給調整の対象外
+    survivorPensionMonthly: number = 0 // 遺族年金の月額（円）。遺族基礎年金と遺族厚生年金の合計
 ): number {
     if (childrenAges.length === 0) return 0;
     
@@ -500,9 +476,9 @@ function calculateChildSupportAllowance(
     const additionalChildren = (eligibleChildren - 1) * 11030; // 11,030円（第2子以降）
     const fullAmount = firstChild + additionalChildren;
     
-    // 遺族厚生年金が発生している場合、その額が児童扶養手当の満額を超えていれば、児童扶養手当は0円
-    // 遺族基礎年金は併給調整の対象外（併給される）
-    if (survivorKouseiMonthly > 0 && survivorKouseiMonthly >= fullAmount) {
+    // 遺族年金（遺族基礎年金＋遺族厚生年金の合計）が児童扶養手当の満額を超えていれば、児童扶養手当は0円
+    // 遺族年金が満額未満の場合、差額分が支給される（年収制限を考慮）
+    if (survivorPensionMonthly > 0 && survivorPensionMonthly >= fullAmount) {
         return 0;
     }
     
@@ -1383,9 +1359,17 @@ function exportMultipleToPDF(elementIds: string[], filename: string) {
                 margin: 10mm;
                 marks: none;
             }
+            /* ダークモードの色を保持 */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
             body {
                 margin: 0;
                 padding: 0;
+                background-color: #020617 !important; /* slate-950 */
+                color: #f1f5f9 !important; /* slate-100 */
             }
             body * {
                 visibility: hidden;
@@ -1398,15 +1382,49 @@ function exportMultipleToPDF(elementIds: string[], filename: string) {
                 width: 100%;
                 max-width: 100%;
                 margin: 0 auto;
-                page-break-before: always;
-                page-break-after: always;
                 page-break-inside: avoid;
                 break-inside: avoid;
-                min-height: calc(100vh - 20mm);
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
+            }
+            /* Tailwindのダークモードクラスの色を明示的に保持 */
+            ${elementSelectors} {
+                background-color: #020617 !important; /* slate-950 (ページ背景) */
+            }
+            ${elementSelectors} .bg-slate-950,
+            ${elementSelectors} .bg-slate-950\\/40,
+            ${elementSelectors} .bg-slate-950\\/60 {
+                background-color: #020617 !important;
+            }
+            ${elementSelectors} .bg-slate-900,
+            ${elementSelectors} .bg-slate-900\\/80 {
+                background-color: #0f172a !important;
+            }
+            ${elementSelectors} .bg-slate-800 {
+                background-color: #1e293b !important;
+            }
+            ${elementSelectors} .text-slate-100 {
+                color: #f1f5f9 !important;
+            }
+            ${elementSelectors} .text-slate-200 {
+                color: #e2e8f0 !important;
+            }
+            ${elementSelectors} .text-slate-300 {
+                color: #cbd5e1 !important;
+            }
+            ${elementSelectors} .text-slate-400 {
+                color: #94a3b8 !important;
+            }
+            ${elementSelectors} .text-slate-500 {
+                color: #64748b !important;
+            }
+            ${elementSelectors} .border-slate-800 {
+                border-color: #1e293b !important;
+            }
+            ${elementSelectors} .border-slate-700 {
+                border-color: #334155 !important;
+            }
+            /* 最初の要素以外は改ページ前を追加（要素間を分離） */
+            ${elementIds.slice(1).map(id => `#${id}`).join(', ')} {
+                page-break-before: always;
             }
             /* 最初の要素は改ページ前を削除 */
             ${elementIds[0] ? `#${elementIds[0]}` : ''} {
@@ -1414,6 +1432,10 @@ function exportMultipleToPDF(elementIds: string[], filename: string) {
             }
             /* 最後の要素は改ページ後を削除（空白ページを防ぐ） */
             ${elementIds[elementIds.length - 1] ? `#${elementIds[elementIds.length - 1]}` : ''} {
+                page-break-after: auto;
+            }
+            /* 中間の要素も改ページ後を削除（不要な空白ページを防ぐ） */
+            ${elementIds.slice(0, -1).map(id => `#${id}`).join(', ')} {
                 page-break-after: auto;
             }
             /* 不要な要素を非表示 */
@@ -1505,6 +1527,8 @@ export default function NecessaryCoveragePage() {
         singleDeath: 65,
         singleDisability: 65,
     });
+    // レイアウト切り替え（1列/2列）
+    const [layoutMode, setLayoutMode] = useState<'columns-2' | 'column-1'>('columns-2');
 
     const [scenarios, setScenarios] = useState<{
         husbandDeath: ScenarioResult;
@@ -1792,13 +1816,14 @@ export default function NecessaryCoveragePage() {
                     // 児童扶養手当（ひとり親・所得制限あり）
                     // 遺族となる配偶者の年収を使用（就労率スライドバーで調整した年収を反映）
                     const survivorAnnualIncome = survivorBaseIncome * (workIncomeRatio / 100);
-                    // 遺族厚生年金の月額を計算（年額を12で割る）
-                    // 遺族基礎年金は併給調整の対象外（併給される）
-                    const survivorKouseiMonthly = survivorKouseiAnnual / 12;
+                    // 遺族年金（遺族基礎年金＋遺族厚生年金の合計）の月額を計算（年額を12で割る）
+                    // 遺族年金が児童扶養手当の満額を超える場合、児童扶養手当は0円
+                    // 遺族年金が満額未満の場合、差額分が支給される（年収制限を考慮）
+                    const survivorPensionMonthly = pension / 12;
                     childSupportAllowanceMonthly = calculateChildSupportAllowance(
                         childrenCurrentAges,
                         survivorAnnualIncome,
-                        survivorKouseiMonthly
+                        survivorPensionMonthly
                     );
                 }
 
@@ -2125,8 +2150,27 @@ export default function NecessaryCoveragePage() {
                                     )}
                                     </div>
 
-                                {/* 死亡シナリオ：2カラムで横並び */}
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                {/* 死亡シナリオ：レイアウト切り替え */}
+                                <div className="mb-4 flex items-center justify-between">
+                                    <h2 className="text-xl font-bold text-slate-100">死亡シナリオ</h2>
+                                    <button
+                                        onClick={() => setLayoutMode(layoutMode === 'columns-2' ? 'column-1' : 'columns-2')}
+                                        className="px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 hover:border-emerald-500 hover:bg-slate-700 transition-all text-sm text-slate-300 flex items-center gap-2"
+                                        title={layoutMode === 'columns-2' ? '1列表示に切り替え' : '2列表示に切り替え'}
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            {layoutMode === 'columns-2' ? (
+                                                // 2列表示のアイコン
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h6a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h6a1 1 0 011 1v14a1 1 0 01-1 1h-6a1 1 0 01-1-1V5z" />
+                                            ) : (
+                                                // 1列表示のアイコン
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5z" />
+                                            )}
+                                        </svg>
+                                        <span>{layoutMode === 'columns-2' ? '2列表示' : '1列表示'}</span>
+                                    </button>
+                                </div>
+                                <div className={`grid gap-8 ${layoutMode === 'columns-2' ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
                                     <div className="w-full">
                                 <ScenarioSection
                                     result={scenarios.husbandDeath}
@@ -2387,8 +2431,25 @@ export default function NecessaryCoveragePage() {
                                     )}
                                 </div>
 
-                                {/* 障害シナリオ：2カラムで横並び */}
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                {/* 障害シナリオ：レイアウト切り替え */}
+                                <div className="mb-4 flex items-center justify-between">
+                                    <h2 className="text-xl font-bold text-slate-100">障害シナリオ</h2>
+                                    <button
+                                        onClick={() => setLayoutMode(layoutMode === 'columns-2' ? 'column-1' : 'columns-2')}
+                                        className="px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 hover:border-amber-500 hover:bg-slate-700 transition-all text-sm text-slate-300 flex items-center gap-2"
+                                        title={layoutMode === 'columns-2' ? '1列表示に切り替え' : '2列表示に切り替え'}
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            {layoutMode === 'columns-2' ? (
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                            ) : (
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                                            )}
+                                        </svg>
+                                        <span>{layoutMode === 'columns-2' ? '2列表示' : '1列表示'}</span>
+                                    </button>
+                                </div>
+                                <div className={`grid gap-8 ${layoutMode === 'columns-2' ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
                                     <div className="w-full">
                                 <ScenarioSection
                                             result={scenarios.husbandDisability}
@@ -3355,164 +3416,6 @@ function ScenarioSection({
 
                 {/* 開閉式説明文 */}
                 <div className="flex-1">
-                    <details className="group">
-                        <summary className="cursor-pointer text-sm font-medium text-slate-400 hover:text-slate-300 list-none">
-                            <span className="flex items-center gap-1">
-                                公的給付の内訳
-                                <span className="text-xs transition-transform group-open:rotate-180">▼</span>
-                            </span>
-                        </summary>
-                        {isDisabilityScenario ? (() => {
-                            // 障害シナリオの場合、実際の金額を計算
-                            const level = 2;
-                            const firstAge = firstDataEntry ? firstDataEntry.age : 0;
-                            const childrenCurrentAges = profile.basicInfo.childrenAges.map(age => age + (firstAge - (isHusbandScenario ? profile.basicInfo.ageHusband : (isWifeScenario ? profile.basicInfo.ageWife : profile.basicInfo.age))));
-                            const eligibleChildrenDisability = calculateEligibleChildrenCount(childrenCurrentAges, 2);
-                            const spouseAge = isHusbandScenario ? profile.basicInfo.ageWife : (isWifeScenario ? profile.basicInfo.ageHusband : 0);
-                            const spouseBonus = (spouseAge > 0 && spouseAge < 65) ? SPOUSE_BONUS : 0;
-                            
-                            const disabilityKisoAnnual = calculateDisabilityBasicPension(level, eligibleChildrenDisability);
-                            let disabilityKouseiAnnual = 0;
-                            if (isHusbandScenario) {
-                                disabilityKouseiAnnual = calculateDisabilityEmployeePension(level, spouseBonus, 0, profile.basicInfo.avgStdMonthlyHusband, profile.basicInfo.monthsHusband, profile.basicInfo.useMinashi300Husband);
-                            } else if (isWifeScenario) {
-                                disabilityKouseiAnnual = calculateDisabilityEmployeePension(level, spouseBonus, 0, profile.basicInfo.avgStdMonthlyWife, profile.basicInfo.monthsWife, profile.basicInfo.useMinashi300Wife);
-                            } else {
-                                disabilityKouseiAnnual = calculateDisabilityEmployeePension(level, 0, 0, profile.basicInfo.avgStdMonthly, profile.basicInfo.employeePensionMonths, profile.basicInfo.useMinashi300);
-                            }
-                            
-                            const disabilityKisoMonthly = disabilityKisoAnnual / 12;
-                            const disabilityKouseiMonthly = disabilityKouseiAnnual / 12;
-                            
-                            return (
-                                <div className="mt-2 p-3 bg-slate-950/60 border border-slate-800 rounded-lg text-xs text-slate-300 space-y-2">
-                                    <div className="space-y-1">
-                                        <div className="font-semibold text-amber-300">障害基礎年金（子の加算含む）+ 障害厚生年金</div>
-                                        <div className="pl-2 text-[10px] text-slate-400 space-y-0.5">
-                                            <div className="flex items-center justify-between gap-2">
-                                                <div>【障害基礎年金（2級）】</div>
-                                                <span className="text-slate-100 font-semibold text-right">月額 {(disabilityKisoMonthly / 10000).toFixed(1)}万円</span>
-                                            </div>
-                                            <div>・基本額: 月額 66,200円</div>
-                                            <div>・子の加算: 第1子・第2子 18,740円/月、第3子以降 6,250円/月</div>
-                                            <div className="text-amber-300 mt-1">※子の加算は障害基礎年金に含まれます</div>
-                                        </div>
-                                        <div className="pl-2 text-[10px] text-slate-400 space-y-0.5 mt-2">
-                                            <div className="flex items-center justify-between gap-2">
-                                                <div>【障害厚生年金（2級）】</div>
-                                                <span className="text-slate-100 font-semibold text-right">月額 {(disabilityKouseiMonthly / 10000).toFixed(1)}万円</span>
-                                            </div>
-                                            <div>・報酬比例部分: 厚生年金加入期間と平均標準報酬月額に基づき計算</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })() : (() => {
-                            // 遺族シナリオの場合、実際の金額を計算
-                            const firstAge = firstDataEntry ? firstDataEntry.age : 0;
-                            const childrenCurrentAges = profile.basicInfo.childrenAges.map(age => age + (firstAge - (isHusbandScenario ? profile.basicInfo.ageWife : (isWifeScenario ? profile.basicInfo.ageHusband : profile.basicInfo.age))));
-                            const eligibleChildren18 = childrenCurrentAges.filter(age => age < 19).length;
-                            
-                            let survivorKisoAnnual = 0;
-                            let survivorKouseiAnnual = 0;
-                            let chukoreiAnnual = 0;
-                            
-                            if (isHusbandScenario) {
-                                // 夫死亡シナリオ：遺族（妻）の年金
-                                if (eligibleChildren18 > 0) {
-                                    survivorKisoAnnual = kisoAnnualByCount(eligibleChildren18);
-                                }
-                                survivorKouseiAnnual = proportionAnnual(profile.basicInfo.avgStdMonthlyHusband, profile.basicInfo.monthsHusband, profile.basicInfo.useMinashi300Husband);
-                                const oldAgeStart = profile.basicInfo.oldAgeStartWife || 65;
-                                if (eligibleChildren18 === 0 && firstAge >= 40 && firstAge < oldAgeStart) {
-                                    chukoreiAnnual = CHUKOREI_KASAN;
-                                }
-                            } else if (isWifeScenario) {
-                                // 妻死亡シナリオ：遺族（夫）の年金
-                                if (eligibleChildren18 > 0) {
-                                    survivorKisoAnnual = kisoAnnualByCount(eligibleChildren18);
-                                }
-                                survivorKouseiAnnual = proportionAnnual(profile.basicInfo.avgStdMonthlyWife, profile.basicInfo.monthsWife, profile.basicInfo.useMinashi300Wife);
-                            } else {
-                                // シングル世帯：親が死亡した場合、子に遺族基礎年金と遺族厚生年金が支給される
-                                if (eligibleChildren18 > 0) {
-                                    survivorKisoAnnual = kisoAnnualByCount(eligibleChildren18);
-                                }
-                                survivorKouseiAnnual = proportionAnnual(profile.basicInfo.avgStdMonthly, profile.basicInfo.employeePensionMonths, profile.basicInfo.useMinashi300);
-                            }
-                            
-                            const survivorKisoMonthly = survivorKisoAnnual / 12;
-                            const survivorKouseiMonthly = survivorKouseiAnnual / 12;
-                            const chukoreiMonthly = chukoreiAnnual / 12;
-                            
-                            return (
-                                <div className="mt-2 p-3 bg-slate-950/60 border border-slate-800 rounded-lg text-xs text-slate-300 space-y-2">
-                                    <div className="space-y-1">
-                                        <div className="font-semibold text-emerald-300">遺族基礎年金 + 遺族厚生年金 + 児童扶養手当</div>
-                                        <div className="pl-2 text-[10px] text-slate-400 space-y-0.5">
-                                            <div className="flex items-center justify-between gap-2">
-                                                <div>【遺族基礎年金】</div>
-                                                <span className="text-slate-100 font-semibold text-right">月額 {(survivorKisoMonthly / 10000).toFixed(1)}万円</span>
-                                            </div>
-                                            <div>・基本額: 月額 68,000円（年額 816,000円）</div>
-                                            <div>・子の加算: 第1子・第2子 18,740円/月、第3子以降 6,250円/月</div>
-                                            <div className="text-emerald-300 mt-1">※18歳到達年度末までの子がいる場合に支給</div>
-                                        </div>
-                                        <div className="pl-2 text-[10px] text-slate-400 space-y-0.5 mt-2">
-                                            <div className="flex items-center justify-between gap-2">
-                                                <div>【遺族厚生年金】</div>
-                                                <span className="text-slate-100 font-semibold text-right">月額 {(survivorKouseiMonthly / 10000).toFixed(1)}万円</span>
-                                            </div>
-                                            <div>・報酬比例部分: 故人の厚生年金加入期間と平均標準報酬月額に基づき計算</div>
-                                            {chukoreiMonthly > 0 && (
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <div>・中高齢寡婦加算: 40歳以上65歳未満で子のいない妻に月額 49,200円</div>
-                                                    <span className="text-slate-100 font-semibold text-right">月額 {(chukoreiMonthly / 10000).toFixed(1)}万円</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                <div className="space-y-1 mt-2">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <div>児童扶養手当合計額: {(childSupportAllowanceTotal / 10000).toFixed(1)}万円/月</div>
-                                        <a 
-                                            href="https://www.cfa.go.jp/policies/kokoseido/jidouteate/annai/" 
-                                            target="_blank" 
-                                            rel="noopener noreferrer"
-                                            className="text-blue-400 hover:text-blue-300 underline text-[10px] flex-shrink-0"
-                                        >
-                                            参考
-                                        </a>
-                                    </div>
-                                    <div className="pl-2 text-[10px] text-slate-400 space-y-0.5">
-                                        <div>【支給額】</div>
-                                        <div>・0歳〜3歳未満: 第1・2子 15,000円、第3子以降 30,000円</div>
-                                        <div>・3歳〜18歳の年度末まで: 第1・2子 10,000円、第3子以降 30,000円</div>
-                                    </div>
-                                </div>
-                                <div className="space-y-1">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <div>児童扶養手当合計額: {(childSupportAllowanceTotal / 10000).toFixed(1)}万円/月</div>
-                                        <a 
-                                            href="https://www.cfa.go.jp/policies/hitori-oya/fuyou-teate" 
-                                            target="_blank" 
-                                            rel="noopener noreferrer"
-                                            className="text-blue-400 hover:text-blue-300 underline text-[10px] flex-shrink-0"
-                                        >
-                                            参考
-                                        </a>
-                                    </div>
-                                    <div className="pl-2 text-[10px] text-slate-400 space-y-0.5">
-                                        <div>【所得制限】</div>
-                                        <div>・年収160万円未満: 全部支給（1人目 46,690円、2人目以降加算 11,030円）</div>
-                                        <div>・年収160万円以上365万円未満: 一部支給（1人目 28,845円、2人目以降加算 8,270円）</div>
-                                        <div>・年収365万円以上: 支給停止</div>
-                                    </div>
-                                </div>
-                            </div>
-                            );
-                        })()}
-                    </details>
                 </div>
             </div>
 

@@ -48,25 +48,53 @@ export default function WorkPage() {
   const moveThrottleRef = useRef<NodeJS.Timeout | null>(null);
   const lastUpdateRef = useRef<{ [key: string]: number }>({});
 
+  // テキストの文字数に応じてパネルの幅を計算する関数
+  const calculatePanelWidth = (text: string): number => {
+    // 日本語の文字幅を考慮（全角文字は約16-18px、半角は約8px）
+    // パディングを最小限に（左右各8px、合計16px）
+    const charCount = text.length;
+    const minWidth = 60; // 最小幅
+    const maxWidth = 250; // 最大幅
+    const charWidth = 16.5; // 1文字あたりの幅（日本語全角を想定、切れないように少し余裕を持たせる）
+    const padding = 16; // 左右のパディング合計（文字が切れないように少し余裕を持たせる）
+    
+    const calculatedWidth = charCount * charWidth + padding;
+    return Math.max(minWidth, Math.min(maxWidth, calculatedWidth));
+  };
+
   // 初期パネルデータを計算する関数（リスクマトリクスコンテナを基準に）
   const getInitialPanels = (): Omit<Panel, 'id'>[] => {
+    const panelHeight = 40;
+    const panelSpacing = 2; // パネル間の余白を最小化
+    
+    // 初期パネルのテキストリスト（文字数の短い順に並べ替え）
+    const panelTexts = [
+      '骨折', // 2文字
+      '上皮内がん', // 5文字
+      '長期の入院', // 6文字
+      '短期の入院', // 6文字
+      '介護費用 (将来的)', // 9文字
+      '火災などの住宅損傷', // 9文字
+      '風邪やインフルエンザ', // 9文字
+      'パートナーの早期死亡', // 10文字
+      'パートナーの介護/障害', // 10文字
+      '旅行のキャンセル費用', // 10文字
+      'ステージの進んだがん', // 11文字
+      '交通事故による高額賠償', // 12文字
+      '自動車の軽微な物損事故', // 12文字
+    ];
+    
     if (!matrixRef.current) {
-      // フォールバック: デフォルト位置
-      return [
-        { text: 'ステージの進んだがん', x: 20, y: 100, width: 200, height: 40 },
-        { text: '長期の入院', x: 20, y: 140, width: 200, height: 40 },
-        { text: 'パートナーの早期死亡', x: 20, y: 180, width: 200, height: 40 },
-        { text: 'パートナーの介護/障害', x: 20, y: 220, width: 200, height: 40 },
-        { text: '介護費用 (将来的)', x: 20, y: 260, width: 200, height: 40 },
-        { text: '交通事故による高額賠償', x: 20, y: 300, width: 200, height: 40 },
-        { text: '火災などの住宅損傷', x: 20, y: 340, width: 200, height: 40 },
-        { text: '風邪やインフルエンザ', x: 20, y: 380, width: 200, height: 40 },
-        { text: '短期の入院', x: 20, y: 420, width: 200, height: 40 },
-        { text: '骨折', x: 20, y: 460, width: 200, height: 40 },
-        { text: '上皮内がん', x: 20, y: 500, width: 200, height: 40 },
-        { text: '自動車の軽微な物損事故', x: 20, y: 540, width: 200, height: 40 },
-        { text: '旅行のキャンセル費用', x: 20, y: 580, width: 200, height: 40 },
-      ];
+      // フォールバック: デフォルト位置（余白最小）
+      const baseX = 20;
+      const baseY = 20;
+      return panelTexts.map((text, index) => ({
+        text,
+        x: baseX,
+        y: baseY + (panelHeight + panelSpacing) * index,
+        width: calculatePanelWidth(text),
+        height: panelHeight,
+      }));
     }
     
     const matrixRect = matrixRef.current.getBoundingClientRect();
@@ -75,26 +103,17 @@ export default function WorkPage() {
       return [];
     }
     
-    // リスクマトリクスコンテナを基準にした相対位置
+    // リスクマトリクスコンテナを基準にした相対位置（余白最小）
     const baseX = 20; // 左マージン
-    const baseY = 100; // 上マージン
-    const panelSpacing = 40;
+    const baseY = 20; // 上マージン（最小化）
     
-    return [
-      { text: 'ステージの進んだがん', x: baseX, y: baseY, width: 200, height: 40 },
-      { text: '長期の入院', x: baseX, y: baseY + panelSpacing * 1, width: 200, height: 40 },
-      { text: 'パートナーの早期死亡', x: baseX, y: baseY + panelSpacing * 2, width: 200, height: 40 },
-      { text: 'パートナーの介護/障害', x: baseX, y: baseY + panelSpacing * 3, width: 200, height: 40 },
-      { text: '介護費用 (将来的)', x: baseX, y: baseY + panelSpacing * 4, width: 200, height: 40 },
-      { text: '交通事故による高額賠償', x: baseX, y: baseY + panelSpacing * 5, width: 200, height: 40 },
-      { text: '火災などの住宅損傷', x: baseX, y: baseY + panelSpacing * 6, width: 200, height: 40 },
-      { text: '風邪やインフルエンザ', x: baseX, y: baseY + panelSpacing * 7, width: 200, height: 40 },
-      { text: '短期の入院', x: baseX, y: baseY + panelSpacing * 8, width: 200, height: 40 },
-      { text: '骨折', x: baseX, y: baseY + panelSpacing * 9, width: 200, height: 40 },
-      { text: '上皮内がん', x: baseX, y: baseY + panelSpacing * 10, width: 200, height: 40 },
-      { text: '自動車の軽微な物損事故', x: baseX, y: baseY + panelSpacing * 11, width: 200, height: 40 },
-      { text: '旅行のキャンセル費用', x: baseX, y: baseY + panelSpacing * 12, width: 200, height: 40 },
-    ];
+    return panelTexts.map((text, index) => ({
+      text,
+      x: baseX,
+      y: baseY + (panelHeight + panelSpacing) * index,
+      width: calculatePanelWidth(text),
+      height: panelHeight,
+    }));
   };
 
   // ユーザーIDとユーザー名の初期化
@@ -982,7 +1001,17 @@ export default function WorkPage() {
           {panels.map(panel => (
             <div
               key={panel.id}
-              className={`absolute bg-gradient-to-br from-yellow-50 to-yellow-100 border-2 rounded-lg shadow-md transition-all ${
+              draggable={false}
+              onDragStart={(e) => e.preventDefault()}
+              onSelectStart={(e) => e.preventDefault()}
+              onMouseDown={(e) => {
+                // テキスト選択を防ぐ
+                if (editingId !== panel.id) {
+                  e.preventDefault();
+                }
+                handleMouseDown(e, panel.id);
+              }}
+              className={`absolute bg-gradient-to-br from-yellow-50 to-yellow-100 border-2 rounded-lg shadow-md transition-all select-none ${
                 draggingId === panel.id ? 'border-blue-500 z-50 shadow-xl opacity-90 cursor-move scale-105' : 
                 resizingId === panel.id ? 'border-green-500 z-50 cursor-ew-resize' : 
                 selectedPanelId === panel.id ? 'border-blue-500 ring-2 ring-blue-300 z-40 shadow-lg' :
@@ -995,11 +1024,14 @@ export default function WorkPage() {
                 top: `${panel.y}px`,
                 width: `${panel.width}px`,
                 height: `${panel.height}px`,
+                userSelect: 'none',
+                WebkitUserSelect: 'none',
+                MozUserSelect: 'none',
+                msUserSelect: 'none',
               }}
-              onMouseDown={(e) => handleMouseDown(e, panel.id)}
             >
               {/* パネルコンテンツ（1行表示、横に伸ばせる） */}
-              <div className="px-3 h-full flex items-center relative">
+              <div className="px-2 h-full flex items-center relative select-none" style={{ userSelect: 'none' }}>
                 {editingId === panel.id ? (
                   <div className="space-y-2 w-full">
                     <textarea
@@ -1010,6 +1042,7 @@ export default function WorkPage() {
                       autoFocus
                       onClick={(e) => e.stopPropagation()}
                       onMouseDown={(e) => e.stopPropagation()}
+                      style={{ userSelect: 'text' }}
                     />
                     <div className="flex gap-2">
                       <button

@@ -405,22 +405,43 @@ export default function DeathDisabilityProbabilityPage() {
                     検証の結果、ご照会いただいた「約12〜15%」という確率は、特定の単一データではなく、主に民間保険会社（特に東京海上日動火災保険など）が、公的統計を基に算出した「死亡リスク」と「就業不能リスク」の推計値を合算、あるいは比較対照する文脈で用いられる数値であることが確認された。
                   </p>
                   <p className="mb-4 text-justify">
-                    具体的には、以下の2つの主要な統計データがその根拠となっている。
+                    具体的には、以下の2つの主要な統計データがその根拠となっている。<strong>重要な点として、これらは「重複除外モデル」により、死亡と就業不能を同時にカウントしないように調整されている。</strong>
                   </p>
-                  <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
-                    <p className="font-bold mb-2">就業不能リスク（約13%）:</p>
-                    <p className="mb-2">35歳の人が65歳までの30年間に、病気やケガによって「長期の就業不能状態」に陥る確率。</p>
-                    <p className="text-sm text-gray-600"><strong>出典:</strong> 全国健康保険協会（協会けんぽ）「平成27年度 現金給付受給者状況調査報告」。</p>
-                    <p className="text-sm text-gray-600"><strong>定義:</strong> 健康保険制度における「傷病手当金」の受給実績に基づく推計。</p>
+                  <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+                    <p className="font-bold mb-2">死亡リスク（35歳→65歳）:</p>
+                    <ul className="mb-2 text-sm space-y-1">
+                      <li>・<strong>男性：約8.59%</strong>（35歳時点の生存数97,934人→65歳時点89,524人）</li>
+                      <li>・<strong>女性：約4.29%</strong>（35歳時点の生存数98,600人→65歳時点94,371人）</li>
+                      <li>・<strong>男女平均：約6.4%</strong>（人口構成比を考慮した加重平均）</li>
+                    </ul>
+                    <p className="text-sm text-gray-600"><strong>出典:</strong> 厚生労働省「令和5年簡易生命表」。</p>
+                    <p className="text-sm text-gray-600"><strong>定義:</strong> 年齢別死亡率に基づく生命表からの算出。生存数データ（l_x）から直接計算。</p>
+                    <p className="text-xs text-gray-500 mt-2"><strong>※注:</strong> この数字は「35歳時点の生存数から65歳時点の生存数を引いた割合」を意味します。つまり、35歳から65歳までの30年間で、その年齢集団の約8.59%（男性）または4.29%（女性）が死亡することを示しています。</p>
                   </div>
-                  <div className="bg-red-50 border-l-4 border-red-500 p-4">
-                    <p className="font-bold mb-2">死亡リスク（約8〜9%）:</p>
-                    <p className="mb-2">35歳の人が65歳までに死亡する確率。</p>
-                    <p className="text-sm text-gray-600"><strong>出典:</strong> 厚生労働省「平成27年 簡易生命表」。</p>
-                    <p className="text-sm text-gray-600"><strong>定義:</strong> 年齢別死亡率に基づく生命表からの算出。</p>
+                  <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
+                    <p className="font-bold mb-2">就業不能リスク（死亡を除く）:</p>
+                    <ul className="mb-2 text-sm space-y-1">
+                      <li>・<strong>重度障害：約4.0%</strong>（障害年金1-2級に該当する確率）</li>
+                      <li>・<strong>要介護・長期療養：約3.0%</strong>（1年以上の長期入院・療養が必要な確率）</li>
+                      <li>・<strong>合計：約7.0%</strong>（死亡せずに就業不能となる確率）</li>
+                    </ul>
+                    <p className="text-sm text-gray-600"><strong>出典:</strong> 全国健康保険協会（協会けんぽ）「平成27年度 現金給付受給者状況調査報告」、厚生労働省「障害年金受給者数統計」「介護保険事業状況報告」。</p>
+                    <p className="text-sm text-gray-600"><strong>定義:</strong> 健康保険制度における「傷病手当金」の受給実績、障害年金の新規裁定件数、要介護認定者数に基づく推計。<strong>死亡した人は除外</strong>。</p>
+                    <p className="text-xs text-gray-500 mt-2"><strong>※注:</strong> この「就業不能リスク」は死亡を含みません。死亡した人は既に「死亡リスク」にカウントされているため、重複を避けるためです。また、就業不能リスクは「傷病手当金受給率」を基に推計されていますが、実際の長期就業不能はこれより高い可能性があります。</p>
+                  </div>
+                  <div className="bg-green-50 border-l-4 border-green-500 p-4">
+                    <p className="font-bold mb-2">合計：経済的不能確率（約13.5%）:</p>
+                    <ul className="mb-2 text-sm space-y-1">
+                      <li>・<strong>男性の場合：</strong> 死亡リスク（8.59%）＋ 就業不能リスク（7.0%）≈ <strong>約15.6%</strong></li>
+                      <li>・<strong>女性の場合：</strong> 死亡リスク（4.29%）＋ 就業不能リスク（7.0%）≈ <strong>約11.3%</strong></li>
+                      <li>・<strong>男女平均：</strong> 死亡リスク（6.4%）＋ 就業不能リスク（7.0%）≈ <strong>約13.4%</strong></li>
+                    </ul>
+                    <p className="text-sm text-gray-600"><strong>計算方法:</strong> 多重脱退モデルにより、死亡と就業不能を重複カウントしないように調整（詳細は「重複除外と数理モデル」参照）。</p>
+                    <p className="text-xs text-gray-500 mt-2"><strong>※注:</strong> この13.5%は「死亡または就業不能のいずれかに遭遇する確率」であり、両方に遭遇する確率ではありません。また、この数値は統計的な平均値であり、個人の健康状態や職業、生活環境によって大きく異なる可能性があります。</p>
+                    <p className="text-xs text-orange-600 mt-2 font-bold"><strong>⚠ 重要な注意:</strong> この13.5%という数字は、100人の集団のうち約13-14人が35歳から65歳までの間に「死亡または就業不能」に遭遇することを意味します。これは決して小さな数字ではありませんが、公的統計データに基づいた推計値です。</p>
                   </div>
                   <p className="mt-4 text-justify">
-                    これらを総合すると、現役世代の後半において「死亡する確率」よりも「働けなくなる確率」の方が高いという事実が浮かび上がる。本報告書では、この「13%の就業不能リスク」と「8%の死亡リスク」を主軸に据えつつ、より厳格な基準である「障害年金（高度障害）」や「介護保険（要介護）」の認定リスクについても、最新の「令和5年簡易生命表」や「令和4年社会医療診療行為別統計」などを用いて詳細に再計算と検証を行う。
+                    これらを総合すると、現役世代の後半において「死亡する確率」よりも「働けなくなる確率」の方が高いという事実が浮かび上がる。本報告書では、この「13.5%の経済的不能確率」を主軸に据えつつ、より厳格な基準である「障害年金（高度障害）」や「介護保険（要介護）」の認定リスクについても、最新の「令和5年簡易生命表」や「令和4年社会医療診療行為別統計」などを用いて詳細に再計算と検証を行う。
                   </p>
                 </div>
               </div>

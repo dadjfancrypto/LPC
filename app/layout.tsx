@@ -15,6 +15,15 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "LPS",
   description: "年金・必要保障額などのシミュレーションツール",
+  icons: {
+    icon: [
+      { url: "/icon.png", sizes: "any", type: "image/png" },
+    ],
+    apple: [
+      { url: "/icon.png", sizes: "180x180", type: "image/png" },
+    ],
+    shortcut: "/icon.png",
+  },
 };
 
 export default function RootLayout({
