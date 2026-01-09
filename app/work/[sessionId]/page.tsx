@@ -1003,7 +1003,6 @@ export default function WorkPage() {
               key={panel.id}
               draggable={false}
               onDragStart={(e) => e.preventDefault()}
-              onSelectStart={(e) => e.preventDefault()}
               onMouseDown={(e) => {
                 // テキスト選択を防ぐ
                 if (editingId !== panel.id) {
